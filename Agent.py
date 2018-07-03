@@ -1,0 +1,42 @@
+# coding:utf-8
+import State
+
+num2str = {0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i"}
+
+
+class Agent(object):
+    # color=1 if white
+    def __init__(self, color):
+        self.color = color
+        self.prev_action = None  # 相手のaction
+
+    def act(self, state, showNQ=False):
+        pass
+
+
+def actionid2str(state, action_id):
+    x, y = state.color_p(state.turn % 2)
+    id1 = action_id // ((State.BOARD_LEN - 1) * (State.BOARD_LEN - 1))
+    id2 = action_id % ((State.BOARD_LEN - 1) * (State.BOARD_LEN - 1))
+    if id1 <= 1:
+        x2 = id2 // (State.BOARD_LEN - 1)
+        y2 = id2 % (State.BOARD_LEN - 1)
+        s = num2str[x2] + str(y2 + 1)
+        if id1 == 0:
+            s += "h"
+        else:
+            s += "v"
+    else:
+        dx = id2 // 3
+        dy = id2 % 3
+        if dx == 2:
+            dx = -1
+        if dy == 2:
+            dy = -1
+        x2 = x + dx
+        y2 = y + dy
+        if (state.Bx == x2 and state.By == y2) or (state.Wx == x2 and state.Wy == y2):
+            x2 += dx
+            y2 += dy
+        s = num2str[x2] + str(y2 + 1)
+    return s
