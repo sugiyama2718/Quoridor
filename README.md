@@ -1,15 +1,17 @@
 # Quoridor
 
-このリポジトリは，QuoridorというボードゲームのAIのプログラムを公開するためのものである．このプログラムは，AlphaGo Zeroの論文を参考に個人的に制作中のものである．
+このリポジトリは，QuoridorというボードゲームのAIのプログラムを公開するためのものである．このプログラムは，AlphaGo Zeroの論文等を参考に個人的に制作中のものである．
+
+## 環境
+
+kivy, tensorflow, graphvizを導入する必要がある。tensorflowのバージョンは1.8.0、その他のライブラリの必要バージョンは未調査。
 
 ## 実行方法
 
-Mac OS X El Capitan, Python3.6.1, tensorflow1.8.0で動作確認済み．
-
-AI同士の対戦をターミナル上で見る：
+GUIで学習済みのAIと対戦：
 
 ```sh
-$ python main.py view
+$ python GUI.py
 ```
 
 学習を走らせる：
