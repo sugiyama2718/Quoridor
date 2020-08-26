@@ -1,0 +1,87 @@
+<Quoridor>:
+    button: button
+    human_button1: human_button1
+    ai_button1: ai_button1
+    human_button2: human_button2
+    ai_button2: ai_button2
+
+    canvas.before:
+        Color:
+            rgba: 1, 1, 1, 1
+        Rectangle:
+            pos: (0, 0)
+            size: (900, 600)
+        Color:
+            rgba: 1, 0, 0, 1
+
+    canvas:
+        Color:
+            rgba: 0.7, 0, 0, 1
+        Triangle:
+            points: (root.Bx - 20, root.By - 20, root.Bx, root.By + 20, root.Bx + 20, root.By - 20)
+        Color:
+            rgba: 0, 0, 0.7, 1
+        Triangle:
+            points: (root.Wx - 20, root.Wy + 20, root.Wx, root.Wy - 20, root.Wx + 20, root.Wy + 20)
+
+    Label:
+        font_size: 30
+        pos: (700, 530)
+        color: 0, 0, 0, 1
+        text: "turn:" + str(root.turn)
+    Label:
+        font_size: 30
+        pos: (700, 500)
+        color: 0, 0, 0, 1
+        text: root.move_str
+    Label:
+        font_size: 30
+        pos: (700, 470)
+        color: 0, 0, 0, 1
+        text: "player1 wall:" + str(root.player1wall)
+    Label:
+        font_size: 30
+        pos: (700, 440)
+        color: 0, 0, 0, 1
+        text: "player2 wall:" + str(root.player2wall)
+    Button:
+        id: button
+        pos: (700, 10)
+        size: (180, 80)
+        text: "Start"
+    Label:
+        font_size: 20
+        pos: (610, 385)
+        color: 0, 0, 0, 1
+        text: "player1"
+    ToggleButton:
+        id: human_button1
+        pos: (700, 420)
+        size: (90, 30)
+        text: "Human"
+        group: "player1"
+        state: "down"
+    ToggleButton:
+        id: ai_button1
+        pos: (790, 420)
+        size: (90, 30)
+        text: "AI"
+        group: "player1"
+    Label:
+        font_size: 20
+        pos: (610, 345)
+        color: 0, 0, 0, 1
+        text: "player2"
+    ToggleButton:
+        id: human_button2
+        pos: (700, 380)
+        size: (90, 30)
+        text: "Human"
+        group: "player2"
+        state: "down"
+    ToggleButton:
+        id: ai_button2
+        pos: (790, 380)
+        size: (90, 30)
+        text: "AI"
+        group: "player2"

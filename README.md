@@ -8,6 +8,8 @@ kivy, tensorflow, graphvizを導入する必要がある。tensorflowのバー�
 
 ## 実行方法
 
+このリポジトリには既に学習済みのAIが含まれている。
+
 GUIで学習済みのAIと対戦：
 
 ```sh
