@@ -14,6 +14,36 @@ class Agent(object):
         pass
 
 
+def move_id2dxdy(move_id):
+    dx = move_id // 3
+    dy = move_id % 3
+    if dx == 2:
+        dx = -1
+    if dy == 2:
+        dy = -1
+    return dx, dy
+
+
+def dxdy2actionid(dx, dy):
+    dx = int(dx >= 1) - int(dx <= -1)
+    dy = int(dy >= 1) - int(dy <= -1)
+    dx2 = dx
+    dy2 = dy
+    if dx2 == -1:
+        dx2 = 2
+    if dy2 == -1:
+        dy2 = 2
+    return 128 + dx2 * 3 + dy2
+
+
+# def str2actionid(state, s):
+#     if len(s) == 2:
+#         pass
+#     elif len(s) == 3:
+#         ret = 64 if s[2] == "v" else 0
+
+
+
 def actionid2str(state, action_id):
     x, y = state.color_p(state.turn % 2)
     id1 = action_id // ((State.BOARD_LEN - 1) * (State.BOARD_LEN - 1))
@@ -27,12 +57,7 @@ def actionid2str(state, action_id):
         else:
             s += "v"
     else:
-        dx = id2 // 3
-        dy = id2 % 3
-        if dx == 2:
-            dx = -1
-        if dy == 2:
-            dy = -1
+        dx, dy = move_id2dxdy(id2)
         x2 = x + dx
         y2 = y + dy
         if (state.Bx == x2 and state.By == y2) or (state.Wx == x2 and state.Wy == y2):
@@ -40,3 +65,17 @@ def actionid2str(state, action_id):
             y2 += dy
         s = num2str[x2] + str(y2 + 1)
     return s
+
+
+def is_jump_move(state, action_id):
+    x, y = state.color_p(state.turn % 2)
+    id1 = action_id // ((State.BOARD_LEN - 1) * (State.BOARD_LEN - 1))
+    id2 = action_id % ((State.BOARD_LEN - 1) * (State.BOARD_LEN - 1))
+    if id1 == 2:
+        dx, dy = move_id2dxdy(id2)
+        x2 = x + dx
+        y2 = y + dy
+        if (state.Bx == x2 and state.By == y2) or (state.Wx == x2 and state.Wy == y2):
+            return True
+    return False
+

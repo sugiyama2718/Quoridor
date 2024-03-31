@@ -1,31 +1,154 @@
 # coding:utf-8
-from Agent import Agent, actionid2str
+#from memory_profiler import profile
+from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid
 from Tree import Tree
 import State
+from State import select_action
 import numpy as np
 import copy
 from graphviz import Digraph
 import os
-#from multiprocessing import Pool
-#import multiprocessing as multi
-#from joblib import Parallel, delayed
+from itertools import product
+import time
+from pprint import pprint
+import random
+from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from config import *
+from util import Glendenning2Official
 
 num2str = {0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i"}
 
+def get_state_vec(state):
+    # stateを固定長タプルにしてdictのkeyにするために使う。state.turnを入れているのは、turnの異なる状態を区別して無限ループを避けるため
+    return tuple([state.turn] + list(state.feature_int().flatten()))
+
+
+def display_parameter(x):
+    a = x[:64].reshape((8, 8))
+    b = x[64:128].reshape((8, 8))
+    c = x[128:].reshape((3, 3))
+    for y in range(8):
+        for x in range(8):
+            print("{:5}".format(a[x, y]), end="")
+        print("  ", end="")
+        for x in range(8):
+            print("{:5}".format(b[x, y]), end="")
+        print("")
+    for y in [-1, 0, 1]:
+        for x in [-1, 0, 1]:
+            print("{:5}".format(c[x, y]), end="")
+        print("")
+
+
+# 引数のgにgraphviz用のグラフを入れる。ノード共有のある木構造向け。
+node_id = 0
+def get_graphviz_tree_for_shared_tree(tree, g, threshold=5, root=True, color=None, visited=None):
+    global node_id
+    if tree is None:
+        return
+    if root:
+        color = tree.s.turn % 2
+        init_visited = set([])
+        def init_tree(t):
+            t.node_id = None
+            state_vec = get_state_vec(t.s)
+            if state_vec in init_visited:
+                return 
+            
+            init_visited.add(state_vec)
+            for key, child_tree in t.children.items():
+                init_tree(child_tree)
+        init_tree(tree)
+        visited = set([])
+        node_id = 0
+    if np.sum(tree.N) == 0:
+        # g.node(str(node_id), label="end")
+        # node_id += 1
+        return
+    
+    g.node(str(tree.node_id), label=str(int(np.sum(tree.N))) + os.linesep + "{:.3f}".format(np.sum(tree.W) / np.sum(tree.N)))
+
+    max_N = int(np.max(tree.N))
+    for key in range(137):
+        if int(tree.N[key]) == 0:
+            continue
+
+        penwidth = "1"
+        if int(tree.N[key]) == max_N:
+            penwidth = "3"
+
+        if key in tree.children.keys():
+            value = tree.children[key]
+            if int(tree.N[key]) >= threshold:
+                state_vec = get_state_vec(value.s)
+                if state_vec in visited:
+                    # 探索済みの場合、既にnode_idが付与済みなのでそれに接続
+                    g.edge(str(tree.node_id), str(value.node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
+                    continue
+
+                visited.add(state_vec)
+                value.node_id = node_id
+                node_id += 1
+                g.edge(str(tree.node_id), str(value.node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
+
+                get_graphviz_tree_for_shared_tree(value, g, root=False, color=color, visited=visited)
+
+        else:
+            if int(tree.N[key]) >= threshold:
+                g.edge(str(tree.node_id), str(node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
+                state = state_copy(tree.s)
+                state.accept_action_str(actionid2str(tree.s, key))
+                if color == 0:
+                    v = state.pseudo_reward
+                else:
+                    v = -state.pseudo_reward
+                g.node(str(node_id), label="end" + os.linesep + str(v))
+
+                node_id += 1
 
 # 引数のgにgraphviz用のグラフを入れる
-def get_graphviz_tree(tree, g, count=0, threshold=5):
-    if len(tree.children.items()) == 0:
-        g.node(str(count), label="0")
+def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
+    if tree is None:
+        return
+    if root:
+        color = tree.s.turn % 2
+    if np.sum(tree.N) == 0:
+        g.node(str(count), label="end")
     else:
         parent_count = count
         g.node(str(parent_count), label=str(int(np.sum(tree.N))) + os.linesep + "{:.3f}".format(np.sum(tree.W) / np.sum(tree.N)))
         count += 1
-        for key, value in tree.children.items():
-            if int(tree.N[key]) >= threshold:
-                g.edge(str(parent_count), str(count), label=actionid2str(tree.s, key) + os.linesep + str(int(tree.N[key])))
-                get_graphviz_tree(value, g, count)
-            count += int(np.sum(value.N)) + 1
+        #for key, value in tree.children.items():
+        max_N = int(np.max(tree.N))
+        for key in range(137):
+            if int(tree.N[key]) == 0:
+                continue
+
+            penwidth = "1"
+            if int(tree.N[key]) == max_N:
+                penwidth = "3"
+
+            if key in tree.children.keys():
+                value = tree.children[key]
+                if int(tree.N[key]) >= threshold:
+                    g.edge(str(parent_count), str(count), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
+
+                    get_graphviz_tree_for_shared_tree(value, g, count, root=False, color=color)
+                count += int(np.sum(value.N)) + 1
+            else:
+                if int(tree.N[key]) >= threshold:
+
+                    g.edge(str(parent_count), str(count), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
+                    state = state_copy(tree.s)
+                    state.accept_action_str(actionid2str(tree.s, key))
+                    if color == 0:
+                        v = state.pseudo_reward
+                    else:
+                        v = -state.pseudo_reward
+                    g.node(str(count), label="end" + os.linesep + str(v))
+                count += int(tree.N[key]) + 1
 
 
 def state_copy(s):
@@ -35,6 +158,8 @@ def state_copy(s):
     ret.column_wall = copy.copy(s.column_wall)
     ret.must_be_checked_x = copy.copy(s.must_be_checked_x)
     ret.must_be_checked_y = copy.copy(s.must_be_checked_y)
+    ret.placable_r_ = copy.copy(s.placable_r_)
+    ret.placable_c_ = copy.copy(s.placable_c_)
     ret.placable_rb = copy.copy(s.placable_rb)
     ret.placable_cb = copy.copy(s.placable_cb)
     ret.placable_rw = copy.copy(s.placable_rw)
@@ -48,41 +173,269 @@ def state_copy(s):
     ret.white_walls = s.white_walls
     ret.terminate = s.terminate
     ret.reward = s.reward
-    ret.row_special_cut = s.row_special_cut
-    ret.row_eq = s.row_eq
+    ret.pseudo_terminate = s.pseudo_terminate
+    ret.pseudo_reward = s.pseudo_reward
+    ret.row_special_cut = np.copy(s.row_special_cut)
+    ret.row_eq = np.copy(s.row_eq)
     ret.row_graph = s.row_graph
-    ret.column_special_cut = s.column_special_cut
-    ret.column_eq = s.column_eq
+    #ret.row_graph = copy.deepcopy(s.row_graph)  # deepcopyは大変遅い
+    ret.column_special_cut = np.copy(s.column_special_cut)
+    ret.column_eq = np.copy(s.column_eq)
     ret.column_graph = s.column_graph
-    ret.dist_array1 = s.dist_array1
-    ret.dist_array2 = s.dist_array2
+    #ret.column_graph = copy.deepcopy(s.column_graph)
+    ret.dist_array1 = np.copy(s.dist_array1)
+    ret.dist_array2 = np.copy(s.dist_array2)
+    ret.cross_movable_arr = np.copy(s.cross_movable_arr)
     return ret
+
+def calc_optimal_move_by_DP(s):
+    s_ori = s
+    s = state_copy(s)
+    start = time.time()
+    boards = list(product(range(9), range(9), range(9), range(9), range(2)))  # 壁0なので、(Bx, By, Wx, Wy, 手番)で盤面が一意に定まる。のでそれで盤面を表現。
+    # print(boards[0])
+    # print(len(boards))
+    # print(s.dist_array1)
+    # print(s.dist_array2)
+    # unreachable1 = (s.dist_array1 == np.max(s.dist_array1))
+    # unreachable2 = (s.dist_array2 == np.max(s.dist_array2))
+    # print(unreachable1)
+    # print(unreachable2)
+
+    # 合法手のみに絞る
+    def is_legal(board):
+        Bx, By, Wx, Wy, _ = board
+        if Bx == Wx and By == Wy:
+            return False
+        # if unreachable1[Bx, By] or unreachable2[Wx, Wy]:
+        #     return False
+        Bd = s.dist_array1[Bx, By]
+        Wd = s.dist_array2[Wx, Wy]
+        if Bd == 0 and Wd == 0:
+            return False
+
+        for is_black in [False, True]:
+            if is_black:
+                x = Bx
+                y = By
+                s.turn = 0
+            else:
+                x = Wx
+                y = Wy
+                s.turn = 1
+            movable_array = s.movable_array(x, y, shortest_only=False)
+            if not np.any(movable_array):
+                return False
+
+        return True
+    boards = list(filter(is_legal, boards))
+    # print(len(boards))
+    # pprint(boards[:10])
+
+    # ゴールからの距離を組にする
+    boards_d = [(-1, -1, -1, -1, -1, -1, -1)] * len(boards)
+    for i, board in enumerate(boards):
+        Bx, By, Wx, Wy, is_black = board
+        Bd = s.dist_array1[Bx, By]
+        Wd = s.dist_array2[Wx, Wy]
+        boards_d[i] = (Bx, By, Wx, Wy, is_black, Bd, Wd)
+
+    # ゴールからの距離の和でソート
+    boards_d = sorted(boards_d, key=lambda x: x[5] + x[6])
+    #pprint(boards_d[:250])
+
+    optimal_dict = {}
+    for Bx, By, Wx, Wy, is_black, Bd, Wd in boards_d:
+        if Bd == 0 or Wd == 0:
+            optimal_dict[(Bx, By, Wx, Wy, is_black)] = (-1, -1, -1, -1, is_black, Wd - Bd, Bd != Wd)  # 次のboardと、B目線でどれだけ差をつけて勝ったか？Bから最大化したい量、有効な要素かどうか
+            continue
+
+        if is_black:
+            x = Bx
+            y = By
+            d = Bd
+            s.turn = 0
+        else:
+            x = Wx
+            y = Wy
+            d = Wd
+            s.turn = 1
+        s.Bx = Bx
+        s.By = By
+        s.Wx = Wx
+        s.Wy = Wy
+        movable_array = s.movable_array(x, y, shortest_only=True)
+        if not np.any(movable_array):
+            movable_array = s.movable_array(x, y, shortest_only=False)
+
+        # 距離を縮める方向に動けているなら探索済みでoptimal_dictに要素が存在するはず
+        cands = []
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if not movable_array[dx, dy]:
+                    continue
+                if is_black:
+                    new_Bx = Bx + dx
+                    new_By = By + dy
+                    new_Wx = Wx
+                    new_Wy = Wy
+                    if new_Bx == new_Wx and new_By == new_Wy:  # 相手のいる方向に進む場合、乗り越える
+                        new_Bx = new_Bx + dx
+                        new_By = new_By + dy
+                    new_d = s.dist_array1[new_Bx, new_By]
+                else:
+                    new_Bx = Bx
+                    new_By = By
+                    new_Wx = Wx + dx
+                    new_Wy = Wy + dy
+                    if new_Bx == new_Wx and new_By == new_Wy:  # 相手のいる方向に進む場合、乗り越える
+                        new_Wx = new_Wx + dx
+                        new_Wy = new_Wy + dy
+                    new_d = s.dist_array2[new_Wx, new_Wy]
+                
+                #print(new_d, d)
+                if new_d < d and (new_Bx, new_By, new_Wx, new_Wy, not is_black) in optimal_dict.keys():
+                    # if new_By == 0 and new_Wy == 8:
+                    #     print(Bx, By, Wx, Wy, is_black, Bd, Wd)
+                    # if not (new_Bx, new_By, new_Wx, new_Wy, not is_black) in optimal_dict.keys():
+                    #     s.display_cui(check_algo=False)  # check_algo=Trueだと無限ループに入ってメモリ使い果たして壊れる！！
+                    #     print("DP failed")
+                    #     exit()
+                    cands.append((new_Bx, new_By, new_Wx, new_Wy, not is_black, optimal_dict[(new_Bx, new_By, new_Wx, new_Wy, not is_black)][5], True))
+                else:
+                    cands.append((new_Bx, new_By, new_Wx, new_Wy, not is_black, 0, False))  # 距離を縮められないのは有効でないとする
+
+        # candsがないのは壁に取り囲まれてまったく身動きが取れない場合のみ。それは解を求めなくても良い
+        if len(cands) == 0:
+            continue
+
+        if is_black:
+            cands = sorted(cands, key=lambda x: x[5] - (not x[6]) * 100, reverse=True)  # Bd-Wd最大化
+        else:
+            cands = sorted(cands, key=lambda x: -x[5] - (not x[6]) * 100, reverse=True)  # Bd-Wd最小化
+
+        # if Bd + Wd <= 2:
+        #     print(cands)
+
+        max_score = cands[0][5]
+        for i, cand in enumerate(cands):
+            if cand[5] < max_score:
+                max_score_index = i
+                break
+            else:
+                max_score_index = i + 1
+        # if max_score_index != len(cands):
+        #     print(max_score_index, len(cands))
+
+        # if Bx == 7 and By == 4 and Wx == 5 and Wy == 4 and is_black:accept_action_str
+        #     print(cands)
+        #     print(max_score_index)
+
+        optimal_dict[(Bx, By, Wx, Wy, is_black)] = cands[random.randrange(max_score_index)]  # 一番良い行動を記録
+
+    # 動作確認用
+    # s = s_ori
+    # Bx, By, Wx, Wy = s.Bx, s.By, s.Wx, s.Wy
+    # is_black = (s.turn % 2 == 0)
+    # print(Bx, By, Wx, Wy, is_black)
+    # for i in range(81):
+    #     Bx, By, Wx, Wy, is_black, d_diff, is_ok = optimal_dict[(Bx, By, Wx, Wy, is_black)]
+    #     print(Bx, By, Wx, Wy, is_black, d_diff, is_ok)
+    #     if Bx == -1:
+    #         break
+    # print(time.time() - start)
+
+    return optimal_dict
+
+
+def calc_next_state(x):
+    state, action = x
+    state.accept_action_str(actionid2str(state, action), check_placable=False)
+    return state
 
 
 class BasicAI(Agent):
-    def __init__(self, color, search_nodes=1, C_puct=5, tau=1, n_parallel=8, virtual_loss_n=1):
+    def __init__(self, color, search_nodes=1, C_puct=5, tau=1, n_parallel=N_PARALLEL, virtual_loss_n=1, use_estimated_V=True, V_ema_w=0.01, 
+                 shortest_only=False, use_average_Q=False, random_playouts=False, tau_mult=2, tau_decay=6, is_mimic_AI=False, tau_peak=6):
         super(BasicAI, self).__init__(color)
         self.search_nodes = search_nodes
         self.C_puct = C_puct
         self.tau = tau
         self.n_parallel = n_parallel
         self.virtual_loss_n = virtual_loss_n
+        self.use_estimated_V = use_estimated_V
+        self.use_average_Q = use_average_Q
+        self.V_ema_w = V_ema_w
         self.init_prev()
         self.tree_for_visualize = None
+        self.shortest_only = shortest_only
+        self.random_playouts = random_playouts
+        self.tau_mult = tau_mult
+        self.tau_decay = tau_decay
+        self.is_mimic_AI = is_mimic_AI  # 指定された後手AIは、先手を追い越すまでの間、回転対称になるように先手の手を真似する
+        self.tau_peak = tau_peak  # ランダム性を一番高くするターン数。初手に壁置くのを読むのは無駄だが、向かい合ったときにいろいろな壁の起き方をするのは有意義だろうという考え
 
-    def init_prev(self):
-        state = State.State()
-        p = np.ones((137,)) / 137.
-        self.prev_tree = Tree(state, p)
+    def init_prev(self, state=None):
+        # 試合前に毎回実行
+        if state is None:
+            state = State.State()
+        # p = np.ones((137,)) / 137.
+        # p = np.asarray(p, dtype=np.float32)
+        self.prev_tree = None
         self.prev_action = None
+        self.estimated_V = 0.0
+        self.prev_wall_num = state.black_walls + state.white_walls
+        self.init_discovery(state)
+        self.optimal_dict = None
+        self.end_game = False  # 移動のみで十分な局面
+        self.end_mimic = False  # 231208時点ではmimic_AIのときのみTrueになりうる
 
-    def act(self, state, showNQ=False, noise=0.):
-        action_id, _ = self.MCTS(state, self.search_nodes, self.C_puct, self.tau, showNQ, noise)
-        return action_id
+        # if self.state2node_per_turn is not None:
+        #     for v in self.state2node_per_turn.values():
+        #         del v
+        self.state2node_per_turn = {}  # turn -> (state.vec -> node)
 
-    def act_and_get_pi(self, state, showNQ=False, noise=0.):
-        action_id, pi = self.MCTS(state, self.search_nodes, self.C_puct, self.tau, showNQ, noise)
-        return action_id, pi
+    def get_state_vec_and_is_state_searched(self, state):
+        turn = state.turn
+        state_vec = get_state_vec(state)
+
+        if turn not in self.state2node_per_turn.keys():
+            return state_vec, False
+
+        if state_vec in self.state2node_per_turn[turn].keys():
+            return state_vec, True
+        
+        return state_vec, False
+        
+    def add_state2node_per_turn_item(self, turn, state_vec, node):
+        if turn not in self.state2node_per_turn.keys():
+            self.state2node_per_turn[turn] = {}
+
+        self.state2node_per_turn[turn][state_vec] = node
+        
+    def init_discovery(self, state):
+
+        # 探索済みマスをTrueにする配列、0にB, 1にWを割当て
+        self.discovery_arr = np.zeros((2, 9, 9), dtype=bool)
+        for color in range(2):
+            x, y = state.color_p(color)
+            self.discovery_arr[color, x, y] = True
+
+    def act(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
+        #tau = (1 + (self.tau_mult - 1) * np.power(0.5, state.turn / self.tau_decay)) * self.tau
+        tau = (1 + (self.tau_mult - 1) * np.exp(- np.square((state.turn - self.tau_peak) / self.tau_decay))) * self.tau
+        if return_root_tree:
+            action_id, tree = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, return_root_tree=True)
+            return action_id, tree
+        else:
+            action_id, _, _, _, _ = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree)
+            return action_id
+
+    def act_and_get_pi(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None):
+        #tau = (1 + (self.tau_mult - 1) * np.power(0.5, state.turn / self.tau_decay)) * self.tau
+        tau = (1 + (self.tau_mult - 1) * np.exp(- np.square((state.turn - self.tau_peak) / self.tau_decay))) * self.tau
+        action_id, pi, v_prev, v_post, searched_node_num = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree)
+        return action_id, pi, v_prev, v_post, searched_node_num
 
     def action_array(self, s):
         if s.terminate:
@@ -92,97 +445,285 @@ class BasicAI(Agent):
         v = np.concatenate([r.flatten(), c.flatten(), s.movable_array(x, y).flatten()])
         return np.asarray(v, dtype="bool")
 
-    def display_parameter(self, x):
-        a = x[:64].reshape((8, 8))
-        b = x[64:128].reshape((8, 8))
-        c = x[128:].reshape((3, 3))
-        for y in range(8):
-            for x in range(8):
-                print("{:5}".format(a[x, y]), end="")
-            print("  ", end="")
-            for x in range(8):
-                print("{:5}".format(b[x, y]), end="")
-            print("")
-        for y in [-1, 0, 1]:
-            for x in [-1, 0, 1]:
-                print("{:5}".format(c[x, y]), end="")
-            print("")
+    def movable_array(self, x, y, s):
+        if self.shortest_only:
+            return s.movable_array(x, y, shortest_only=True).flatten()
+
+        # 壁が両方0なら最短路以外の手はない。教師の質向上を目的とする
+        if s.black_walls == 0 and s.white_walls == 0:
+            return s.movable_array(x, y, shortest_only=True).flatten()
+
+        ret = s.movable_array(x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
+
+        all_movable_arr = s.movable_array(x, y, shortest_only=False)
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                x2 = x + dx
+                y2 = y + dy
+                if x2 < 0 or x2 >= 9 or y2 < 0 or y2 >= 9:
+                    continue
+
+                # 移動可能かつ未探索なら追加
+                if all_movable_arr[dx, dy] and not self.discovery_arr[s.turn % 2, x2, y2]:
+                    ret[dx, dy] = True
+
+        ret = ret.flatten()
+
+        return ret
 
     def select(self, root_tree, C_puct):
         t = root_tree
         a = 0
         nodes = []
         actions = []
-        count = 0
         while True:
+            
             if t.P is None:
-                t.P = self.p_array([t.s])[0]
+                print("!"*200)
+                print(actions)
+                assert False, "t.P is None is not expected"
+                #return t, a, nodes, actions, True  # tは葉ノード
 
-            if self.color == t.s.turn % 2:
-                x = t.Q + C_puct * t.P * np.sqrt(1. + np.sum(t.N)) / (1. + t.N)
-            else:
-                x = -t.Q + C_puct * t.P * np.sqrt(1. + np.sum(t.N)) / (1. + t.N)
-            x -= np.min(x)
-            #x[~self.action_array(t.s)] = -1.
-            x[t.P == 0.] = -1.  # できない行動を選択しない（できない行動はp=0となることが前提）
-
-            a = np.argmax(x)
+            # 負けノードは探索しない
+            #a = select_action(t.Q, t.N, t.P, C_puct, self.use_estimated_V, self.estimated_V, self.color, t.s.turn, self.use_average_Q)
+            a = select_action(t.Q, t.N, t.P_without_loss, C_puct, self.use_estimated_V, self.estimated_V, self.color, t.s.turn, self.use_average_Q)
 
             nodes.append(t)
             actions.append(a)
 
             if a not in t.children.keys():
-                break
+                return t, a, nodes, actions, False # 葉ノードでない
             else:
                 t = t.children[a]
-            count += 1
-        return t, a, nodes, actions
 
-    def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False):
+    def calc_leaf_movable_arr(self, root_state, actions):
+        # stateはroot、actionsはMCTSのleafまでの道のりを想定。actionsはどれも合法手とする。
+        leaf_discovery_arr = np.copy(self.discovery_arr)
+        state = state_copy(root_state)
+        for i, action in enumerate(actions):
+            try:
+                state.accept_action_str(actionid2str(state, action), check_placable=False, calc_placable_array=False, check_movable=False)
+            except:
+                print("{} error action={}".format(i, action))
+                print(actions)
+                root_state.display_cui()
+                state.display_cui()
+                print("!"*30)
+            if action < 128:
+                leaf_discovery_arr = np.zeros((2, 9, 9), dtype=bool)
+            leaf_discovery_arr[0, state.Bx, state.By] = True
+            leaf_discovery_arr[1, state.Wx, state.Wy] = True
+
+        x, y = state.color_p(state.turn % 2)
+        ret = state.movable_array(x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
+        if self.shortest_only or (state.black_walls == 0 and state.white_walls == 0):
+            return ret.flatten()
+
+        all_movable_arr = state.movable_array(x, y, shortest_only=False)
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                x2 = x + dx
+                y2 = y + dy
+                if x2 < 0 or x2 >= 9 or y2 < 0 or y2 >= 9:
+                    continue
+
+                # 移動可能かつ未探索なら追加
+                if all_movable_arr[dx, dy] and not leaf_discovery_arr[state.turn % 2, x2, y2]:
+                    ret[dx, dy] = True
+        ret = ret.flatten()
+
+        return ret
+
+    def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False, use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
         # 壁がお互いになく、分岐のない場合読みを入れない。ただし、それでもprev_treeとかの関係上振る舞いが変わるので保留中。
         #search_node_num = max_node
         #if state.black_walls == 0 and state.white_walls == 0:
         #    x, y = state.color_p(state.turn % 2)
         #    if int(np.sum(state.movable_array(x, y, shortest_only=True))) == 1:
         #        search_node_num = 1
-        p = self.p(state)
+
+        if self.random_playouts:
+            max_node = SELFPLAY_SEARCHNODES_MIN
+            if random.random() < DEEP_SEARCH_P:
+                max_node = SELFPLAY_SEARCHNODES_MAX
+            node_num_expectation = DEEP_SEARCH_P * SELFPLAY_SEARCHNODES_MAX + (1 - DEEP_SEARCH_P) * SELFPLAY_SEARCHNODES_MIN
+        else:
+            node_num_expectation = max_node
+
+        root_v = self.v(state)
+
+        wall_num = state.black_walls + state.white_walls
+
+        B_dist = state.dist_array1[state.Bx, state.By]
+        W_dist = state.dist_array2[state.Wx, state.Wy]
+        #print(B_dist, W_dist)
+
+        # 自分の道が確定していて相手よりも早く着くなら最短路を進むだけ
+        if state.is_certain_path_terminate():
+            self.tree_for_visualize = self.prev_tree = None  # 読みが入らなくなるので、prev_treeが参照されないようにNoneを入れておく
+            x, y = state.color_p(state.turn % 2)
+            movable_arr = state.movable_array(x, y, shortest_only=True)
+            if not np.any(movable_arr):
+                movable_arr = state.movable_array(x, y, shortest_only=False)
+            cands = []
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if movable_arr[dx, dy]:
+                        cands.append((dx, dy))
+            dx, dy = random.choice(cands)
+            if dx == -1:
+                dx = 2
+            if dy == -1:
+                dy = 2
+            action_id = 128 + dx * 3 + dy
+            pi_ret = np.zeros((137))
+            pi_ret[action_id] = 1.0
+            self.prev_wall_num = wall_num
+            if return_root_tree:
+                return action_id, Tree(state, pi_ret)
+            else:
+                return action_id, pi_ret, root_v, 0.0, node_num_expectation  # 探索はしていないので探索後のvは0にしておく
+
+        if wall_num == 0 or (state.black_walls == 0 and (W_dist + (1 - state.turn % 2) <= B_dist - 1)) or (state.white_walls == 0 and (B_dist + state.turn % 2 <= W_dist - 1)):
+            self.end_game = True
+
+        if self.end_game:
+            #print("endgame")
+            self.tree_for_visualize = self.prev_tree = None  # 読みが入らなくなるので、prev_treeが参照されないようにNoneを入れておく
+            if (self.optimal_dict is None) or (self.prev_wall_num != wall_num):
+                #print("DP")
+                self.optimal_dict = calc_optimal_move_by_DP(state)
+            Bx, By, Wx, Wy = state.Bx, state.By, state.Wx, state.Wy
+            is_black = (state.turn % 2 == 0)
+            next_Bx, next_By, next_Wx, next_Wy, _, _, _ = self.optimal_dict[(Bx, By, Wx, Wy, is_black)]
+            if self.color == 0:
+                dx = next_Bx - Bx
+                dy = next_By - By
+            else:
+                dx = next_Wx - Wx
+                dy = next_Wy - Wy
+            action_id = dxdy2actionid(dx, dy)
+            #print(dx, dy)
+            #print(actionid2str(state, action_id))
+            pi_ret = np.zeros((137))
+            pi_ret[action_id] = 1.0
+            self.prev_wall_num = wall_num
+            if return_root_tree:
+                return action_id, Tree(state, pi_ret)
+            else:
+                return action_id, pi_ret, root_v, 0.0, node_num_expectation  # 探索はしていないので探索後のvは0にしておく
+
+        if wall_num != self.prev_wall_num:
+            self.init_discovery(state)
+        for color in range(2):
+            x, y = state.color_p(color)
+            self.discovery_arr[color, x, y] = True
+
+        x, y = state.color_p(state.turn % 2)
+        p = self.p(state, leaf_movable_arrs=[self.movable_array(x, y, state)])
         illegal = (p == 0.)
-        old_p = p
-        p = (1. - noise) * p + noise * np.random.rand(len(p))
+        p = (1. - noise) * p + noise * np.random.dirichlet([0.3] * len(p))  # ディリクレ分布はチェスと同じ設定
         p[illegal] = 0.
         p = p / sum(p)
-        #root_tree = Tree(state, p)
-        root_tree = self.prev_tree
-        root_tree.s = state
-        if self.prev_action is not None:
-            if self.prev_action in root_tree.children.keys():
-                root_tree = root_tree.children[self.prev_action]
+        p = np.asarray(p, dtype=np.float32)
+
+        visited = set([])
+
+        def negate_tree(tree, count=0):
+            state_vec = get_state_vec(tree.s)
+            if state_vec in visited:
+                return tree
+            
+            visited.add(state_vec)
+
+            ret = Tree(tree.s, tree.P)
+
+            ret.V = -tree.V
+            ret.result = tree.result  # resultは立場によらずに定まるからそのままコピー
+            ret.optimal_action = tree.optimal_action  
+            ret.is_lose_child_arr = tree.is_lose_child_arr
+            ret.P_without_loss = tree.P_without_loss
+            ret.dist_diff_arr = tree.dist_diff_arr
+            ret.already_certain_path_confirmed = tree.already_certain_path_confirmed
+
+            # if tree.P is None:
+            #     ret = Tree(state_copy(tree.s), tree.P)
+            # else:
+            #     ret = Tree(state_copy(tree.s), np.copy(tree.P))
+            ret.N = np.copy(tree.N)
+            ret.W = -np.copy(tree.W)
+            ret.Q = -np.copy(tree.Q)
+            assert count <= max_node, "negate_treeで無限再帰の可能性" 
+            # if showNQ and count >= 30:
+            #     print("negate tree start")
+            #     tree.s.display_cui()
+            for key, child_tree in tree.children.items():
+                # if showNQ and count >= 30:
+                #     print("s", count, key)
+                ret.children[key] = negate_tree(child_tree, count + 1)
+                # if showNQ and count >= 30:
+                #     print("e", count, key)
+            return ret
+
+        if use_prev_tree:
+            if self.prev_tree is not None and opponent_prev_tree is None:
+                root_tree = self.prev_tree
+                root_tree.s = state
+                if self.prev_action is not None:
+                    if self.prev_action in root_tree.children.keys():
+                        root_tree = root_tree.children[self.prev_action]
+                    else:
+                        root_tree = Tree(state, p)
+            elif opponent_prev_tree is not None:
+                if self.prev_tree is not None:
+                    del self.prev_tree
+                root_tree = negate_tree(opponent_prev_tree)
             else:
                 root_tree = Tree(state, p)
-        root_tree.P = p
+        else:
+            root_tree = Tree(state, p)
+
+        # 載せたノイズを反映させる
+        root_tree.set_P(p)
+
+        # 非合法手のNを強制的に0にして、例えば探索済みマスに戻るような手を読まないようにする
+        root_tree.N = root_tree.N * ~illegal
+        root_tree.W = root_tree.W * ~illegal
+        root_tree.Q = root_tree.Q * ~illegal
+
+        def add_virtual_loss(node, action):
+            node.N[action] += self.virtual_loss_n
+            if self.color == node.s.turn % 2:  # 先後でQがひっくり返ることを考慮
+                node.W[action] -= self.virtual_loss_n
+            else:
+                node.W[action] += self.virtual_loss_n
+            node.Q[action] = node.W[action] / node.N[action]
+
+        def should_deepsearch(W, N, root_v):
+            return self.random_playouts and abs(np.sum(W) / np.sum(N) - root_v) >= DEEP_TH
 
         node_num = np.sum(root_tree.N)
-        while node_num < max_node:
+
+        if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.W, root_tree.N, root_v):
+            max_node = SELFPLAY_SEARCHNODES_MAX
+
+        while node_num < max_node and root_tree.result == 0:
             # select
             nodess = []
             actionss = []
-            for j in range(min(self.n_parallel, max_node)):
-                _, _, nodes, actions = self.select(root_tree, C_puct)
+
+            for _ in range(min(self.n_parallel, max_node)):
+                _, _, nodes, actions, _ = self.select(root_tree, C_puct)
                 if nodes is None:
                     break
                 nodess.append(nodes)
                 actionss.append(actions)
 
-                # virtual loss
                 for node, action in zip(nodes, actions):
-                    node.N[action] += self.virtual_loss_n
-                    if self.color == node.s.turn % 2:  # 先後でQがひっくり返ることを考慮
-                        node.W[action] -= self.virtual_loss_n
-                    else:
-                        node.W[action] += self.virtual_loss_n
-                    node.Q[action] = node.W[action] / node.N[action]
+                    add_virtual_loss(node, action)
+
+            # virtual lossを元に戻す
             for nodes, actions in zip(nodess, actionss):
-                # virtual lossを元に戻す
                 for node, action in zip(nodes, actions):
                     node.N[action] -= self.virtual_loss_n
                     if self.color == node.s.turn % 2:
@@ -194,72 +735,234 @@ class BasicAI(Agent):
                     else:
                         node.Q[action] = node.W[action] / node.N[action]
 
+            # thread_input_list = []
+            # for nodes, actions in zip(nodess, actionss):
+            #     s = state_copy(nodes[-1].s)
+            #     a = actions[-1]
+            #     thread_input_list.append((s, a))
+
+            # with ThreadPoolExecutor(max_workers=2) as thread:
+            #     states = list(thread.map(calc_next_state, thread_input_list))
+
             states = []
+            leaf_movable_arrs = []
             for nodes, actions in zip(nodess, actionss):
+                leaf_movable_arrs.append(self.calc_leaf_movable_arr(state, actions))
                 s = state_copy(nodes[-1].s)
                 #print([self.actionid2str(node.s, action) for node, action in zip(nodes, actions)])
-                s.accept_action_str(actionid2str(s, actions[-1]))
+                s.accept_action_str(actionid2str(s, actions[-1]), check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
                 states.append(s)
             node_num += len(states)
 
-            #p = self.p_array(states, random_flip=random_flip)
-            v = self.v_array(states, random_flip=random_flip)
+            p_arr, v_arr = self.pv_array(states, leaf_movable_arrs)
 
+            # if showNQ and (state.turn == 42 or state.turn == 43):
             for nodes2, actions2 in zip(nodess, actionss):
                 pass
-                #print([self.actionid2str(node.s, action) for node, action in zip(nodes2, actions2)])
-            #print("")
+            #     print([Glendenning2Official(actionid2str(node.s, action)) for node, action in zip(nodes2, actions2)])
+            # print("")
 
-            count = 0
-            for s, nodes, actions in zip(states, nodess, actionss):
-                if not s.terminate:
+            # expand
+            for count, s, nodes, actions in zip(range(len(states)), states, nodess, actionss):
+                if not s.pseudo_terminate:
                     t = nodes[-1]
                     a = actions[-1]
-                    if a not in t.children.keys():
+                    state_vec, is_searched = self.get_state_vec_and_is_state_searched(s)
+
+                    if a in t.children.keys():
+                        continue
+                    if is_searched:  # 過去に探索していた状態と一致したとき  
+                        t.children[a] = self.state2node_per_turn[s.turn][state_vec]
+                        # t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
+                        # t.children[a].V = np.array(v_arr[count], dtype=np.float32)
+                        if s.turn != t.children[a].s.turn or t.s.turn + 1 != t.children[a].s.turn:
+                            t.s.display_cui()
+                            s.display_cui()
+                            t.children[a].s
+                            assert False, "!" * 100
+
+                    else:  # 初めて探索されたとき
                         t.children[a] = Tree(s, None)
-                count += 1
+                        t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
+                        t.children[a].V = np.array(v_arr[count], dtype=np.float32)
+                        self.add_state2node_per_turn_item(s.turn, state_vec, t.children[a])
 
             # backup
             count = 0
-            for nodes, actions in zip(nodess, actionss):
+            for nodes, actions, s in zip(nodess, actionss, states):
                 for node, action in zip(nodes, actions):
                     node.N[action] += 1
-                    node.W[action] += v[count]
+                    node.W[action] += v_arr[count]
+                    self.estimated_V = self.estimated_V * (1 - self.V_ema_w) + v_arr[count] * self.V_ema_w
                     node.Q[action] = node.W[action] / node.N[action]
                 count += 1
+
+            if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.W, root_tree.N, root_v):
+                max_node = SELFPLAY_SEARCHNODES_MAX
+
+            # 勝敗ノード決定
+            for count, s, nodes, actions in zip(range(len(states)), states, nodess, actionss):
+                # 葉ノードに当たったときのみ変更がありえるので葉ノード以外除外
+                if not s.pseudo_terminate:
+                    continue
+
+                # print("~"*50)
+                # print(s.pseudo_reward)
+                # s.display_cui()
+
+                # 葉ノード側からたどる
+                for node, action in zip(nodes[::-1], actions[::-1]):
+                    # 過去の探索で既に勝敗が決まっているときは飛ばす(optimal_actionなどが書き換えられないよう)
+                    if node.result != 0:
+                        continue
+
+                    is_win_node = (node.s.turn % 2 == 0 and s.pseudo_reward == 1) or (node.s.turn % 2 == 1 and s.pseudo_reward == -1)
+                    win_reward = 1 if node.s.turn % 2 == 0 else -1
+                    lose_reward = -1 if node.s.turn % 2 == 0 else 1
+
+                    if action not in node.children.keys():  # 葉ノードを子に持つ
+                        s_B_dist = s.dist_array1[s.Bx, s.By]
+                        s_W_dist = s.dist_array2[s.Wx, s.Wy]
+                        node.dist_diff_arr[action] = max(s_W_dist - s_B_dist + (1 - s.turn % 2), s_B_dist - s_W_dist + s.turn % 2)
+                    elif  node.children[action].result != 0:  # 勝敗が決定した子ノードを持つ
+                        node.dist_diff_arr[action] = int(np.min(node.children[action].dist_diff_arr))
+
+                    if is_win_node:  # 勝ち側は一つでも勝ちに向かう行動があれば勝ちノード
+                        if action not in node.children.keys() or node.children[action].result == win_reward:
+                            node.result = s.pseudo_reward
+                            node.optimal_action = action
+                            node_illegal = (node.P == 0.)
+                            
+                            if node_illegal[action]:
+                                print("!"*100)
+                                state.display_cui()
+                                node.s.display_cui()
+                                print(node.P)
+                                print(node_illegal)
+                                print(actionid2str(node.s, action))
+                                print(actions)
+                            assert not node_illegal[action], actionid2str(node.s, action)
+                            
+                    else:  # 負け側はすべての行動が相手の勝ちになるときに限り負けノード
+                        if action not in node.children.keys() or node.children[action].result == lose_reward:
+                            node.set_is_lose_child_arr(action, True)
+                            #node.is_lose_child_arr[action] = True
+
+                            if not node.already_certain_path_confirmed: # 壁置きで負けになる場合、一度確定路判定をする。移動の場合も判定するとだいぶ遅くなるので壁おきに制限。
+                                node.already_certain_path_confirmed = True
+                                if node.s.is_certain_path_terminate((node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
+                                    node.set_is_lose_child_arr_True(np.arange(128))
+                                    # print("!!!certain path !!!")
+                                    # print(actions)
+                                    # print(node.P)
+                                    # print(node.P_without_loss)
+                            node_illegal = (node.P == 0.)
+                            if np.all(node_illegal | node.is_lose_child_arr):
+                                # print("~"*50)
+                                # node.s.display_cui()
+                                # print(node.dist_diff_arr)
+                                node.result = s.pseudo_reward
+                                node.optimal_action = int(np.argmin(node.dist_diff_arr))
+                            else:
+                                break
+
+                    # print(node.s.turn, is_win_node, node.result)
+                
+            # root_treeの勝敗が決まったら探索を打ち切る
+            if root_tree.result != 0:
+                break
+
         if showNQ:
             print("p=")
-            self.display_parameter(np.asarray(old_p * 1000, dtype="int32"))
+            display_parameter(np.asarray(root_tree.P * 1000, dtype="int32"))
             print("N=")
-            self.display_parameter(np.asarray(root_tree.N, dtype="int32"))
+            display_parameter(np.asarray(root_tree.N, dtype="int32"))
             print("Q=")
-            self.display_parameter(np.asarray(root_tree.Q * 1000, dtype="int32"))
-            print("v={}".format(self.v(root_tree.s)))
+            display_parameter(np.asarray(root_tree.Q * 1000, dtype="int32"))
+            print("prev v={:.3f}, post v={:.3f}".format(root_v[0], np.sum(root_tree.W) / np.sum(root_tree.N)))
+            print("root_tree result = {}".format(root_tree.result))
 
-        if tau == 0:
-            N2 = root_tree.N * (root_tree.N == np.max(root_tree.N))
+        if root_tree.result != 0:  # 勝敗決定の場合
+            action = root_tree.optimal_action
+            pi = np.zeros((137))
+            pi[action] = 1.0
         else:
-            N2 = np.power(np.asarray(root_tree.N, dtype="float64"), 1. / tau)
-        pi = N2 / np.sum(N2)
-        action = np.random.choice(len(pi), p=pi)
+            x, y = state.color_p(state.turn % 2)
+            shortest_move = state.movable_array(x, y, shortest_only=True).flatten()
+            move_N = root_tree.N[128:]
+            move_Q = root_tree.Q[128:]
+            use_shortest = (move_N >= int(np.sum(root_tree.N) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる
+            use_shortest = use_shortest & shortest_move
+
+            N2 = root_tree.N
+            if np.any(use_shortest):
+                N2[128:] = move_N * use_shortest
+
+            if tau == 0:
+                N2 = N2* (N2 == np.max(N2))
+            else:
+                N2 = np.power(np.asarray(N2, dtype="float64"), 1. / tau)
+            pi = N2 / np.sum(N2)
+            action = np.random.choice(len(pi), p=pi)
+
+        if self.is_mimic_AI:
+            # print("mimic AI")
+
+            # actionの座標を計算し、回転対称に写す。
+            if self.prev_action is not None:
+                is_placewall = (self.prev_action < 128)
+                if is_placewall:
+                    is_row = self.prev_action < 64
+                    wall_id = self.prev_action % 64
+                    prev_wall_x = wall_id // 8
+                    prev_wall_y = wall_id % 8
+                    wall_x = 7 - prev_wall_x
+                    wall_y = 7 - prev_wall_y
+                    action_id = int(not is_row) * 64 + wall_x * 8 + wall_y
+                    # print(is_row, wall_x, wall_y, action_id) 
+                else:
+                    move_id = self.prev_action - 128
+                    prev_move_x, prev_move_y = move_id2dxdy(move_id)
+                    move_x = -prev_move_x
+                    move_y = -prev_move_y
+                    action_id = dxdy2actionid(move_x, move_y)
+                    # print(move_x, move_y, action_id)
+
+                end_mimic = state.turn >= FORCE_MIMIC_TURN and root_tree.N[action_id] / np.sum(root_tree.N) <= MIMIC_N_RATIO
+                
+                # 合法手でない手を打たないように対策
+                if root_tree.N[action_id] == 0:
+                    end_mimic = True
+
+                if not self.end_mimic and not end_mimic:
+                    action = action_id
+
+                if is_jump_move(state, action_id) or end_mimic:
+                    self.end_mimic = True
+
         # 葉に向う行動は勝ちになる行動のみ
         if action in root_tree.children.keys():
             self.prev_tree = root_tree.children[action]
-        action2 = np.argmax(root_tree.N)
-        pi_ret = np.zeros((137, ))
-        pi_ret[action2] = 1.
+        else:
+            self.prev_tree = None
         self.tree_for_visualize = root_tree
-        return action, root_tree.N / np.sum(root_tree.N)
+        self.prev_wall_num = wall_num
+
+        if return_root_tree:
+            return action, root_tree
+        elif root_tree.result != 0:  # 勝敗決定の場合
+            
+            return action, pi, root_v, (np.sum(root_tree.W) + root_v) / (np.sum(root_tree.N) + 1), node_num_expectation
+        else:
+            return action, root_tree.N / np.sum(root_tree.N), root_v, (np.sum(root_tree.W) + root_v) / (np.sum(root_tree.N) + 1), np.sum(root_tree.N)
 
     def get_tree_for_graphviz(self):
+        if self.tree_for_visualize is None:
+            return None
+        
         g = Digraph(format='png')
         g.attr('node', shape='circle')
 
-        get_graphviz_tree(self.tree_for_visualize, g)
+        get_graphviz_tree_for_shared_tree(self.tree_for_visualize, g)
 
         return g
-
-
-
-
-

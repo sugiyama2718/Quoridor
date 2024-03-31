@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+numpy = "*"
+pandas = "*"
+matplotlib = "*"
+kivy = "*"
+tqdm = "*"
+scikit-learn = "*"
+h5py = "*"
+tensorflow = "*"
+graphviz = "*"
+cython = "*"
+beautifulsoup4 = "*"
+numba = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"
