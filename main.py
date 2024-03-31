@@ -27,12 +27,17 @@ import csv
 from collections import OrderedDict
 from analyze_h5 import analyze_h5_main
 import shutil
+import random
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制？
 
 # agentsは初期化されてるとする
-def normal_play(agents):
-    state = State()
+def normal_play(agents, initial_state=None):
+    if initial_state is None:
+        state = State()
+    else:
+        state = initial_state
+        
     while True:
         state.display_cui()
         start = time.time()
@@ -52,8 +57,8 @@ def normal_play(agents):
                 a = s
         agents[1].prev_action = s
 
-        g = agents[0].get_tree_for_graphviz()
-        g.render(os.path.join("game_trees", "game_tree{}".format(state.turn)))
+        # g = agents[0].get_tree_for_graphviz()
+        # g.render(os.path.join("game_trees", "game_tree{}".format(state.turn)))
 
         if state.terminate:
             break
@@ -75,8 +80,8 @@ def normal_play(agents):
                 a = s
         agents[0].prev_action = s
 
-        g = agents[1].get_tree_for_graphviz()
-        g.render(os.path.join("game_trees", "game_tree{}".format(state.turn)))
+        # g = agents[1].get_tree_for_graphviz()
+        # g.render(os.path.join("game_trees", "game_tree{}".format(state.turn)))
 
         #time.sleep(0.1)
         if state.terminate:
@@ -84,9 +89,10 @@ def normal_play(agents):
 
     state.display_cui()
     print("The game finished. reward=({}, {})".format(state.reward, -state.reward))
+    return state.reward
 
 
-def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, info=False):
+def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, info=False, id_=None):
     data = []
     hash_ = 0
     for j in range(play_num):
@@ -106,9 +112,10 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
         move_count = [0, 0]
         B_xy_list = []
         W_xy_list = []
+        tau = np.random.rand() * (TAU_MAX - TAU_MIN_OPENING) + TAU_MIN_OPENING
+        AIs[0].tau = tau
+        AIs[1].tau = tau
         while True:
-            AIs[0].tau = np.random.rand() * (1. - TAU_MIN) + TAU_MIN
-            AIs[1].tau = np.random.rand() * (1. - TAU_MIN) + TAU_MIN
             if state.turn >= 20:
                 AIs[0].tau = TAU_MIN
                 AIs[1].tau = TAU_MIN
@@ -132,6 +139,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             W_xy_list.append((state.Wx, state.Wy))
 
             if display:
+                print("generate id=", id_)
                 state.display_cui()
             state.check_placable_array_algo()
             end = False
@@ -166,6 +174,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             W_xy_list.append((state.Wx, state.Wy))
 
             if display:
+                print("generate id=", id_)
                 state.display_cui()
             state.check_placable_array_algo()
             end = False
@@ -366,6 +375,8 @@ def train_from_random_parameter_process(x):
     # layer_num = 9
     first_epoch = 2077
     last_epoch = 2257
+    # first_epoch = 2125 + 60
+    # last_epoch = 2365
     lr_schedule = [(last_epoch - first_epoch + 1, LEARNING_RATE)] 
     #lr_schedule = [(10, LEARNING_RATE * 10), (100, LEARNING_RATE * 3), (last_epoch - first_epoch + 1, LEARNING_RATE)]  # (lrを変える最初から数えたepoch数, lr)のリスト。epoch数で昇順。
 
@@ -374,6 +385,7 @@ def train_from_random_parameter_process(x):
     #repeat = LEARN_REP_NUM
     ckpt_path = "train_results"
     data_path = "data_for_experiment/230928/data"
+    #data_path = "train_results/data"
 
     AI = CNNAI(0)
     AI.save(os.path.join(ckpt_path, "parameter/train_experiment.ckpt"))
@@ -469,17 +481,20 @@ def train_without_selfplay():
 
 def generate_h5(h5_id, display, AI_id, search_nodes, epoch):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+    seed = h5_id * 10000
+    random.seed(seed)
     is_random_AI = (AI_id == 0)
     #print(h5_id, display, AI_id, search_nodes, is_random_AI)
 
     if is_random_AI:
-        AIs = [CNNAI(0, search_nodes=1, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000, random_playouts=False),
-               CNNAI(1, search_nodes=1, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000, random_playouts=False)]
+        AIs = [CNNAI(0, search_nodes=1, all_parameter_zero=True, p_is_almost_flat=True, seed=seed, random_playouts=False),
+               CNNAI(1, search_nodes=1, all_parameter_zero=True, p_is_almost_flat=True, seed=seed, random_playouts=False)]
         # AIs = [CNNAI(0, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000),
         #        CNNAI(1, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000)]
     else:
+        is_mimic_AI = random.random() < MIMIC_AI_RATIO
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True),
-               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True)]
+               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True, is_mimic_AI=is_mimic_AI)]
         AIs[0].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
         AIs[1].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
 
@@ -491,9 +506,12 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch):
     all_data = []
     for _ in range(GAME_NUM_IN_H5):
         if h5_id < H5_NUM:
-            temp_data = generate_data(AIs, 1, noise=1.)
+            temp_data = generate_data(AIs, 1, noise=1., id_=h5_id)
         else:
-            temp_data = generate_data(AIs, 1, noise=NOISE)
+            # display = False
+            # if h5_id == 326919:
+            #     display = True
+            temp_data = generate_data(AIs, 1, noise=NOISE, id_=h5_id)
         all_data.extend(temp_data)
 
         if len(temp_data) == 0:
@@ -867,10 +885,11 @@ if __name__ == '__main__':
         debug_learn([CNNAI(0, search_nodes=search_nodes, v_is_dist=True, p_is_almost_flat=True), CNNAI(1, search_nodes=search_nodes, v_is_dist=True)])
     elif sys.argv[1] == "view":
         AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.25, seed=100)]
-        AIs[0].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
-        AIs[1].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
-        # AIs[0].load(os.path.join(PARAMETER_DIR, "epoch1500.ckpt"))
-        # AIs[1].load(os.path.join(PARAMETER_DIR, "epoch1500.ckpt"))
+        #AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=100, is_mimic_AI=True)]
+        # AIs[0].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
+        # AIs[1].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
+        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch3090.ckpt"))
+        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch3090.ckpt"))
 
         # AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, all_parameter_zero=True, v_is_dist=True, p_is_almost_flat=True), 
         #        CNNAI(1, search_nodes=search_nodes, tau=0.25, all_parameter_zero=True, v_is_dist=True, p_is_almost_flat=True)]
@@ -880,11 +899,15 @@ if __name__ == '__main__':
         #        CNNAI(1, search_nodes=search_nodes, tau=0.25, all_parameter_zero=True, p_is_almost_flat=True)]
 
         #normal_play(AIs)
-        game_num = 1
+        game_num = 10
         for i in range(game_num):
             AIs[0].init_prev()
             AIs[1].init_prev()
             normal_play(AIs)
+            
+            if i < game_num - 1:
+                print("input key to see next game")
+                input()
 
     elif sys.argv[1] == "vs":
         AIs = [Human(0), CNNAI(1, search_nodes=search_nodes, tau=0.5)]
@@ -940,17 +963,23 @@ if __name__ == '__main__':
         np.random.seed(0)
         game_num = 2
         seed = 0
-        AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, random_playouts=True),
-               CNNAI(1, search_nodes=search_nodes, seed=seed, random_playouts=True)]
+        # master_AI = CNNAI(0, search_nodes=search_nodes, seed=seed, random_playouts=True)
+        # slave_AI = CNNAI(1, search_nodes=search_nodes, seed=seed, random_playouts=True, opponent_AI=master_AI)
+        # AIs = [master_AI, slave_AI]
+        AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, random_playouts=True), CNNAI(1, search_nodes=search_nodes, seed=seed, random_playouts=True)]
         # path = "data_for_experiment/221219/train_results/parameter"
         # epoch = 350
         # path = "backup/221228/train_results/parameter"
         # epoch = 2700
         path = PARAMETER_DIR
         #path = "backup/23"
-        epoch = 120
-        AIs[0].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
-        AIs[1].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
+        # epoch = 120
+        # AIs[0].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
+        # AIs[1].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
+        # AIs[0].load(os.path.join(path, "post.ckpt"))
+        # AIs[1].load(os.path.join(path, "post.ckpt"))
+        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch3800.ckpt"))
+        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch3800.ckpt"))
 
         start_time = time.time()
         temp_data = generate_data(AIs, game_num, noise=NOISE, display=True, info=True)
