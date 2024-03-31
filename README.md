@@ -11,6 +11,8 @@ $ pipenv shell
 $ pipenv install
 ```
 
+If you want to train AI, then you need tensorflow-gpu.
+
 ## Usage
 
 Play quoridor in GUI:
