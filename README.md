@@ -1,22 +1,25 @@
-# Quoridor
+# Project Description
 
-このリポジトリは，QuoridorというボードゲームのAIのプログラムを公開するためのものである．このプログラムは，AlphaGo Zeroの論文等を参考に個人的に制作中のものである．
+This repository is for an AI program for the board game Quoridor based on AlphaGo Zero and KataGo papers.
 
-## 環境
+## Environment
 
-kivy, tensorflow, graphvizを導入する必要がある。tensorflowのバージョンは1.8.0、その他のライブラリの必要バージョンは未調査。
+Install pipenv and try below:
 
-## 実行方法
+```sh
+$ pipenv shell
+$ pipenv install
+```
 
-このリポジトリには既に学習済みのAIが含まれている。
+## Usage
 
-GUIで学習済みのAIと対戦：
+Play quoridor in GUI:
 
 ```sh
 $ python GUI.py
 ```
 
-学習を走らせる：
+Train AI:
 
 ```sh
 $ python main.py train
