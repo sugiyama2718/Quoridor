@@ -682,6 +682,7 @@ class BasicAI(Agent):
                 root_tree = Tree(state, p)
         else:
             root_tree = Tree(state, p)
+            self.state2node_per_turn = {}
 
         # 載せたノイズを反映させる
         root_tree.set_P(p)
