@@ -42,7 +42,8 @@ from datetime import datetime
 touched = False
 action = ""
 
-SEARCH_NODE_LIST = [1, 100, 200, 300, 500, 800, 1000, 1500, 2000, 3000, 5000, 7500, 10000, 15000, 20000]
+SEARCH_NODE_LIST = [1, 100, 200, 300, 500, 800, 1000, 1500, 2000, 3000, 5000, 7500, 10000, 15000, 20000, 30000, 50000, 100000]
+SEARCH_NODE_LIST_LEN = len(SEARCH_NODE_LIST)
 TAU_LIST = [0.16 * i for i in range(5)]
 DEFAULT_SEARCH_NODE_INDEX = 6
 DEFAULT_TAU_INDEX = 2
@@ -967,7 +968,7 @@ class QuoridorApp(App):
                     orientation: 'vertical'      
                     Slider:
                         min: 0
-                        max: 14
+                        max: {SEARCH_NODE_LIST_LEN - 1}
                         value: {DEFAULT_SEARCH_NODE_INDEX}
                         step: 1
                         orientation: "horizontal"
@@ -1018,7 +1019,7 @@ class QuoridorApp(App):
                     orientation: 'vertical'      
                     Slider:
                         min: 0
-                        max: 14
+                        max: {SEARCH_NODE_LIST_LEN - 1}
                         value: {DEFAULT_SEARCH_NODE_INDEX}
                         step: 1
                         cursor_size: 20, 20
@@ -1064,7 +1065,7 @@ class QuoridorApp(App):
                     orientation: 'vertical'      
                     Slider:
                         min: 0
-                        max: 14
+                        max: {SEARCH_NODE_LIST_LEN - 1}
                         value: {DEFAULT_SEARCH_NODE_INDEX}
                         step: 1
                         cursor_size: 20, 20
