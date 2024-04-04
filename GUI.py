@@ -20,7 +20,7 @@ from kivy.graphics import Rectangle, Color, Triangle
 from kivy.core.window import Window
 from kivy.lang import Builder
 
-from Agent import actionid2str
+from Agent import actionid2str, str2actionid
 from State import State, CHANNEL
 from State import DRAW_TURN
 from CNNAI import CNNAI
@@ -291,15 +291,18 @@ class Quoridor(Widget):
 
         if isinstance(s, int):
             a = actionid2str(self.state, s)
+            self.agents[1 - color].prev_action = s
         else:
             a = s
+            self.agents[1 - color].prev_action = str2actionid(self.state, s)
+
         if not self.state.accept_action_str(a):
             print(a)
             print("this action is impossible")
             return
         print(Glendenning2Official(a))
 
-        self.agents[1 - color].prev_action = s
+
         self.state.display_cui()
         self.turn += 1
         self.add_history(self.state, a)
