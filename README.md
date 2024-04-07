@@ -26,3 +26,10 @@ Train AI:
 ```sh
 $ python main.py train
 ```
+
+## Make exe
+
+```sh
+$ pyinstaller --log-level=INFO xxx.spec
+```
+
