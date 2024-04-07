@@ -1,7 +1,7 @@
 # coding:utf-8
 import State
 
-num2str = {0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i"}
+num2str = {-1: "j", 0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i", 9:"j"}
 
 
 class Agent(object):
