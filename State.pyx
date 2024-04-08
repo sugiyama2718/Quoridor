@@ -291,6 +291,20 @@ cdef class State:
 
         return True
 
+    def is_mirror_match(self):
+        # 盤面上の壁が5枚以下ではmirror matchは成立し得ない
+        if 20 - (self.black_walls + self.white_walls) <= 5:
+            return False
+        
+        if self.black_walls != self.white_walls:
+            return False
+
+        # 回転対称でなければ
+        if not np.all(self.row_wall == np.flip(self.row_wall)) and np.all(self.column_wall == np.flip(self.column_wall)):
+            return False
+
+        return True
+
     def is_certain_path_terminate(self, color=None):
         B_dist = self.dist_array1[self.Bx, self.By]
         W_dist = self.dist_array2[self.Wx, self.Wy]
