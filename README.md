@@ -27,9 +27,22 @@ Train AI:
 $ python main.py train
 ```
 
+If you turn off your computer and want to restart training:
+
+```sh
+$ python main.py retrain
+```
+
 ## Make exe
 
 ```sh
 $ pyinstaller --log-level=INFO xxx.spec
 ```
+
+## Cython
+
+```sh
+$ python setup.py build_ext --inplace
+```
+
 
