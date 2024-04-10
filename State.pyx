@@ -292,6 +292,10 @@ cdef class State:
         return True
 
     def is_mirror_match(self):
+        # 先手の場合しか成立しない
+        if self.turn % 2 == 1:
+            return False
+
         # 盤面上の壁が5枚以下ではmirror matchは成立し得ない
         if 20 - (self.black_walls + self.white_walls) <= 5:
             return False
@@ -299,8 +303,12 @@ cdef class State:
         if self.black_walls != self.white_walls:
             return False
 
-        # 回転対称でなければ
+        # 壁が回転対称でなければ
         if not np.all(self.row_wall == np.flip(self.row_wall)) and np.all(self.column_wall == np.flip(self.column_wall)):
+            return False
+        
+        # コマ位置が回転対称でなければ
+        if not (self.Bx == 8 - self.Wx and self.By == 8 - self.Wy):
             return False
         
         # 中央マスから横に移動できる場合、先手は横に移動することで優位に立てる可能性がある
