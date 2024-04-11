@@ -14,7 +14,7 @@ from tqdm import tqdm
 SIGMA = 1.0
 RANDOM_EPSILON = 1e-5  # 同スコアのものにランダム性を加える目的
 EPSILON = 1e-10
-FIX_EPOCH_LIST = [60, 62, 71, 91, 96, 155, 220, 465, 620, 1050, 1284, 2020, 2520, 2780, 2910, 3090, 3350, 3360, 3400, 3545, 3700]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
+FIX_EPOCH_LIST = [60, 62, 71, 91, 96, 155, 220, 465, 620, 1050, 1284, 2020, 2520, 2780, 2910, 3090, 3350, 3360, 3400, 3460, 3545, 3560, 3700, 3850]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
 
 USE_PAST_RESULT = True
 
@@ -142,7 +142,7 @@ if __name__ == "__main__":
         # print(len(past_AI_id_list), len(past_search_nodes_list))
 
         # ノード数固定で良いパラメータ抜き出し用
-        all_AI_id_set = set([-1] + list(sorted(param_files)))
+        all_AI_id_set = set([-1] + list(sorted(param_files)) + FIX_EPOCH_LIST)
         AI_id_set = all_AI_id_set - set(range(-1, max(past_AI_id_arr) + 1))
         AI_id_list = sorted(list(AI_id_set))
 
@@ -196,9 +196,9 @@ if __name__ == "__main__":
     N_arr = np.zeros((AI_num, AI_num))
 
     # train_logにn_arrが残っている場合、AI_idとsearch_nodesがそのときのものと一致している前提で新しいn_arr, N_arrに読み込む
-    if os.path.exists(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr.csv")):
-        past_n_arr = np.loadtxt(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr.csv"), delimiter=',')
-        past_N_arr = np.loadtxt(os.path.join(TRAIN_LOG_DIR, "detail", "N_arr.csv"), delimiter=',')
+    if os.path.exists(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr_extracted.csv")):
+        past_n_arr = np.loadtxt(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr_extracted.csv"), delimiter=',')
+        past_N_arr = np.loadtxt(os.path.join(TRAIN_LOG_DIR, "detail", "N_arr_extracted.csv"), delimiter=',')
         past_n_arr = past_n_arr[np.ix_(use_index_list, use_index_list)]
         past_N_arr = past_N_arr[np.ix_(use_index_list, use_index_list)]
         size = past_n_arr.shape[0]
@@ -274,6 +274,9 @@ if __name__ == "__main__":
 
         np.savetxt(os.path.join(save_dir, "n_arr.csv"), n_arr, delimiter=",")
         np.savetxt(os.path.join(save_dir, "N_arr.csv"), N_arr, delimiter=",")
+
+        np.savetxt(os.path.join(save_dir, "n_arr_extracted.csv"), n_arr[survived_list, survived_list], delimiter=",")
+        np.savetxt(os.path.join(save_dir, "N_arr_extracted.csv"), N_arr[survived_list, survived_list], delimiter=",")
 
         plt.clf()
         #plt.plot(np.array(AI_id_list)[survived_list], r_arr[survived_list], label="true")
