@@ -308,7 +308,7 @@ cdef class State:
             return False
         
         # 中央マスから横に移動できる場合、先手は横に移動することで優位に立てる可能性がある
-        if not (self.column_wall[3, 3] or self.column_wall[4, 3]):
+        if not (self.column_wall[3, 3] or self.column_wall[4, 3] or self.row_wall[3, 3] or self.row_wall[4, 3]):
             return False
         
         # 中央マスを通る、つまりジャンプが生じる場合でしか後手勝利にならない
@@ -319,6 +319,12 @@ cdef class State:
         blocked_cross_movable_array = np.copy(self.cross_movable_arr)
         blocked_cross_movable_array[4, 3, DOWN] = 0
         blocked_cross_movable_array[4, 4, UP] = 0
+        blocked_cross_movable_array[4, 4, DOWN] = 0
+        blocked_cross_movable_array[4, 5, UP] = 0
+        blocked_cross_movable_array[3, 4, RIGHT] = 0
+        blocked_cross_movable_array[4, 4, LEFT] = 0
+        blocked_cross_movable_array[4, 4, RIGHT] = 0
+        blocked_cross_movable_array[5, 4, LEFT] = 0
         blocked_dist_array = self.dist_array(0, blocked_cross_movable_array)
         if blocked_dist_array[4, 4] != np.max(blocked_dist_array):
             return False
