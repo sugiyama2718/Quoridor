@@ -292,10 +292,6 @@ cdef class State:
         return True
 
     def is_mirror_match(self):
-        # 先手の場合しか成立しない
-        if self.turn % 2 == 1:
-            return False
-
         # 盤面上の壁が5枚以下ではmirror matchは成立し得ない
         if 20 - (self.black_walls + self.white_walls) <= 5:
             return False
@@ -307,8 +303,8 @@ cdef class State:
         if not np.all(self.row_wall == np.flip(self.row_wall)) and np.all(self.column_wall == np.flip(self.column_wall)):
             return False
         
-        # コマ位置が回転対称でなければ
-        if not (self.Bx == 8 - self.Wx and self.By == 8 - self.Wy):
+        # コマが回転対称のときは、先手番なら後手勝ち
+        if not (self.Bx == 8 - self.Wx and self.By == 8 - self.Wy and self.turn % 2 == 0):
             return False
         
         # 中央マスから横に移動できる場合、先手は横に移動することで優位に立てる可能性がある
@@ -317,6 +313,14 @@ cdef class State:
         
         # 中央マスを通る、つまりジャンプが生じる場合でしか後手勝利にならない
         if self.dist_array1[self.Bx, self.By] <= self.dist_array1[4, 4]:
+            return False
+        
+        # ゴールへの道が中央マスを必ず通る場合のみ後手勝利。中央マスの上側を塞いだとき、ゴールにたどり着けなくなるかどうかで判定。
+        blocked_cross_movable_array = np.copy(self.cross_movable_arr)
+        blocked_cross_movable_array[4, 3, DOWN] = 0
+        blocked_cross_movable_array[4, 4, UP] = 0
+        blocked_dist_array = self.dist_array(0, blocked_cross_movable_array)
+        if blocked_dist_array[4, 4] != np.max(blocked_dist_array):
             return False
 
         return True
