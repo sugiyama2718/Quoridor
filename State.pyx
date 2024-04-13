@@ -303,16 +303,17 @@ cdef class State:
         if not np.all(self.row_wall == np.flip(self.row_wall)) and np.all(self.column_wall == np.flip(self.column_wall)):
             return False
         
-        # コマが回転対称のときは、先手番なら後手勝ち
-        if not (self.Bx == 8 - self.Wx and self.By == 8 - self.Wy and self.turn % 2 == 0):
-            return False
-        
         # 中央マスから横に移動できる場合、先手は横に移動することで優位に立てる可能性がある
         if not (self.column_wall[3, 3] or self.column_wall[4, 3] or self.row_wall[3, 3] or self.row_wall[4, 3]):
             return False
         
-        # 中央マスを通る、つまりジャンプが生じる場合でしか後手勝利にならない
-        if self.dist_array1[self.Bx, self.By] <= self.dist_array1[4, 4]:
+        # コマが回転対称で飛び越し前かつ先手番なら後手勝ち
+        f1 = (self.Bx == 8 - self.Wx and self.By == 8 - self.Wy and self.turn % 2 == 0 and self.dist_array1[self.Bx, self.By] > self.dist_array1[4, 4])
+
+        # 飛び越し後は逆
+        f2 = (self.Bx == 8 - self.Wx and self.By == 8 - self.Wy and self.turn % 2 == 1 and self.dist_array1[self.Bx, self.By] < self.dist_array1[4, 4])
+        
+        if not (f1 or f2):
             return False
         
         # ゴールへの道が中央マスを必ず通る場合のみ後手勝利。中央マスの上側を塞いだとき、ゴールにたどり着けなくなるかどうかで判定。
