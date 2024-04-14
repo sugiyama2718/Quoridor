@@ -33,6 +33,9 @@ for dir in dirs:
     state.black_walls = p1_walls
     state.white_walls = p2_walls
     state.set_state_by_wall()
+
+    state.display_cui()
+    print(state.is_mirror_match())
     
     results.append(state.is_mirror_match())
 
