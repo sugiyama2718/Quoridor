@@ -318,17 +318,23 @@ cdef class State:
         
         # ゴールへの道が中央マスを必ず通る場合のみ後手勝利。中央マスの上側を塞いだとき、ゴールにたどり着けなくなるかどうかで判定。
         blocked_cross_movable_array = np.copy(self.cross_movable_arr)
-        blocked_cross_movable_array[4, 3, DOWN] = 0
-        blocked_cross_movable_array[4, 4, UP] = 0
-        blocked_cross_movable_array[4, 4, DOWN] = 0
-        blocked_cross_movable_array[4, 5, UP] = 0
-        blocked_cross_movable_array[3, 4, RIGHT] = 0
-        blocked_cross_movable_array[4, 4, LEFT] = 0
-        blocked_cross_movable_array[4, 4, RIGHT] = 0
-        blocked_cross_movable_array[5, 4, LEFT] = 0
-        blocked_dist_array = self.dist_array(0, blocked_cross_movable_array)
-        if blocked_dist_array[4, 4] != np.max(blocked_dist_array):
-            return False
+        if self.column_wall[3, 3] or self.column_wall[4, 3]:
+            blocked_cross_movable_array[4, 3, DOWN] = 0
+            blocked_cross_movable_array[4, 4, UP] = 0
+            blocked_cross_movable_array[4, 4, DOWN] = 0
+            blocked_cross_movable_array[4, 5, UP] = 0
+            blocked_dist_array = self.dist_array(0, blocked_cross_movable_array)
+            print(blocked_dist_array)
+            if blocked_dist_array[4, 3] != np.max(blocked_dist_array) and blocked_dist_array[4, 5] != np.max(blocked_dist_array):
+                return False
+        else:
+            blocked_cross_movable_array[3, 4, RIGHT] = 0
+            blocked_cross_movable_array[4, 4, LEFT] = 0
+            blocked_cross_movable_array[4, 4, RIGHT] = 0
+            blocked_cross_movable_array[5, 4, LEFT] = 0
+            blocked_dist_array = self.dist_array(0, blocked_cross_movable_array)
+            if blocked_dist_array[3, 4] != np.max(blocked_dist_array) and blocked_dist_array[5, 4] != np.max(blocked_dist_array):
+                return False
 
         return True
 
