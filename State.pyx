@@ -300,7 +300,7 @@ cdef class State:
             return False
 
         # 壁が回転対称でなければ
-        if not np.all(self.row_wall == np.flip(self.row_wall)) and np.all(self.column_wall == np.flip(self.column_wall)):
+        if not (np.all(self.row_wall == np.flip(self.row_wall)) and np.all(self.column_wall == np.flip(self.column_wall))):
             return False
         
         # 中央マスから横に移動できる場合、先手は横に移動することで優位に立てる可能性がある
