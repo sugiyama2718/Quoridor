@@ -285,9 +285,12 @@ cdef class State:
             if self.black_walls == 0 and (W_dist + (1 - self.turn % 2) <= B_dist - 1):
                 self.pseudo_terminate = True
                 self.pseudo_reward = -1
-            if self.white_walls == 0 and (B_dist + self.turn % 2 <= W_dist - 1):
+            elif self.white_walls == 0 and (B_dist + self.turn % 2 <= W_dist - 1):
                 self.pseudo_terminate = True
                 self.pseudo_reward = 1
+            elif self.is_mirror_match():
+                self.pseudo_terminate = True
+                self.pseudo_reward = -1
 
         return True
 
