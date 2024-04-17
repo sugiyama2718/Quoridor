@@ -37,18 +37,11 @@ def dxdy2actionid(dx, dy):
 
 
 def str2actionid(state, s):
-    print(s)
     for action_id in range(128 + 9):
         action_str = actionid2str(state, action_id)
-        print(action_str)
         if action_str == s:
             return action_id
     return -1
-    # if len(s) == 2:
-    #     pass
-    # elif len(s) == 3:
-    #     ret = 64 if s[2] == "v" else 0
-
 
 
 def actionid2str(state, action_id):
