@@ -291,6 +291,9 @@ cdef class State:
             elif self.is_mirror_match():
                 self.pseudo_terminate = True
                 self.pseudo_reward = -1
+            else:
+                self.pseudo_terminate = False
+                self.pseudo_reward = 0
 
         return True
 
@@ -327,7 +330,6 @@ cdef class State:
             blocked_cross_movable_array[4, 4, DOWN] = 0
             blocked_cross_movable_array[4, 5, UP] = 0
             blocked_dist_array = self.dist_array(0, blocked_cross_movable_array)
-            print(blocked_dist_array)
             if blocked_dist_array[4, 3] != np.max(blocked_dist_array) and blocked_dist_array[4, 5] != np.max(blocked_dist_array):
                 return False
         else:
