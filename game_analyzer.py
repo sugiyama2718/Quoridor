@@ -105,7 +105,7 @@ def float2score(x):
 
 def tree2score(tree, turn):
     if int(np.sum(tree.N)) == 0:
-        return 0  # TODO: 勝敗を返すようにしたい
+        return tree.result * 1000
     score = float2score(np.sum(tree.W) / np.sum(tree.N)) 
     if turn % 2 == 1:
         score *= -1
@@ -686,6 +686,9 @@ class Quoridor(Widget):
         self.agents = self.analyze_AIs
 
     def get_multiaction_description_from_tree(self, tree, action, depth, first_call):
+        if tree.result != 0:
+            return Glendenning2Official(actionid2str(tree.s, tree.optimal_action))
+
         if depth <= 0 or action not in tree.children.keys():
             return ""
         
@@ -713,13 +716,21 @@ class Quoridor(Widget):
         analyze_AI.init_prev(state)  # 副作用があるかも
         _, MCTS_tree = analyze_AI.MCTS(state, self.search_nodes, analyze_AI.C_puct, self.tau, 
                                                  showNQ=False, noise=0., random_flip=False, use_prev_tree=self.use_prev_tree, opponent_prev_tree=None, return_root_tree=True)
+        if self.graphviz_on.state == "down" and not state.pseudo_terminate:
+            g = analyze_AI.get_tree_for_graphviz()
+            if g is not None:
+                g.render(os.path.join("game_trees", "game_tree{}".format(state.turn)))
         return MCTS_tree
     
     def tree2info(self, tree):
-        nonzero_num = sum([int(np.sum(tree.children[a].N) >= 1) for a in range(len(tree.N)) if a in tree.children.keys()])
-        goodmove_num = np.sum(tree.N / np.sum(tree.N) >= GOOD_TH)
-        action_cands = np.argsort(tree.N)[::-1][:min(10, max(3, goodmove_num), nonzero_num)]
-        root_score = tree2score(tree, tree.s.turn)
+        if tree.result == 0:
+            nonzero_num = sum([int(np.sum(tree.children[a].N) >= 1) for a in range(len(tree.N)) if a in tree.children.keys()])
+            goodmove_num = np.sum(tree.N / np.sum(tree.N) >= GOOD_TH)
+            action_cands = np.argsort(tree.N)[::-1][:min(10, max(3, goodmove_num), nonzero_num)]
+            root_score = tree2score(tree, tree.s.turn)
+        else:
+            root_score = tree.result * 1000
+            action_cands = [tree.optimal_action]
         return root_score, action_cands
     
     def treeinfo2text(self, tree, root_score, action_cands):
