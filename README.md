@@ -11,6 +11,10 @@ pipenv shell
 pipenv install
 ```
 
+
+If you want to use a pre-trained model, please download the zip file from the following link, unzip it, and place the application_data directly under this repository.  
+https://drive.google.com/drive/u/1/folders/10ZZLK9tDxJCG-0eV6wxiKF5g0RubCsxo
+
 If you want to train AI, then you need tensorflow-gpu.
 
 ## Usage
@@ -19,6 +23,12 @@ Play quoridor in GUI:
 
 ```sh
 python GUI.py
+```
+
+Analyze quoridor games:
+
+```sh
+python game_analyzer.py
 ```
 
 Train AI:
