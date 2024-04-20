@@ -433,7 +433,7 @@ class Quoridor(Widget):
             self.prev_prev_str = prev_str
 
             if node.search_text is not None:
-                _, _, is_mirror = self.get_normalized_state(all_actions)
+                _, _, is_mirror = self.get_normalized_state(list(map(Official2Glendenning, all_actions)))
                 if is_mirror:
                     search_text = self.mirror_text(node.search_text)
                 else:
@@ -534,9 +534,7 @@ class Quoridor(Widget):
                 json_dict = json.load(fin)
             self.opening_tree = load_dict_to_opening_tree(json_dict)
             load_statevec2node(self.opening_tree)
-    
 
-    
     def save_opening_tree(self):
         with open(DEFAULT_OPENING_JSONFILEPATH, "w") as fout:
             json.dump(self.opening_tree.to_dict(), fout)
@@ -554,9 +552,6 @@ class Quoridor(Widget):
             return state, state_vec, False
         else:
             return mirror_state, mirror_state_vec, True
-
-        
-
 
     def register(self, is_display=True):
         print("register")
