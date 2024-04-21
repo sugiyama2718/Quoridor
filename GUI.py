@@ -76,7 +76,7 @@ LEVEL_NUM = len(epoch_list)
 
 #TRAINING_LIST = [(0, 500), (60, 500), (62, 500), (71, 500), (91, 500), (96, 500), (155, 500), (220, 500), (465, 500), (620, 500), (620, 500), (634, 1000)]
 TRAINING_LIST = [(0, 500), (1, 500), (2, 500), (3, 500), (4, 500), (5, 500), (6, 500), (7, 500), (8, 500), (9, 500), 
-                 (10, 500), (11, 500), (12, 500), (13, 200), (13, 500), (14, 500), (15, 500), (16, 500), (17, 500), (18, 500), (19, 500), (20, 500)]
+                 (10, 500), (11, 500), (12, 500), (13, 200), (13, 500), (14, 500), (15, 500), (16, 500), (17, 500), (18, 500), (19, 500), (20, 500), (21, 500)]
 TRAINING_LEVEL_NUM = len(TRAINING_LIST)
 
 # 対戦モードid
@@ -230,6 +230,8 @@ class Quoridor(Widget):
             y = i // 8
             self.canvas.add(Rectangle(pos=(int(10 + (x + 1) / 9 * (BOARD_LEN - 30)), int(20 + y / 9 * (BOARD_LEN - 30))), size=(10, (BOARD_LEN - 30) // 9 * 2 - 10)))
 
+        self.virtual_human = GUIHuman(0)  # 対戦前の指し手用
+
     def human_tab_f(self):
         print("Human vs. Human")
         self.mode = HUMAN_HUMAN_MODE
@@ -246,7 +248,7 @@ class Quoridor(Widget):
         print("Training")
         self.mode = TRAINING_MODE 
 
-    def add_history(self, s, a):
+    def add_history(self, s, a, is_record=True):
         s = state_copy(s)
 
         if self.state_history is None:  # このときaction_historyもNoneとして実装
@@ -259,10 +261,37 @@ class Quoridor(Widget):
         self.state_history.append(s)
         self.action_history.append(a)
 
-        action_strs = map(Glendenning2Official, self.action_history[1:])  # 0はNone
-        path = os.path.join(self.record_folder_name, "record.txt")
-        with open(path, 'w') as fout:
-            fout.write(",".join(action_strs))
+        if is_record:
+            action_strs = map(Glendenning2Official, self.action_history[1:])  # 0はNone
+            path = os.path.join(self.record_folder_name, "record.txt")
+            with open(path, 'w') as fout:
+                fout.write(",".join(action_strs))
+
+    def oneturn_notplaying(self):
+        global touched, action
+
+        s = self.virtual_human.act(self.state)
+        action = ""
+
+        if s == -1 or s == "":
+            return
+
+        if isinstance(s, int):
+            a = actionid2str(self.state, s)
+        else:
+            a = s
+
+        if not self.state.accept_action_str(a):
+            print(a)
+            print("this action is impossible")
+            return
+        print(Glendenning2Official(a))
+
+        self.state.display_cui()
+        self.turn += 1
+        self.add_history(self.state, a, is_record=False)
+
+        touched = False
 
     def oneturn(self, color):
         global touched, action
@@ -355,6 +384,7 @@ class Quoridor(Widget):
     def resign(self):
         print("resign")
         self.is_resign = True
+        self.playing_game = False
         self.end_game()
 
     def set_remaining_time_str(self):
@@ -470,10 +500,15 @@ class Quoridor(Widget):
             print(self.training_joseki)
 
         self.agents = [agent1, agent2]
-        self.state = State()
-        self.turn = 0
-        self.state_history = None
-        self.add_history(self.state, None)
+
+        if self.mode == TRAINING_MODE or self.state.terminate:
+            self.state = State()
+            self.turn = 0
+            self.state_history = None
+            self.add_history(self.state, None)
+        else:
+            # 現局面をそのまま使う
+            pass
         self.playing_game = True
         self.use_prev_tree = True
         self.prev_act_time = time.time()
@@ -564,6 +599,9 @@ class Quoridor(Widget):
                 self.set_remaining_time_str()
                 if self.remaining_time <= 0.0:
                     self.set_game_result("You lose")
+
+        elif not self.playing_game:
+            self.oneturn_notplaying()
 
         # 試合終了処理
         if self.state.terminate and self.playing_game:
