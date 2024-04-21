@@ -305,8 +305,8 @@ class Quoridor(Widget):
         elif isinstance(self.agents[color], CNNAI):
             if time.time() - self.prev_act_time <= self.ai_wait_time:
                 return
-            s = self.agents[color].act(self.state, use_prev_tree=self.use_prev_tree)
-            print("use_prev_tree=" + str(self.use_prev_tree))
+            s, _, _, v_post, _ = self.agents[color].act_and_get_pi(self.state, use_prev_tree=self.use_prev_tree)
+            print("score= {}, use_prev_tree={}".format(int(1000 * v_post), self.use_prev_tree))
 
             if self.graphviz_on.state == "down" and not self.state.pseudo_terminate:
                 g = self.agents[color].get_tree_for_graphviz()
