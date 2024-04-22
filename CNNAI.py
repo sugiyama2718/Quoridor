@@ -43,8 +43,9 @@ def layernorm(x, beta, gamma, filters):
 class CNNAI(BasicAI):
     def __init__(self, color, search_nodes=1, C_puct=2, tau=1, all_parameter_zero=False, v_is_dist=False, p_is_almost_flat=False, 
     seed=0, use_estimated_V=True, V_ema_w=0.01, shortest_only=False, per_process_gpu_memory_fraction=PER_PROCESS_GPU_MEMORY_FRACTION, use_average_Q=False, random_playouts=False,
-    filters=DEFAULT_FILTERS, layer_num=DEFAULT_LAYER_NUM, use_global_pooling=USE_GLOBAL_POOLING, use_self_attention=USE_SELF_ATTENTION, use_slim_head=USE_SLIM_HEAD):
-        super(CNNAI, self).__init__(color, search_nodes, C_puct, tau, use_estimated_V=use_estimated_V, V_ema_w=V_ema_w, shortest_only=shortest_only, use_average_Q=use_average_Q, random_playouts=random_playouts)
+    filters=DEFAULT_FILTERS, layer_num=DEFAULT_LAYER_NUM, use_global_pooling=USE_GLOBAL_POOLING, use_self_attention=USE_SELF_ATTENTION, use_slim_head=USE_SLIM_HEAD, opponent_AI=None,
+    is_mimic_AI=False):
+        super(CNNAI, self).__init__(color, search_nodes, C_puct, tau, use_estimated_V=use_estimated_V, V_ema_w=V_ema_w, shortest_only=shortest_only, use_average_Q=use_average_Q, random_playouts=random_playouts, is_mimic_AI=is_mimic_AI)
 
         np.random.seed(seed)
         random.seed(seed)
@@ -62,8 +63,10 @@ class CNNAI(BasicAI):
         self.use_global_pooling = use_global_pooling
         self.use_self_attention = use_self_attention
         self.use_slim_head = use_slim_head
+        self.opponent_AI = opponent_AI  # tensorflowを自己対戦の２AIで共有するための変数。TODO: 非合法手がまだ出るので修正は必要。ただしGPUメモリが節約できなかったので着手していない。
 
-        self.init_tensorflow()
+        if self.opponent_AI is None:
+            self.init_tensorflow()
 
     def init_tensorflow(self):
         # tensorflowの準備
@@ -120,6 +123,7 @@ class CNNAI(BasicAI):
                 #self.b_convs.append(self.bias_variable([self.filters], name=f"b_conv{i}"))
                 self.betas.append(self.bias_variable([LAYER_NORM_LEN, LAYER_NORM_LEN, self.filters], name=f"beta{i}"))
                 self.gammas.append(self.weight_variable([LAYER_NORM_LEN, LAYER_NORM_LEN, self.filters], name=f"gamma{i}"))
+                
                 self.WQs.append(self.weight_variable([self.filters, self.filters], name=f"WQ{i}"))
                 self.WKs.append(self.weight_variable([self.filters, self.filters], name=f"WK{i}"))
                 self.WVs.append(self.weight_variable([self.filters, self.filters], name=f"WV{i}"))
@@ -397,6 +401,9 @@ class CNNAI(BasicAI):
         return self.v_array([s])[0]
 
     def v_array(self, states, random_flip=False):
+        if self.opponent_AI is not None:
+            return self.opponent_AI.v_array(states, random_flip)
+        
         if self.v_is_dist:
             y = np.zeros((len(states),))
             for i, s in enumerate(states):
@@ -429,6 +436,9 @@ class CNNAI(BasicAI):
         return self.p_array([s], leaf_movable_arrs=leaf_movable_arrs)[0]
 
     def p_array(self, states, random_flip=False, leaf_movable_arrs=None):
+        if self.opponent_AI is not None:
+            return self.opponent_AI.p_array(states, random_flip, leaf_movable_arrs)
+
         mask = np.zeros((len(states), self.action_num))
         if self.p_is_almost_flat:
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
@@ -483,6 +493,9 @@ class CNNAI(BasicAI):
     def pv_array(self, states, leaf_movable_arrs=None):
         if self.v_is_dist:
             assert False, "not implemented"
+
+        if self.opponent_AI is not None:
+            return self.opponent_AI.pv_array(states, leaf_movable_arrs)
 
         mask = np.zeros((len(states), self.action_num))
         if self.p_is_almost_flat:
@@ -724,6 +737,9 @@ class CNNAI(BasicAI):
             fout.write(json.dumps(params))
 
     def load(self, path):
+        if self.opponent_AI is not None:
+            return
+
         dir = os.path.dirname(path)
         name = os.path.basename(path).split(".")[0]
         with open(os.path.join(dir, f"{name}.json"), "r") as fin:
