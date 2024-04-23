@@ -492,14 +492,8 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
         # AIs = [CNNAI(0, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000),
         #        CNNAI(1, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000)]
     else:
-        is_mimic_AI = False
-        if random.random() < MIMIC_AI_RATIO:
-            is_mimic_AI = True
-        elif MIMIC_AI_RATIO <= random.random() < MIMIC_AI_RATIO + FORCE_OPENING_RATE:
-            print("FORCE_OPENING")
-
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True),
-               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True, is_mimic_AI=is_mimic_AI)]
+               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True)]
         AIs[0].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
         AIs[1].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
 
@@ -510,6 +504,16 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
 
     all_data = []
     for _ in range(GAME_NUM_IN_H5):
+        is_mimic_AI = False
+        force_opening = None
+        if random.random() < MIMIC_AI_RATIO:
+            is_mimic_AI = True
+        elif MIMIC_AI_RATIO <= random.random() < MIMIC_AI_RATIO + FORCE_OPENING_RATE:
+            force_opening = random.choice(FORCE_OPENING_LIST)
+        AIs[0].force_opening = force_opening
+        AIs[1].is_mimic_AI = is_mimic_AI
+        AIs[1].force_opening = force_opening
+
         if h5_id < H5_NUM:
             temp_data = generate_data(AIs, 1, noise=1., id_=h5_id, display=is_test, info=is_test)
         else:
