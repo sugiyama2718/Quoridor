@@ -723,7 +723,7 @@ class BasicAI(Agent):
                 if return_root_tree:
                     return force_action_id, Tree(state, pi_ret)
                 else:
-                    return force_action_id, pi_ret, root_v, 0.0, SELFPLAY_SEARCHNODES_MIN  # 探索はしていないので探索後のvは0にしておく
+                    return force_action_id, pi_ret, root_v, 0.0, 1  # 探索はしていないので探索後のvは0にしておく、またpolicyの学習への影響を最小限にする
 
         while node_num < max_node and root_tree.result == 0:
             # select
