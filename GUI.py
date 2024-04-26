@@ -4,6 +4,7 @@ BOARD_LEN = 600
 WINDOW_WIDTH = 1000
 
 from kivy.config import Config
+from kivy.metrics import dp
 Config.set('graphics', 'width', str(WINDOW_WIDTH))
 Config.set('graphics', 'height', str(BOARD_LEN))
 Config.set('graphics', 'resizable', False)
@@ -212,23 +213,23 @@ class Quoridor(Widget):
 
         with self.canvas.before:
             Color(96/255, 32/128, 0, 1)
-            Rectangle(pos=(10, 10), size=(BOARD_LEN - 20, BOARD_LEN - 20))
+            Rectangle(pos=(dp(10), dp(10)), size=(dp(BOARD_LEN - 20), dp(BOARD_LEN - 20)))
             Color(64/255, 0, 0, 1)
             for i in range(10):
-                Rectangle(pos=(int(10 + i / 9 * (BOARD_LEN - 30)), 10), size=(10, BOARD_LEN - 20))
+                Rectangle(pos=(int(dp(10 + i / 9 * (BOARD_LEN - 30))), dp(10)), size=(dp(10), dp(BOARD_LEN - 20)))
             for i in range(10):
-                Rectangle(pos=(10, int(10 + i / 9 * (BOARD_LEN - 30))), size=(BOARD_LEN - 20, 10))
+                Rectangle(pos=(dp(10), dp(int(10 + i / 9 * (BOARD_LEN - 30)))), size=(dp(BOARD_LEN - 20), dp(10)))
 
         for i, color in enumerate(self.row_wall_colors):
             self.canvas.add(color)
             x = i % 8
             y = i // 8
-            self.canvas.add(Rectangle(pos=(int(20 + x / 9 * (BOARD_LEN - 30)), int(10 + (y + 1) / 9 * (BOARD_LEN - 30))), size=((BOARD_LEN - 30) // 9 * 2 - 10, 10)))
+            self.canvas.add(Rectangle(pos=(dp(int(20 + x / 9 * (BOARD_LEN - 30))), dp(int(10 + (y + 1) / 9 * (BOARD_LEN - 30)))), size=(dp((BOARD_LEN - 30) // 9 * 2 - 10), dp(10))))
         for i, color in enumerate(self.column_wall_colors):
             self.canvas.add(color)
             x = i % 8
             y = i // 8
-            self.canvas.add(Rectangle(pos=(int(10 + (x + 1) / 9 * (BOARD_LEN - 30)), int(20 + y / 9 * (BOARD_LEN - 30))), size=(10, (BOARD_LEN - 30) // 9 * 2 - 10)))
+            self.canvas.add(Rectangle(pos=(dp(int(10 + (x + 1) / 9 * (BOARD_LEN - 30))), dp(int(20 + y / 9 * (BOARD_LEN - 30)))), size=(dp(10), dp((BOARD_LEN - 30) // 9 * 2 - 10))))
 
         self.virtual_human = GUIHuman(0)  # 対戦前の指し手用
 
@@ -636,10 +637,10 @@ class Quoridor(Widget):
             stateWx = self.state.Wx
             stateWy = self.state.Wy
 
-        self.Bx = int(15 + (stateBx + 0.5) / 9 * (BOARD_LEN - 30))
-        self.By = int(15 + (8.5 - stateBy) / 9 * (BOARD_LEN - 30))
-        self.Wx = int(15 + (stateWx + 0.5) / 9 * (BOARD_LEN - 30))
-        self.Wy = int(15 + (8.5 - stateWy) / 9 * (BOARD_LEN - 30))
+        self.Bx = dp(int(15 + (stateBx + 0.5) / 9 * (BOARD_LEN - 30)))
+        self.By = dp(int(15 + (8.5 - stateBy) / 9 * (BOARD_LEN - 30)))
+        self.Wx = dp(int(15 + (stateWx + 0.5) / 9 * (BOARD_LEN - 30)))
+        self.Wy = dp(int(15 + (8.5 - stateWy) / 9 * (BOARD_LEN - 30)))
 
         for x in range(8):
             for y in range(8):
@@ -649,11 +650,11 @@ class Quoridor(Widget):
         for x in range(8):
             for y in range(8):
                 mouse_x, mouse_y = Window.mouse_pos
-                if int(20 + (x + 0.5) / 9 * (BOARD_LEN - 30)) <= mouse_x < int(20 + (x + 1.5) / 9 * (BOARD_LEN - 30)) and int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) <= mouse_y <= int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) + 10:
+                if int(dp(20 + (x + 0.5) / 9 * (BOARD_LEN - 30))) <= mouse_x < int(dp(20 + (x + 1.5) / 9 * (BOARD_LEN - 30))) and int(dp(10 + (y + 1) / 9 * (BOARD_LEN - 30))) <= mouse_y <= dp(int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) + 10):
                     self.row_wall_colors[y * 8 + x].a = 0.5
-                if int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) - 10 <= mouse_x <= int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) and int(10 + (y + 0.5) / 9 * (BOARD_LEN - 30)) <= mouse_y < int(10 + (y + 1.5) / 9 * (BOARD_LEN - 30)):
+                if int(dp(20 + (x + 1) / 9 * (BOARD_LEN - 30))) - 10 <= mouse_x <= int(dp(20 + (x + 1) / 9 * (BOARD_LEN - 30))) and int(dp(10 + (y + 0.5) / 9 * (BOARD_LEN - 30))) <= mouse_y < dp(int(10 + (y + 1.5) / 9 * (BOARD_LEN - 30))):
                     self.column_wall_colors[y * 8 + x].a = 0.5
-                if int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) - 10 <= mouse_x <= int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) and int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) <= mouse_y <= int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) + 10:
+                if int(dp(20 + (x + 1) / 9 * (BOARD_LEN - 30))) - 10 <= mouse_x <= int(dp(20 + (x + 1) / 9 * (BOARD_LEN - 30))) and int(dp(10 + (y + 1) / 9 * (BOARD_LEN - 30))) <= mouse_y <= dp(int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) + 10):
                     self.row_wall_colors[y * 8 + x].a = 0
                     self.column_wall_colors[y * 8 + x].a = 0
 
@@ -733,18 +734,18 @@ class Quoridor(Widget):
                     action_x = x
                     action_y = y
 
-                if int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) - 10 <= touch.x <= int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) and int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) <= touch.y <= int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) + 10:
+                if dp(int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) - 10) <= touch.x <= dp(int(20 + (x + 1) / 9 * (BOARD_LEN - 30))) and dp(int(10 + (y + 1) / 9 * (BOARD_LEN - 30))) <= touch.y <= dp(int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) + 10):
                     continue
 
-                if int(20 + x / 9 * (BOARD_LEN - 30)) <= touch.x < int(10 + (x + 1) / 9 * (BOARD_LEN - 30)) and int(20 + y / 9 * (BOARD_LEN - 30)) <= touch.y < int(10 + (y + 1) / 9 * (BOARD_LEN - 30)):
+                if dp(int(20 + x / 9 * (BOARD_LEN - 30))) <= touch.x < dp(int(10 + (x + 1) / 9 * (BOARD_LEN - 30))) and dp(int(20 + y / 9 * (BOARD_LEN - 30))) <= touch.y < dp(int(10 + (y + 1) / 9 * (BOARD_LEN - 30))):
                     action = chr(ord("a") + action_x) + str(9 - action_y)
 
                 # 壁置きではx, yが8以降は無視する必要がある
                 if x == 8 or y == 8:
                     continue
-                if int(20 + (x + 0.5) / 9 * (BOARD_LEN - 30)) <= touch.x < int(20 + (x + 1.5) / 9 * (BOARD_LEN - 30)) and int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) <= touch.y <= int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) + 10:
+                if dp(int(20 + (x + 0.5) / 9 * (BOARD_LEN - 30))) <= touch.x < dp(int(20 + (x + 1.5) / 9 * (BOARD_LEN - 30))) and dp(int(10 + (y + 1) / 9 * (BOARD_LEN - 30))) <= touch.y <= dp(int(10 + (y + 1) / 9 * (BOARD_LEN - 30)) + 10):
                     action = chr(ord("a") + wall_x) + str(8 - wall_y) + "h"
-                if int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) - 10 <= touch.x <= int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) and int(10 + (y + 0.5) / 9 * (BOARD_LEN - 30)) <= touch.y < int(10 + (y + 1.5) / 9 * (BOARD_LEN - 30)):
+                if dp(int(20 + (x + 1) / 9 * (BOARD_LEN - 30)) - 10) <= touch.x <= dp(int(20 + (x + 1) / 9 * (BOARD_LEN - 30))) and dp(int(10 + (y + 0.5) / 9 * (BOARD_LEN - 30))) <= touch.y < dp(int(10 + (y + 1.5) / 9 * (BOARD_LEN - 30))):
                     action = chr(ord("a") + wall_x) + str(8 - wall_y) + "v"
 
         #print(touch.x, touch.y)
@@ -830,7 +831,7 @@ class QuoridorApp(App):
             rgba: 1, 1, 1, 1
         Rectangle:
             pos: (0, 0)
-            size: ({WINDOW_WIDTH}, 600)
+            size: ({dp(WINDOW_WIDTH)}, {dp(600)})
         Color:
             rgba: 1, 0, 0, 1
 
@@ -838,78 +839,78 @@ class QuoridorApp(App):
         Color:
             rgba: 1.0, 1.0, 1.0, 1
         Triangle:
-            points: (root.Bx - 20, root.By - 20 + root.upside_down * 40, root.Bx, root.By + 20 - root.upside_down * 40, root.Bx + 20, root.By - 20 + root.upside_down * 40)
+            points: (root.Bx - {dp(20)}, root.By - {dp(20)} + root.upside_down * {dp(40)}, root.Bx, root.By + {dp(20)} - root.upside_down * {dp(40)}, root.Bx + {dp(20)}, root.By - {dp(20)} + root.upside_down * {dp(40)})
         Color:
             rgba: 0, 0, 0, 1
         Triangle:
-            points: (root.Wx - 20, root.Wy + 20 - root.upside_down * 40, root.Wx, root.Wy - 20 + root.upside_down * 40, root.Wx + 20, root.Wy + 20 - root.upside_down * 40)
+            points: (root.Wx - {dp(20)}, root.Wy + {dp(20)} - root.upside_down * {dp(40)}, root.Wx, root.Wy - {dp(20)} + root.upside_down * {dp(40)}, root.Wx + {dp(20)}, root.Wy + {dp(20)} - root.upside_down * {dp(40)})
 
     Label:
-        font_size: 30
-        pos: (620, 530)
+        font_size: {dp(30)}
+        pos: ({dp(620)}, {dp(530)})
         color: 0, 0, 0, 1
         text: "turn:" + str(root.turn)
     Label:
-        font_size: 30
-        pos: (680, 500)
+        font_size: {dp(30)}
+        pos: ({dp(680)}, {dp(500)})
         color: 0, 0, 0, 1
         text: root.move_str
     Label:
-        font_size: 30
-        pos: (680, 470)
+        font_size: {dp(30)}
+        pos: ({dp(680)}, {dp(470)})
         color: 0, 0, 0, 1
         text: "player1 wall:" + str(root.player1wall)
     Label:
-        font_size: 30
-        pos: (680, 440)
+        font_size: {dp(30)}
+        pos: ({dp(680)}, {dp(440)})
         color: 0, 0, 0, 1
         text: "player2 wall:" + str(root.player2wall)
     Label:
-        font_size: 30
-        pos: (820, 530)
+        font_size: {dp(30)}
+        pos: ({dp(820)}, {dp(530)})
         color: 0, 0, 0, 1
         text: root.remaining_time_str
     Label:
-        font_size: 30
-        pos: (850, 500)
+        font_size: {dp(30)}
+        pos: ({dp(850)}, {dp(500)})
         color: 0, 0, 0, 1
         text: root.game_result
 
     Button:
         id: turn0_button
-        pos: (595, 100)
-        size: (100, 40)
+        pos: ({dp(595)}, {dp(100)})
+        size: ({dp(100)}, {dp(40)})
         text: "Back to turn 0"
     Button:
         id: undo_button
-        pos: (700, 100)
-        size: (80, 40)
+        pos: ({dp(700)}, {dp(100)})
+        size: ({dp(80)}, {dp(40)})
         text: "Undo"
     Button:
         id: redo_button
-        pos: (790, 100)
-        size: (80, 40)
+        pos: ({dp(790)}, {dp(100)})
+        size: ({dp(80)}, {dp(40)})
         text: "Redo"
     Button:
         id: resign_button
-        pos: (900, 100)
-        size: (80, 40)
+        pos: ({dp(900)}, {dp(100)})
+        size: ({dp(80)}, {dp(40)})
         text: "Resign"
 
     Label:
-        pos: (610, 40)
-        size: (80, 40)
+        pos: ({dp(610)}, {dp(40)})
+        size: ({dp(80)}, {dp(40)})
         color: 0, 0, 0, 1
         text: 'Graphviz'
     ToggleButton:
-        pos: (600, 10)
-        size: (50, 40)
+        pos: ({dp(600)}, {dp(10)})
+        size: ({dp(50)}, {dp(40)})
         id: graphviz_on
         text: "On"
         group: "graphviz"
     ToggleButton:
-        pos: (650, 10)
-        size: (50, 40)
+        pos: ({dp(650)}, {dp(10)})
+        size: ({dp(50)}, {dp(40)})
         id: graphviz_off
         text: "Off"
         group: "graphviz"
@@ -917,29 +918,29 @@ class QuoridorApp(App):
 
     Button:
         id: button
-        pos: (700, 10)
-        size: (180, 80)
+        pos: ({dp(700)}, {dp(10)})
+        size: ({dp(180)}, {dp(80)})
         text: "Start"
 
     TabbedPanel:
         id: mode_tab
         do_default_tab: False
         tab_width: self.width // 4
-        pos: (600, 150)
-        size: (380, 320)
+        pos: ({dp(600)}, {dp(150)})
+        size: ({dp(380)}, {dp(320)})
         TabbedPanelItem:
             id: human_tab
-            font_size: 15
+            font_size: {dp(15)}
             text: 'vs. Human'
            
             BoxLayout:
                 orientation: 'vertical'
-                spacing: 5
+                spacing: {dp(5)}
                 
                 BoxLayout:
                     orientation: 'horizontal'
                     size_hint: 1.0, 0.2
-                    spacing: 5
+                    spacing: {dp(5)}
                     padding: 5, 5
                     Label:
                         size_hint: 0.5, 1.0
@@ -963,16 +964,16 @@ class QuoridorApp(App):
         TabbedPanelItem:
             id: human_ai_tab
             text: 'vs. AI'
-            font_size: 15
+            font_size: {dp(15)}
             
             BoxLayout:
                 orientation: 'vertical'
-                spacing: 25
+                spacing: {dp(25)}
                 BoxLayout:
                     size_hint: 1.0, 0.25
                     orientation: 'horizontal'
-                    spacing: 5
-                    padding: 5, 5
+                    spacing: {dp(5)}
+                    padding: {dp(5)}, {dp(5)}
                     Label:
                         text: 'human side'
                         size_hint: 0.5, 1.0
@@ -1013,7 +1014,7 @@ class QuoridorApp(App):
                         on_value: root.change_search_nodes(*args)   
                     Label:
                         id: search_nodes_label
-                        font_size: 20
+                        font_size: {dp(20)}
                         text: "search nodes ="
                 BoxLayout:
                     size_hint: 1.0, 0.25
@@ -1027,7 +1028,7 @@ class QuoridorApp(App):
                         on_value: root.change_level(*args)   
                     Label:
                         id: level_label
-                        font_size: 20
+                        font_size: {dp(20)}
                         text: "level ="
                 BoxLayout:
                     size_hint: 1.0, 0.25
@@ -1041,17 +1042,17 @@ class QuoridorApp(App):
                         on_value: root.change_tau(*args)   
                     Label:
                         id: tau_label
-                        font_size: 20
+                        font_size: {dp(20)}
                         text: "randomness ="
                     
         TabbedPanelItem:
             id: ai_ai_tab
             text: 'Watch AI game'
-            font_size: 13
+            font_size: {dp(13)}
  
             BoxLayout:
                 orientation: 'vertical'
-                spacing: 15
+                spacing: {dp(15)}
                 BoxLayout:
                     size_hint: 1.0, 0.16
                     orientation: 'vertical'      
@@ -1060,12 +1061,12 @@ class QuoridorApp(App):
                         max: {SEARCH_NODE_LIST_LEN - 1}
                         value: {DEFAULT_SEARCH_NODE_INDEX}
                         step: 1
-                        cursor_size: 20, 20
+                        cursor_size: {dp(20)}, {dp(20)}
                         orientation: "horizontal"
                         on_value: root.change_search_nodes_1p(*args)   
                     Label:
                         id: search_nodes_label_1p
-                        font_size: 15
+                        font_size: {dp(15)}
                         text: "1p search nodes ="
                 BoxLayout:
                     size_hint: 1.0, 0.16
@@ -1075,12 +1076,12 @@ class QuoridorApp(App):
                         max: {LEVEL_NUM - 1}
                         value: {LEVEL_NUM - 1}
                         step: 1
-                        cursor_size: 20, 20
+                        cursor_size: {dp(20)},{dp(20)}
                         orientation: "horizontal"
                         on_value: root.change_level_1p(*args)   
                     Label:
                         id: level_label_1p
-                        font_size: 15
+                        font_size: {dp(15)}
                         text: "1p level ="
                 BoxLayout:
                     size_hint: 1.0, 0.16
@@ -1090,12 +1091,12 @@ class QuoridorApp(App):
                         max: 4
                         value: {DEFAULT_TAU_INDEX}
                         step: 1
-                        cursor_size: 20, 20
+                        cursor_size: {dp(20)},{dp(20)}
                         orientation: "horizontal"
                         on_value: root.change_tau_1p(*args)   
                     Label:
                         id: tau_label_1p
-                        font_size: 15
+                        font_size: {dp(15)}
                         text: "1p randomness ="                        
 
                 BoxLayout:
@@ -1106,12 +1107,12 @@ class QuoridorApp(App):
                         max: {SEARCH_NODE_LIST_LEN - 1}
                         value: {DEFAULT_SEARCH_NODE_INDEX}
                         step: 1
-                        cursor_size: 20, 20
+                        cursor_size: {dp(20)},{dp(20)}
                         orientation: "horizontal"
                         on_value: root.change_search_nodes_2p(*args)   
                     Label:
                         id: search_nodes_label_2p
-                        font_size: 15
+                        font_size: {dp(15)}
                         text: "2p search nodes ="
                 BoxLayout:
                     size_hint: 1.0, 0.16
@@ -1121,12 +1122,12 @@ class QuoridorApp(App):
                         max: {LEVEL_NUM - 1}
                         value: {LEVEL_NUM - 1}
                         step: 1
-                        cursor_size: 20, 20
+                        cursor_size: {dp(20)},{dp(20)}
                         orientation: "horizontal"
                         on_value: root.change_level_2p(*args)   
                     Label:
                         id: level_label_2p
-                        font_size: 15
+                        font_size: {dp(15)}
                         text: "2p level ="
                 BoxLayout:
                     size_hint: 1.0, 0.16
@@ -1136,27 +1137,27 @@ class QuoridorApp(App):
                         max: 4
                         value: {DEFAULT_TAU_INDEX}
                         step: 1
-                        cursor_size: 20, 20
+                        cursor_size: {dp(20)},{dp(20)}
                         orientation: "horizontal"
                         on_value: root.change_tau_2p(*args)   
                     Label:
                         id: tau_label_2p
-                        font_size: 15
+                        font_size: {dp(15)}
                         text: "2p randomness ="   
 
         TabbedPanelItem:
             id: training_tab
-            font_size: 15
+            font_size: {dp(15)}
             text: 'Training'
            
             BoxLayout:
                 orientation: 'vertical'
-                spacing: 5
+                spacing: {dp(5)}
                 
                 BoxLayout:
                     orientation: 'horizontal'
                     size_hint: 1.0, 0.2
-                    spacing: 5
+                    spacing: {dp(5)}
                     padding: 5, 5
                     Label:
                         size_hint: 0.5, 1.0
@@ -1178,26 +1179,26 @@ class QuoridorApp(App):
                     orientation: 'vertical'      
                     Slider:
                         min: 0
-                        max: {TRAINING_LEVEL_NUM - 1}
-                        value: {TRAINING_LEVEL_NUM - 1}
+                        max: {dp(TRAINING_LEVEL_NUM - 1)}
+                        value: {dp(TRAINING_LEVEL_NUM - 1)}
                         step: 1
                         orientation: "horizontal"
                         on_value: root.change_level_training(*args)   
                     Label:
                         id: training_level_label
-                        font_size: 18
+                        font_size: {dp(18)}
                         text: ""
                 Label:
                     size_hint: 1.0, 0.2
                     id: player_level_label
-                    font_size: 18
+                    font_size: {dp(18)}
                     text: "your level = -1"
                 Label:
                     size_hint: 1.0, 0.25
                     id: training_info
-                    font_size: 18
-                    text: ""
-        """)
+                    font_size: {dp(18)}
+                    text: "" 
+        """) 
         #game = Builder.load_file(os.path.join(os.getcwd(), "quoridor.kv"))
         #print(type(game))
         game = Quoridor()
