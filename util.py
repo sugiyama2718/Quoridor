@@ -1,5 +1,7 @@
 import os
 from Tree import OpeningTree
+from tqdm import tqdm
+from State import State
 
 def Glendenning2Official(s):
     """
@@ -67,3 +69,61 @@ def move_to_child(node, key, statevec2node):
     else:
         node = statevec2node[tuple(node.children[key])]  # node.children[key]がstate_vecになっている
     return node
+
+
+def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
+    statevec2node = {}
+    opening_tree = get_opening_node_from_state(State(), statevec2node)
+    opening_tree.visited_num = 0
+    opening_tree.p1_win_num = 0
+    opening_tree.p2_win_num = 0
+    opening_tree.selfplay_epoch = target_epoch
+    opening_tree.game_num = len(all_kifu_list)
+
+    # 定跡木の作成
+    for action_list in tqdm(all_kifu_list):
+        state = State()
+        mirror_state = State()
+
+        normalized_action_list, _ = get_normalized_action_list(action_list)
+        mirror_action_list = list(map(mirror_action, action_list))
+
+        node = opening_tree
+        path = [node]
+
+        for action_str, mirror_action_str, normalized_action_str, depth in zip(action_list, mirror_action_list, normalized_action_list, range(len(action_list))):
+            state.accept_action_str(action_str, check_placable=False, calc_placable_array=False, check_movable=False)
+            mirror_state.accept_action_str(mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
+
+            state_vec = tuple(state.feature_int().flatten())
+            mirror_state_vec = tuple(mirror_state.feature_int().flatten())
+
+            if state_vec <= mirror_state_vec:
+                normalized_state = state
+            else:
+                normalized_state = mirror_state
+
+            if depth <= max_depth:
+                key = Glendenning2Official(normalized_action_str)
+                if key not in node.children.keys():
+                    node.children[key] = get_opening_node_from_state(normalized_state, statevec2node)
+                    if isinstance(node.children[key], OpeningTree):
+                        node.children[key].visited_num = 0
+                        node.children[key].p1_win_num = 0
+                        node.children[key].p2_win_num = 0
+                        node.children[key].selfplay_epoch = target_epoch
+                        node.children[key].game_num = len(all_kifu_list)
+
+                node = move_to_child(node, key, statevec2node)
+                path.append(node)
+
+        is_sente_win = 1 - state.turn % 2  # 引き分けは極めて稀なので考慮しない。
+
+        for node in path:
+            node.visited_num += 1
+            if is_sente_win:
+                node.p1_win_num += 1
+            else:
+                node.p2_win_num += 1
+                
+    return opening_tree
