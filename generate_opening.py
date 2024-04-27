@@ -90,7 +90,7 @@ if __name__ == "__main__":
             if isinstance(node, OpeningTree):
                 traverse(node, actions + [key])
 
-    opening_tree = generate_opening_tree(target_epoch, all_kifu_list, max_depth)
+    opening_tree, _ = generate_opening_tree(target_epoch, all_kifu_list, max_depth)
 
     traverse(opening_tree, [])
 

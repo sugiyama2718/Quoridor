@@ -126,4 +126,4 @@ def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
             else:
                 node.p2_win_num += 1
                 
-    return opening_tree
+    return opening_tree, statevec2node
