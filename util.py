@@ -71,6 +71,29 @@ def move_to_child(node, key, statevec2node):
     return node
 
 
+def get_state_from_action_list(action_list):
+    state = State()
+    for a in action_list:
+        state.accept_action_str(a)
+    return state
+
+
+def get_normalized_state(action_list):
+    # Glendenning notation
+    mirror_action_list = list(map(mirror_action, action_list))
+
+    state = get_state_from_action_list(action_list)
+    mirror_state = get_state_from_action_list(mirror_action_list)
+
+    state_vec = tuple(state.feature_int().flatten())
+    mirror_state_vec = tuple(mirror_state.feature_int().flatten())
+
+    if state_vec <= mirror_state_vec:
+        return state, state_vec, False
+    else:
+        return mirror_state, mirror_state_vec, True
+
+
 def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
     statevec2node = {}
     opening_tree = get_opening_node_from_state(State(), statevec2node)

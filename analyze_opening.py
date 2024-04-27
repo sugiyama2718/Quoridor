@@ -15,12 +15,12 @@ import argparse
 from BasicAI import display_parameter
 import pandas as pd
 from pprint import pprint
-from util import Glendenning2Official, generate_opening_tree
+from util import Official2Glendenning, generate_opening_tree, get_normalized_state
 from Tree import OpeningTree
 
 
 if __name__ == "__main__":
-    target_openings = [
+    target_openings = [  # official notation
         ['e2', 'e8', 'e3', 'e7', 'e4', 'e6', 'd3h', 'c6h', 'd5v'],
         ['e2', 'e8', 'e3', 'e7', 'e4', 'e6', 'd3h', 'c6h', 'e6v'],
         ['e2', 'e8', 'e3', 'e7', 'e4', 'e6', 'a3h'],
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # メモリ使用量に注意。240225時点で、20エポック分で1GBほど消費。
     target_epoch = 4067
-    epoch_num_for_joseki = 10
+    epoch_num_for_joseki = 3
 
     min_size = 6  # これより探訪数が少ない定石は除外する
     max_depth = 15  # これより深い定跡は作らない（メモリ節約のため）
@@ -60,15 +60,10 @@ if __name__ == "__main__":
 
                 all_kifu_list.extend(kifu_list)
 
-    def traverse(tree, actions):
-        if tree.visited_num / tree.game_num >= 0.005:
-            print(actions)
-            print("{} ({:.2f}%), p1 win rate = {:.2f}%".format(tree.visited_num, tree.visited_num / tree.game_num * 100, tree.p1_win_num / tree.visited_num * 100))
-            print()
-        for key, node in tree.children.items():
-            if isinstance(node, OpeningTree):
-                traverse(node, actions + [key])
-
     opening_tree, statevec2node = generate_opening_tree(target_epoch, all_kifu_list, max_depth)
 
-    traverse(opening_tree, [])
+    for target_opening in target_openings:
+        state, state_vec, _ = get_normalized_state(list(map(Official2Glendenning, target_opening)))
+        tree = statevec2node[state_vec]
+        print("{} ({:.2f}%), p1 win rate = {:.2f}%".format(tree.visited_num, tree.visited_num / tree.game_num * 100, tree.p1_win_num / tree.visited_num * 100))
+
