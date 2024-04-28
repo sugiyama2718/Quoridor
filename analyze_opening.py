@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # メモリ使用量に注意。240225時点で、20エポック分で1GBほど消費。
     target_epoch = 4000
-    epoch_num_for_analyze = 30
+    epoch_num_for_analyze = 100
     each_epoch_num_for_analyze = 10
 
     max_depth = 15  # これより深い定跡は作らない（メモリ節約のため）
@@ -68,10 +68,13 @@ if __name__ == "__main__":
 
         for opening_name, target_opening in target_opening_data:
             state, state_vec, _ = get_normalized_state(list(map(Official2Glendenning, target_opening)))
-            tree = statevec2node[state_vec]
-            #print("{} ({:.2f}%), p1 win rate = {:.2f}%".format(tree.visited_num, tree.visited_num / tree.game_num * 100, tree.p1_win_num / tree.visited_num * 100))
+            if state_vec in statevec2node.keys():
+                tree = statevec2node[state_vec]
+                #print("{} ({:.2f}%), p1 win rate = {:.2f}%".format(tree.visited_num, tree.visited_num / tree.game_num * 100, tree.p1_win_num / tree.visited_num * 100))
 
-            visit_rate_dict[opening_name].append(tree.visited_num / tree.game_num)
+                visit_rate_dict[opening_name].append(tree.visited_num / tree.game_num)
+            else:
+                visit_rate_dict[opening_name].append(0.0)
 
     visit_rate_df = pd.DataFrame(visit_rate_dict, index=list(range(start_epoch_all, end_epoch_all, each_epoch_num_for_analyze)))
     visit_rate_df.to_csv(os.path.join(save_dir, "visit_rate_df.csv"))
