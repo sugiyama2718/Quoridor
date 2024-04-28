@@ -42,6 +42,10 @@ if __name__ == "__main__":
     start_epoch_all = target_epoch - epoch_num_for_analyze
     end_epoch_all = target_epoch
 
+    visit_rate_dict = {}
+    for opening_name in target_opening_names:
+        visit_rate_dict[opening_name] = []
+
     for start_epoch in range(start_epoch_all, end_epoch_all, each_epoch_num_for_analyze):
         end_epoch = start_epoch + each_epoch_num_for_analyze
         print("="*50)
@@ -62,8 +66,18 @@ if __name__ == "__main__":
 
         opening_tree, statevec2node = generate_opening_tree(target_epoch, all_kifu_list, max_depth)
 
-        for target_opening in target_openings:
+        for opening_name, target_opening in target_opening_data:
             state, state_vec, _ = get_normalized_state(list(map(Official2Glendenning, target_opening)))
             tree = statevec2node[state_vec]
-            print("{} ({:.2f}%), p1 win rate = {:.2f}%".format(tree.visited_num, tree.visited_num / tree.game_num * 100, tree.p1_win_num / tree.visited_num * 100))
+            #print("{} ({:.2f}%), p1 win rate = {:.2f}%".format(tree.visited_num, tree.visited_num / tree.game_num * 100, tree.p1_win_num / tree.visited_num * 100))
+
+            visit_rate_dict[opening_name].append(tree.visited_num / tree.game_num)
+
+    visit_rate_df = pd.DataFrame(visit_rate_dict, index=list(range(start_epoch_all, end_epoch_all, each_epoch_num_for_analyze)))
+    visit_rate_df.to_csv(os.path.join(save_dir, "visit_rate_df.csv"))
+
+    visit_rate_df.plot()
+    plt.savefig(os.path.join(save_dir, "visit_rate.png"))
+
+    print("visit rate csv and png are saved at", save_dir)
 
