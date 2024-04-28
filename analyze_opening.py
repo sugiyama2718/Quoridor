@@ -10,9 +10,7 @@ from collections import Counter
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from State import RIGHT, DOWN, State, BOARD_LEN
-import pickle
 import argparse
-from BasicAI import display_parameter
 import pandas as pd
 from pprint import pprint
 from util import Official2Glendenning, generate_opening_tree, get_normalized_state
@@ -34,14 +32,8 @@ if __name__ == "__main__":
     target_epoch = 4067
     epoch_num_for_joseki = 10
 
-    min_size = 6  # これより探訪数が少ない定石は除外する
     max_depth = 15  # これより深い定跡は作らない（メモリ節約のため）
-    max_win_rate_diff = 0.15
-    joseki_num = 100
-    n_cand = 3
-    #n_div_try = 10
 
-    #target_dir = KIFU_DIR
     target_dir = os.path.join("other_records", "240423")
     save_dir = os.path.join("application_data", "joseki")
     os.makedirs(save_dir, exist_ok=True)
