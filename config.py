@@ -1,5 +1,6 @@
 import copy
 import os
+import json
 
 # 学習設定 large 学習本番
 POOL_SIZE = 60000  # 学習のときにサンプルする対象となる試合数
@@ -154,3 +155,9 @@ REG_SCALE_DICT = {
 AUX_IMPORTANCE = 0.5
 DIST_ARRAY_SCALE = 10
 NEXT_PI_IMPORTANCE = 0.5  # next_piのlossは大きめの値を取るので影響を小さくするための係数
+
+APPLICATION_CONFIG_PATH = os.path.join("application_data", "config.json")
+def read_application_config():
+    with open(APPLICATION_CONFIG_PATH, 'r') as file:
+        ret = json.load(file)
+    return ret
