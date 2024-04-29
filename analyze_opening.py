@@ -29,13 +29,13 @@ if __name__ == "__main__":
     target_openings = [x[1] for x in target_opening_data]
 
     # メモリ使用量に注意。240225時点で、20エポック分で1GBほど消費。
-    target_epoch = 4000
-    epoch_num_for_analyze = 100
+    target_epoch = 4110
+    epoch_num_for_analyze = 810
     each_epoch_num_for_analyze = 10
 
     max_depth = 15  # これより深い定跡は作らない（メモリ節約のため）
 
-    target_dir = os.path.join("other_records", "240417_3900kifu")
+    target_dir = os.path.join("other_records", "240428_all")
     save_dir = os.path.join("application_data", "joseki")
     os.makedirs(save_dir, exist_ok=True)
 
@@ -75,6 +75,9 @@ if __name__ == "__main__":
                 visit_rate_dict[opening_name].append(tree.visited_num / tree.game_num)
             else:
                 visit_rate_dict[opening_name].append(0.0)
+
+        del opening_tree, statevec2node
+        gc.collect()
 
     visit_rate_df = pd.DataFrame(visit_rate_dict, index=list(range(start_epoch_all, end_epoch_all, each_epoch_num_for_analyze)))
     visit_rate_df.to_csv(os.path.join(save_dir, "visit_rate_df.csv"))
