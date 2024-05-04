@@ -25,6 +25,7 @@ UP = 0
 RIGHT = 1
 DOWN = 2
 LEFT = 3
+BITARRAY_SIZE = 64
 
 
 def select_action(DTYPE_float[:] Q, DTYPE_float[:] N, DTYPE_float[:] P, float C_puct, use_estimated_V, float estimated_V, color, turn, use_average_Q):
@@ -85,6 +86,8 @@ cdef class State:
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
+        self.row_wall_bit = bitarray(BITARRAY_SIZE)
+        self.column_wall_bit = bitarray(BITARRAY_SIZE)
         self.placable_r_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_c_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_rb = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -209,6 +212,7 @@ cdef class State:
                 if s[2] == "h":
                     if rf and walls >= 1:
                         self.row_wall[x, y] = 1
+                        self.row_wall_bit[x * 9 + y] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -218,6 +222,7 @@ cdef class State:
                 elif s[2] == "v":
                     if cf and walls >= 1:
                         self.column_wall[x, y] = 1
+                        self.column_wall_bit[x * 9 + y] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -230,6 +235,7 @@ cdef class State:
                 if s[2] == "h":
                     if walls >= 1:
                         self.row_wall[x, y] = 1
+                        self.row_wall_bit[x * 9 + y] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -239,6 +245,7 @@ cdef class State:
                 elif s[2] == "v":
                     if walls >= 1:
                         self.column_wall[x, y] = 1
+                        self.column_wall_bit[x * 9 + y] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -643,19 +650,23 @@ cdef class State:
             column_f = False
         if row_f:
             self.row_wall[x, y] = 1
+            self.row_wall_bit[x * 9 + y] = 1
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0) 
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
+            self.row_wall_bit[x * 9 + y] = 0
             row_f = row_f and f
         if column_f:
             self.column_wall[x, y] = 1
+            self.column_wall_bit[x * 9 + y] = 1
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0)
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
+            self.column_wall_bit[x * 9 + y] = 0
             column_f = column_f and f
         return row_f, column_f
     
@@ -671,13 +682,17 @@ cdef class State:
             column_f = False
         if row_f and self.must_be_checked_y[x, y]:
             self.row_wall[x, y] = 1
+            self.row_wall_bit[x * 9 + y] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
+            self.row_wall_bit[x * 9 + y] = 0
             row_f = row_f and f
         if column_f and self.must_be_checked_x[x, y]:
             self.column_wall[x, y] = 1
+            self.column_wall_bit[x * 9 + y] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
+            self.column_wall_bit[x * 9 + y] = 0
             column_f = column_f and f
         return row_f, column_f
 
@@ -690,8 +705,10 @@ cdef class State:
             row_f = False
         if row_f and self.must_be_checked_y[x, y]:
             self.row_wall[x, y] = 1
+            self.row_wall_bit[x * 9 + y] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
+            self.row_wall_bit[x * 9 + y] = 0
             row_f = row_f and f
         return row_f
 
@@ -704,8 +721,10 @@ cdef class State:
             column_f = False
         if column_f and self.must_be_checked_x[x, y]:
             self.column_wall[x, y] = 1
+            self.column_wall_bit[x * 9 + y] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
+            self.column_wall_bit[x * 9 + y] = 0
             column_f = column_f and f
         return column_f
 
