@@ -1137,7 +1137,7 @@ cdef class State:
     def arrivable_(self, int x, int y, int goal_y, int isleft):
         #cdef np.ndarray[DTYPE_t, ndim = 3] cross_arr
         cdef DTYPE_t[:, :, :] prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
-        cdef DTYPE_t[:] cross = np.zeros((4,), dtype="int32")
+        cross = bitarray(4)
         #cross_arr = self.cross_movable_array2(self.row_wall, self.column_wall)  # 一時的にself.row_wallとかを書き換えてこの関数が呼ばれることがあるために毎回計算する必要あり
         x_stack = [x]
         y_stack = [y]
@@ -1150,10 +1150,10 @@ cdef class State:
                 self.prev = prev
                 return True
             #cross = self.cross_movable(x, y)
-            cross[0] = (not (y == 0 or self.row_wall[min(x, BOARD_LEN - 2), y - 1] or self.row_wall[max(x - 1, 0), y - 1]))
-            cross[1] = (not (x == BOARD_LEN - 1 or self.column_wall[x, min(y, BOARD_LEN - 2)] or self.column_wall[x, max(y - 1, 0)]))
-            cross[2] = (not (y == BOARD_LEN - 1 or self.row_wall[min(x, BOARD_LEN - 2), y] or self.row_wall[max(x - 1, 0), y]))
-            cross[3] = (not (x == 0 or self.column_wall[x - 1, min(y, BOARD_LEN - 2)] or self.column_wall[x - 1, max(y - 1, 0)]))
+            cross[0] = (not (y == 0 or self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y - 1] or self.row_wall_bit[max(x - 1, 0) * 8 + y - 1]))
+            cross[1] = (not (x == BOARD_LEN - 1 or self.column_wall_bit[x * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * 8 + max(y - 1, 0)]))
+            cross[2] = (not (y == BOARD_LEN - 1 or self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y] or self.row_wall_bit[max(x - 1, 0) * 8 + y]))
+            cross[3] = (not (x == 0 or self.column_wall_bit[(x - 1) * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * 8 + max(y - 1, 0)]))
             if isleft and goal_y == 0:
                 p_list = [(3, -1, 0), (0, 0, -1), (1, 1, 0), (2, 0, 1)]
             elif not isleft and goal_y == 0:
