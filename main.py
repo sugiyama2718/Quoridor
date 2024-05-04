@@ -995,16 +995,18 @@ if __name__ == '__main__':
         np.random.seed(0)
         game_num = 2
         seed = 0
-        search_nodes = 800
-        AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed),
-               CNNAI(1, search_nodes=search_nodes, seed=seed)]
+        search_nodes = 500
+        AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, tau=0.32),
+               CNNAI(1, search_nodes=search_nodes, seed=seed, tau=0.32)]
         path = PARAMETER_DIR
-        epoch = 73
-        # AIs[0].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
-        # AIs[1].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
+        epoch = 3985
+
+        AIs[0].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
+        AIs[1].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
 
         start_time = time.time()
         temp_data = evaluate(AIs, game_num, display=True)
+        print("{:.2f}s".format(time.time() - start_time))
 
     elif sys.argv[1] == "train_from_existing_data":
         # モデルを大きくしたとき等に良いパラメータの初期値を得るため、自己対戦データを順に学習していく
