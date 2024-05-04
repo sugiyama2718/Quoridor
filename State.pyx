@@ -9,6 +9,7 @@ import time
 import copy
 import collections
 import math
+from bitarray import bitarray
 
 DTYPE = np.int32
 ctypedef np.int32_t DTYPE_t
