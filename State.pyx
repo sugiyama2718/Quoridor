@@ -896,6 +896,20 @@ cdef class State:
     def calc_placable_array(self, skip_calc_graph=False):
         cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] wall_point_array = np.zeros((BOARD_LEN + 1, BOARD_LEN + 1), dtype=DTYPE)
+
+        # 周囲を囲む
+        wall_point_array[0, :] = True
+        wall_point_array[BOARD_LEN, :] = True
+        wall_point_array[:, 0] = True
+        wall_point_array[:, BOARD_LEN] = True
+
+        wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] = self.row_wall
+        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] = self.row_wall
+        wall_point_array[2:, 1:BOARD_LEN] = self.row_wall
+        wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] = self.column_wall
+        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] = self.column_wall
+        wall_point_array[1:BOARD_LEN, 2:] = self.column_wall
 
         self.must_be_checked_x = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         self.must_be_checked_y = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
