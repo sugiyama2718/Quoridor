@@ -892,8 +892,31 @@ cdef class State:
             if edge[1] == 2:
                 placable[x, y] = 0
         return placable
-
+    
     def calc_placable_array(self, skip_calc_graph=False):
+        cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+
+        self.must_be_checked_x = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        self.must_be_checked_y = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+
+        for x in range(BOARD_LEN - 1):
+            for y in range(BOARD_LEN - 1):
+                if row_array[x, y] and column_array[x, y]:
+                    f1, f2 = self.placable(x, y)
+                    row_array[x, y] = f1
+                    column_array[x, y] = f2
+                elif row_array[x, y]:  # columnはFalse
+                    row_array[x, y] = self.placable_r(x, y)
+                    column_array[x, y] = False
+                elif column_array[x, y]:
+                    row_array[x, y] = False
+                    column_array[x, y] = self.placable_c(x, y)
+                else:
+                    row_array[x, y] = column_array[x, y] = False
+        return row_array, column_array
+
+    def old_calc_placable_array2(self, skip_calc_graph=False):
         cdef np.ndarray[DTYPE_t, ndim = 3] arr
         cdef np.ndarray[DTYPE_t, ndim = 2] row_array, column_array
         cdef DTYPE_t[:, :, :] cross_arr, cross_arr_copy
@@ -1331,13 +1354,13 @@ cdef class State:
         #         for x in range(BOARD_LEN):
         #             print(self.cross_movable_arr[x, y, i], end=" ")
         #         print("")
-        if check_algo:
-            self.check_placable_array_algo()
-
         if ret_str:
             return ret
         else:
             sys.stdout.write(ret)
+
+        if check_algo:
+            self.check_placable_array_algo()
 
     def check_placable_array_algo(self):
         placabler1, placablec1 = self.old_calc_placable_array()
