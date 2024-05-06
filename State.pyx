@@ -228,7 +228,7 @@ cdef class State:
                 if s[2] == "h":
                     if rf and walls >= 1:
                         self.row_wall[x, y] = 1
-                        self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
+                        self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -238,7 +238,7 @@ cdef class State:
                 elif s[2] == "v":
                     if cf and walls >= 1:
                         self.column_wall[x, y] = 1
-                        self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
+                        self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -251,7 +251,7 @@ cdef class State:
                 if s[2] == "h":
                     if walls >= 1:
                         self.row_wall[x, y] = 1
-                        self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
+                        self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -261,7 +261,7 @@ cdef class State:
                 elif s[2] == "v":
                     if walls >= 1:
                         self.column_wall[x, y] = 1
-                        self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
+                        self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -666,23 +666,23 @@ cdef class State:
             column_f = False
         if row_f:
             self.row_wall[x, y] = 1
-            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0) 
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
-            self.row_wall_bit[x *BIT_BOARD_LEN + y] = 0
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 0
             row_f = row_f and f
         if column_f:
             self.column_wall[x, y] = 1
-            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0)
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
-            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 0
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 0
             column_f = column_f and f
         return row_f, column_f
     
@@ -703,17 +703,17 @@ cdef class State:
             column_f = False
         if row_f and self.must_be_checked_y[x, y]:
             self.row_wall[x, y] = 1
-            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
-            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 0
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 0
             row_f = row_f and f
         if column_f and self.must_be_checked_x[x, y]:
             self.column_wall[x, y] = 1
-            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
-            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 0
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 0
             column_f = column_f and f
         return row_f, column_f
 
@@ -726,10 +726,10 @@ cdef class State:
             row_f = False
         if row_f and self.must_be_checked_y[x, y]:
             self.row_wall[x, y] = 1
-            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
-            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 0
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 0
             row_f = row_f and f
         return row_f
 
@@ -742,10 +742,10 @@ cdef class State:
             column_f = False
         if column_f and self.must_be_checked_x[x, y]:
             self.column_wall[x, y] = 1
-            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
-            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 0
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 0
             column_f = column_f and f
         return column_f
 
@@ -1203,44 +1203,43 @@ cdef class State:
         return direction_array
 
     def arrivable_with_prev(self, int x, int y, int goal_y, int isleft):
-        cdef int stack_index, i, dx, dy, x2, y2
-        cross = bitarray(4)
-
-        self.prev[:, :, :] = 0
-
-        if isleft and goal_y == 0:
-            p_list = self.P_LIST_CAND1
-        elif not isleft and goal_y == 0:
-            p_list = self.P_LIST_CAND2
-        elif isleft and goal_y == BOARD_LEN - 1:
-            p_list = self.P_LIST_CAND3
-        else:
-            p_list = self.P_LIST_CAND4
-
-        self.x_stack[0] = x
-        self.y_stack[0] = y
-        stack_index = 1
-        while stack_index > 0:
-            stack_index -= 1
-            x = self.x_stack[stack_index]
-            y = self.y_stack[stack_index]
+        #cdef np.ndarray[DTYPE_t, ndim = 3] cross_arr
+        cdef DTYPE_t[:, :, :] prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
+        cdef DTYPE_t[:] cross = np.zeros((4,), dtype="int32")
+        #cross_arr = self.cross_movable_array2(self.row_wall, self.column_wall)  # 一時的にself.row_wallとかを書き換えてこの関数が呼ばれることがあるために毎回計算する必要あり
+        x_stack = [x]
+        y_stack = [y]
+        while len(x_stack) > 0:
+            x = x_stack.pop()
+            y = y_stack.pop()
             self.seen[x, y] = 1
             if y == goal_y:
+                #self.seen = seen
+                self.prev = prev
                 return True
-            cross[0] = (not (y == 0 or self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y - 1] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y - 1]))
-            cross[1] = (not (x == BOARD_LEN - 1 or self.column_wall_bit[x * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * BIT_BOARD_LEN + max(y - 1, 0)]))
-            cross[2] = (not (y == BOARD_LEN - 1 or self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y]))
-            cross[3] = (not (x == 0 or self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + max(y - 1, 0)]))
-
+            #cross = self.cross_movable(x, y)
+            cross[0] = (not (y == 0 or self.row_wall[min(x, BOARD_LEN - 2), y - 1] or self.row_wall[max(x - 1, 0), y - 1]))
+            cross[1] = (not (x == BOARD_LEN - 1 or self.column_wall[x, min(y, BOARD_LEN - 2)] or self.column_wall[x, max(y - 1, 0)]))
+            cross[2] = (not (y == BOARD_LEN - 1 or self.row_wall[min(x, BOARD_LEN - 2), y] or self.row_wall[max(x - 1, 0), y]))
+            cross[3] = (not (x == 0 or self.column_wall[x - 1, min(y, BOARD_LEN - 2)] or self.column_wall[x - 1, max(y - 1, 0)]))
+            if isleft and goal_y == 0:
+                p_list = [(3, -1, 0), (0, 0, -1), (1, 1, 0), (2, 0, 1)]
+            elif not isleft and goal_y == 0:
+                p_list = [(2, 0, 1), (1, 1, 0), (0, 0, -1), (3, -1, 0)]
+            elif isleft and goal_y == BOARD_LEN - 1:
+                p_list = [(1, 1, 0), (2, 0, 1), (3, -1, 0), (0, 0, -1)]
+            else:
+                p_list = [(0, 0, -1), (3, -1, 0), (2, 0, 1), (1, 1, 0)]
             for i, dx, dy in p_list:
                 x2 = x + dx
                 y2 = y + dy
                 if cross[i] and not self.seen[x2, y2]:
-                    self.prev[x2, y2, 0] = x
-                    self.prev[x2, y2, 1] = y
-                    self.x_stack[stack_index] = x2
-                    self.y_stack[stack_index] = y2
-                    stack_index += 1
+                    prev[x2, y2, 0] = x
+                    prev[x2, y2, 1] = y
+                    x_stack.append(x2)
+                    y_stack.append(y2)
+        #self.seen = seen
+        self.prev = prev
         return False
 
     def arrivable_(self, int x, int y, int goal_y, int isleft):
@@ -1268,6 +1267,11 @@ cdef class State:
         for i in range(4):
             cross_bitarrs[i] = ~cross_bitarrs[i]
             cross_bitarrs[i] &= bitarray_mask
+            # print()
+            # for y in range(BOARD_LEN):
+            #     for x in range(BOARD_LEN):
+            #         print(cross_bitarrs[i][x + y * BIT_BOARD_LEN], end="")
+            #     print()
 
         if isleft and goal_y == 0:
             p_list = self.P_LIST_CAND1
@@ -1297,7 +1301,7 @@ cdef class State:
             for i, dx, dy in p_list:
                 x2 = x + dx
                 y2 = y + dy
-                if cross_bitarrs[i][x2 * BIT_BOARD_LEN + y2] and not self.seen[x2, y2]:
+                if cross_bitarrs[i][x + y * BIT_BOARD_LEN] and not self.seen[x2, y2]:
                     self.x_stack[stack_index] = x2
                     self.y_stack[stack_index] = y2
                     stack_index += 1
