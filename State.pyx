@@ -29,6 +29,10 @@ LEFT = 3
 BITARRAY_SIZE = 128
 BIT_BOARD_LEN = 11
 
+bitarray_mask = bitarray(BITARRAY_SIZE)
+for i in range(BOARD_LEN):
+    bitarray_mask[i * BIT_BOARD_LEN:i * BIT_BOARD_LEN + BOARD_LEN] = 1
+
 
 def select_action(DTYPE_float[:] Q, DTYPE_float[:] N, DTYPE_float[:] P, float C_puct, use_estimated_V, float estimated_V, color, turn, use_average_Q):
     if use_estimated_V:
@@ -1241,7 +1245,29 @@ cdef class State:
 
     def arrivable_(self, int x, int y, int goal_y, int isleft):
         cdef int stack_index, i, dx, dy, x2, y2
-        cross = bitarray(4)
+        cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
+
+        cross_bitarrs[UP][:BOARD_LEN] = 1
+        cross_bitarrs[UP] |= self.row_wall_bit >> BIT_BOARD_LEN  # ２次元では下に一つシフトするのと等価
+        cross_bitarrs[UP] |= self.row_wall_bit >> (BIT_BOARD_LEN + 1)  # ２次元では下に一つ, 右に一つシフトするのと等価
+
+        for i in range(BOARD_LEN):
+            cross_bitarrs[RIGHT][i * BIT_BOARD_LEN + (BOARD_LEN - 1)] = 1
+        cross_bitarrs[RIGHT] |= self.column_wall_bit
+        cross_bitarrs[RIGHT] |= self.column_wall_bit >> BIT_BOARD_LEN
+
+        cross_bitarrs[DOWN][(BOARD_LEN - 1) * BIT_BOARD_LEN:(BOARD_LEN - 1) * BIT_BOARD_LEN + BOARD_LEN] = 1
+        cross_bitarrs[DOWN] |= self.row_wall_bit
+        cross_bitarrs[DOWN] |= self.row_wall_bit >> 1
+
+        for i in range(BOARD_LEN):
+            cross_bitarrs[LEFT][i * BIT_BOARD_LEN] = 1
+        cross_bitarrs[LEFT] |= self.column_wall_bit >> 1
+        cross_bitarrs[LEFT] |= self.column_wall_bit >> (BIT_BOARD_LEN + 1)
+
+        for i in range(4):
+            cross_bitarrs[i] = ~cross_bitarrs[i]
+            cross_bitarrs[i] &= bitarray_mask
 
         if isleft and goal_y == 0:
             p_list = self.P_LIST_CAND1
@@ -1263,15 +1289,15 @@ cdef class State:
             if y == goal_y:
                 return True
 
-            cross[0] = y != 0 and not self.seen[x, y - 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y - 1] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y - 1]))
-            cross[1] = x != BOARD_LEN - 1 and not self.seen[x + 1, y] and (not (self.column_wall_bit[x * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * BIT_BOARD_LEN + max(y - 1, 0)]))
-            cross[2] = y != BOARD_LEN - 1 and not self.seen[x, y + 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y]))
-            cross[3] = x != 0 and not self.seen[x - 1, y] and (not (self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + max(y - 1, 0)]))
+            # cross[0] = y != 0 and not self.seen[x, y - 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y - 1] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y - 1]))
+            # cross[1] = x != BOARD_LEN - 1 and not self.seen[x + 1, y] and (not (self.column_wall_bit[x * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * BIT_BOARD_LEN + max(y - 1, 0)]))
+            # cross[2] = y != BOARD_LEN - 1 and not self.seen[x, y + 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y]))
+            # cross[3] = x != 0 and not self.seen[x - 1, y] and (not (self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + max(y - 1, 0)]))
 
             for i, dx, dy in p_list:
                 x2 = x + dx
                 y2 = y + dy
-                if cross[i]:
+                if cross_bitarrs[i][x2 * BIT_BOARD_LEN + y2] and not self.seen[x2, y2]:
                     self.x_stack[stack_index] = x2
                     self.y_stack[stack_index] = y2
                     stack_index += 1
