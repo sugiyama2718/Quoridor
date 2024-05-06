@@ -29,6 +29,7 @@ LEFT = 3
 BITARRAY_SIZE = 64
 
 
+
 def select_action(DTYPE_float[:] Q, DTYPE_float[:] N, DTYPE_float[:] P, float C_puct, use_estimated_V, float estimated_V, color, turn, use_average_Q):
     if use_estimated_V:
         pass
@@ -84,7 +85,8 @@ cdef class State:
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public row_graph, column_graph
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
-    cdef public row_wall_bit, column_wall_bit
+    cdef public DTYPE_t[:] x_stack, y_stack
+    cdef public row_wall_bit, column_wall_bit, P_LIST_CAND1, P_LIST_CAND2, P_LIST_CAND3, P_LIST_CAND4
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -121,6 +123,14 @@ cdef class State:
         self.column_graph = {0: [[], {range(81)}, True, True]}
         self.dist_array1 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
         self.dist_array2 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
+
+        self.P_LIST_CAND1 = [(3, -1, 0), (0, 0, -1), (1, 1, 0), (2, 0, 1)]
+        self.P_LIST_CAND2 = [(2, 0, 1), (1, 1, 0), (0, 0, -1), (3, -1, 0)]
+        self.P_LIST_CAND3 = [(1, 1, 0), (2, 0, 1), (3, -1, 0), (0, 0, -1)]
+        self.P_LIST_CAND4 = [(0, 0, -1), (3, -1, 0), (2, 0, 1), (1, 1, 0)]
+
+        self.x_stack = np.zeros(81, dtype=DTYPE)
+        self.y_stack = np.zeros(81, dtype=DTYPE)
 
         for y in range(BOARD_LEN):
             self.dist_array1[:, y] = y
@@ -1190,43 +1200,44 @@ cdef class State:
         return direction_array
 
     def arrivable_(self, int x, int y, int goal_y, int isleft):
-        #cdef np.ndarray[DTYPE_t, ndim = 3] cross_arr
-        cdef DTYPE_t[:, :, :] prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
+        cdef int stack_index, i, dx, dy, x2, y2
         cross = bitarray(4)
-        #cross_arr = self.cross_movable_array2(self.row_wall, self.column_wall)  # 一時的にself.row_wallとかを書き換えてこの関数が呼ばれることがあるために毎回計算する必要あり
-        x_stack = [x]
-        y_stack = [y]
-        while len(x_stack) > 0:
-            x = x_stack.pop()
-            y = y_stack.pop()
+
+        self.prev[:, :, :] = 0
+
+        if isleft and goal_y == 0:
+            p_list = self.P_LIST_CAND1
+        elif not isleft and goal_y == 0:
+            p_list = self.P_LIST_CAND2
+        elif isleft and goal_y == BOARD_LEN - 1:
+            p_list = self.P_LIST_CAND3
+        else:
+            p_list = self.P_LIST_CAND4
+
+        self.x_stack[0] = x
+        self.y_stack[0] = y
+        stack_index = 1
+        while stack_index > 0:
+            stack_index -= 1
+            x = self.x_stack[stack_index]
+            y = self.y_stack[stack_index]
             self.seen[x, y] = 1
             if y == goal_y:
-                #self.seen = seen
-                self.prev = prev
                 return True
-            #cross = self.cross_movable(x, y)
             cross[0] = (not (y == 0 or self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y - 1] or self.row_wall_bit[max(x - 1, 0) * 8 + y - 1]))
             cross[1] = (not (x == BOARD_LEN - 1 or self.column_wall_bit[x * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * 8 + max(y - 1, 0)]))
             cross[2] = (not (y == BOARD_LEN - 1 or self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y] or self.row_wall_bit[max(x - 1, 0) * 8 + y]))
             cross[3] = (not (x == 0 or self.column_wall_bit[(x - 1) * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * 8 + max(y - 1, 0)]))
-            if isleft and goal_y == 0:
-                p_list = [(3, -1, 0), (0, 0, -1), (1, 1, 0), (2, 0, 1)]
-            elif not isleft and goal_y == 0:
-                p_list = [(2, 0, 1), (1, 1, 0), (0, 0, -1), (3, -1, 0)]
-            elif isleft and goal_y == BOARD_LEN - 1:
-                p_list = [(1, 1, 0), (2, 0, 1), (3, -1, 0), (0, 0, -1)]
-            else:
-                p_list = [(0, 0, -1), (3, -1, 0), (2, 0, 1), (1, 1, 0)]
+
             for i, dx, dy in p_list:
                 x2 = x + dx
                 y2 = y + dy
                 if cross[i] and not self.seen[x2, y2]:
-                    prev[x2, y2, 0] = x
-                    prev[x2, y2, 1] = y
-                    x_stack.append(x2)
-                    y_stack.append(y2)
-        #self.seen = seen
-        self.prev = prev
+                    self.prev[x2, y2, 0] = x
+                    self.prev[x2, y2, 1] = y
+                    self.x_stack[stack_index] = x2
+                    self.y_stack[stack_index] = y2
+                    stack_index += 1
         return False
 
     def old_display_cui(self, check_algo=True, official=True, p1_atmark=False):
