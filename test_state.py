@@ -3,7 +3,7 @@ from State import State
 import numpy as np
 import os
 
-test_case_list = range(1, 15)
+test_case_list = range(1, 16)
 TEST_DIR = "testcases/placable_array"
 
 results = []
