@@ -677,6 +677,11 @@ cdef class State:
             return False, False
         row_f = True
         column_f = True
+    
+        # if x == 2 and y == 2 and self.turn == 17:
+        #     print(self.row_wall)
+        #     print(self.column_wall)
+        #     print()
 
         if self.row_wall[max(x - 1, 0), y] or self.row_wall[min(x + 1, BOARD_LEN - 2), y]:
             row_f = False
@@ -915,11 +920,17 @@ cdef class State:
 
         wall_point_array = np.array(wall_point_array >= 1, dtype=DTYPE)
 
-        count_array_x = wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[2:, 1:BOARD_LEN]
-        count_array_y = wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 2:]
-
+        count_array_x = wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 2:]
+        count_array_y = wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[2:, 1:BOARD_LEN]
+        
         self.must_be_checked_x = (count_array_x >= 2)
         self.must_be_checked_y = (count_array_y >= 2)
+        # if self.turn == 17:
+        #     print(self.row_wall)
+        #     print(self.column_wall)
+        #     print(wall_point_array)
+        #     print(count_array_x)
+        #     print(self.must_be_checked_x)
 
         for x in range(BOARD_LEN - 1):
             for y in range(BOARD_LEN - 1):
