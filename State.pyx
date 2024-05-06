@@ -26,8 +26,8 @@ UP = 0
 RIGHT = 1
 DOWN = 2
 LEFT = 3
-BITARRAY_SIZE = 64
-
+BITARRAY_SIZE = 128
+BIT_BOARD_LEN = 11
 
 
 def select_action(DTYPE_float[:] Q, DTYPE_float[:] N, DTYPE_float[:] P, float C_puct, use_estimated_V, float estimated_V, color, turn, use_average_Q):
@@ -224,7 +224,7 @@ cdef class State:
                 if s[2] == "h":
                     if rf and walls >= 1:
                         self.row_wall[x, y] = 1
-                        self.row_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+                        self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -234,7 +234,7 @@ cdef class State:
                 elif s[2] == "v":
                     if cf and walls >= 1:
                         self.column_wall[x, y] = 1
-                        self.column_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+                        self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -247,7 +247,7 @@ cdef class State:
                 if s[2] == "h":
                     if walls >= 1:
                         self.row_wall[x, y] = 1
-                        self.row_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+                        self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -257,7 +257,7 @@ cdef class State:
                 elif s[2] == "v":
                     if walls >= 1:
                         self.column_wall[x, y] = 1
-                        self.column_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+                        self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -662,23 +662,23 @@ cdef class State:
             column_f = False
         if row_f:
             self.row_wall[x, y] = 1
-            self.row_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0) 
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
-            self.row_wall_bit[x * (BOARD_LEN - 1) + y] = 0
+            self.row_wall_bit[x *BIT_BOARD_LEN + y] = 0
             row_f = row_f and f
         if column_f:
             self.column_wall[x, y] = 1
-            self.column_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0)
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
-            self.column_wall_bit[x * (BOARD_LEN - 1) + y] = 0
+            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 0
             column_f = column_f and f
         return row_f, column_f
     
@@ -699,17 +699,17 @@ cdef class State:
             column_f = False
         if row_f and self.must_be_checked_y[x, y]:
             self.row_wall[x, y] = 1
-            self.row_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
-            self.row_wall_bit[x * (BOARD_LEN - 1) + y] = 0
+            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 0
             row_f = row_f and f
         if column_f and self.must_be_checked_x[x, y]:
             self.column_wall[x, y] = 1
-            self.column_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
-            self.column_wall_bit[x * (BOARD_LEN - 1) + y] = 0
+            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 0
             column_f = column_f and f
         return row_f, column_f
 
@@ -722,10 +722,10 @@ cdef class State:
             row_f = False
         if row_f and self.must_be_checked_y[x, y]:
             self.row_wall[x, y] = 1
-            self.row_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
-            self.row_wall_bit[x * (BOARD_LEN - 1) + y] = 0
+            self.row_wall_bit[x * BIT_BOARD_LEN + y] = 0
             row_f = row_f and f
         return row_f
 
@@ -738,10 +738,10 @@ cdef class State:
             column_f = False
         if column_f and self.must_be_checked_x[x, y]:
             self.column_wall[x, y] = 1
-            self.column_wall_bit[x * (BOARD_LEN - 1) + y] = 1
+            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
-            self.column_wall_bit[x * (BOARD_LEN - 1) + y] = 0
+            self.column_wall_bit[x * BIT_BOARD_LEN + y] = 0
             column_f = column_f and f
         return column_f
 
@@ -1223,10 +1223,10 @@ cdef class State:
             self.seen[x, y] = 1
             if y == goal_y:
                 return True
-            cross[0] = (not (y == 0 or self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y - 1] or self.row_wall_bit[max(x - 1, 0) * 8 + y - 1]))
-            cross[1] = (not (x == BOARD_LEN - 1 or self.column_wall_bit[x * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * 8 + max(y - 1, 0)]))
-            cross[2] = (not (y == BOARD_LEN - 1 or self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y] or self.row_wall_bit[max(x - 1, 0) * 8 + y]))
-            cross[3] = (not (x == 0 or self.column_wall_bit[(x - 1) * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * 8 + max(y - 1, 0)]))
+            cross[0] = (not (y == 0 or self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y - 1] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y - 1]))
+            cross[1] = (not (x == BOARD_LEN - 1 or self.column_wall_bit[x * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * BIT_BOARD_LEN + max(y - 1, 0)]))
+            cross[2] = (not (y == BOARD_LEN - 1 or self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y]))
+            cross[3] = (not (x == 0 or self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + max(y - 1, 0)]))
 
             for i, dx, dy in p_list:
                 x2 = x + dx
@@ -1263,10 +1263,10 @@ cdef class State:
             if y == goal_y:
                 return True
 
-            cross[0] = y != 0 and not self.seen[x, y - 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y - 1] or self.row_wall_bit[max(x - 1, 0) * 8 + y - 1]))
-            cross[1] = x != BOARD_LEN - 1 and not self.seen[x + 1, y] and (not (self.column_wall_bit[x * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * 8 + max(y - 1, 0)]))
-            cross[2] = y != BOARD_LEN - 1 and not self.seen[x, y + 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y] or self.row_wall_bit[max(x - 1, 0) * 8 + y]))
-            cross[3] = x != 0 and not self.seen[x - 1, y] and (not (self.column_wall_bit[(x - 1) * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * 8 + max(y - 1, 0)]))
+            cross[0] = y != 0 and not self.seen[x, y - 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y - 1] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y - 1]))
+            cross[1] = x != BOARD_LEN - 1 and not self.seen[x + 1, y] and (not (self.column_wall_bit[x * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * BIT_BOARD_LEN + max(y - 1, 0)]))
+            cross[2] = y != BOARD_LEN - 1 and not self.seen[x, y + 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y]))
+            cross[3] = x != 0 and not self.seen[x - 1, y] and (not (self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + max(y - 1, 0)]))
 
             for i, dx, dy in p_list:
                 x2 = x + dx
