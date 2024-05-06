@@ -812,13 +812,12 @@ cdef class State:
 
     def arrivable(self, x, y, goal_y, isleft=True):
         self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
-        self.prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
         return self.arrivable_(x, y, goal_y, isleft)
 
     def getroute(self, x, y, goal_y, isleft):
         self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
         self.prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
-        self.arrivable_(x, y, goal_y, isleft)
+        self.arrivable_with_prev(x, y, goal_y, isleft)
         x2 = np.argmax(self.seen[:, goal_y])
         y2 = goal_y
         route = []
@@ -1199,7 +1198,7 @@ cdef class State:
 
         return direction_array
 
-    def arrivable_(self, int x, int y, int goal_y, int isleft):
+    def arrivable_with_prev(self, int x, int y, int goal_y, int isleft):
         cdef int stack_index, i, dx, dy, x2, y2
         cross = bitarray(4)
 
@@ -1235,6 +1234,44 @@ cdef class State:
                 if cross[i] and not self.seen[x2, y2]:
                     self.prev[x2, y2, 0] = x
                     self.prev[x2, y2, 1] = y
+                    self.x_stack[stack_index] = x2
+                    self.y_stack[stack_index] = y2
+                    stack_index += 1
+        return False
+
+    def arrivable_(self, int x, int y, int goal_y, int isleft):
+        cdef int stack_index, i, dx, dy, x2, y2
+        cross = bitarray(4)
+
+        if isleft and goal_y == 0:
+            p_list = self.P_LIST_CAND1
+        elif not isleft and goal_y == 0:
+            p_list = self.P_LIST_CAND2
+        elif isleft and goal_y == BOARD_LEN - 1:
+            p_list = self.P_LIST_CAND3
+        else:
+            p_list = self.P_LIST_CAND4
+
+        self.x_stack[0] = x
+        self.y_stack[0] = y
+        stack_index = 1
+        while stack_index > 0:
+            stack_index -= 1
+            x = self.x_stack[stack_index]
+            y = self.y_stack[stack_index]
+            self.seen[x, y] = 1
+            if y == goal_y:
+                return True
+
+            cross[0] = y != 0 and not self.seen[x, y - 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y - 1] or self.row_wall_bit[max(x - 1, 0) * 8 + y - 1]))
+            cross[1] = x != BOARD_LEN - 1 and not self.seen[x + 1, y] and (not (self.column_wall_bit[x * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * 8 + max(y - 1, 0)]))
+            cross[2] = y != BOARD_LEN - 1 and not self.seen[x, y + 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * 8 + y] or self.row_wall_bit[max(x - 1, 0) * 8 + y]))
+            cross[3] = x != 0 and not self.seen[x - 1, y] and (not (self.column_wall_bit[(x - 1) * 8 + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * 8 + max(y - 1, 0)]))
+
+            for i, dx, dy in p_list:
+                x2 = x + dx
+                y2 = y + dy
+                if cross[i]:
                     self.x_stack[stack_index] = x2
                     self.y_stack[stack_index] = y2
                     stack_index += 1
