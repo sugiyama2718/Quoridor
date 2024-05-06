@@ -897,22 +897,29 @@ cdef class State:
         cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim = 2] wall_point_array = np.zeros((BOARD_LEN + 1, BOARD_LEN + 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] count_array_x = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] count_array_y = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
 
         # 周囲を囲む
-        wall_point_array[0, :] = True
-        wall_point_array[BOARD_LEN, :] = True
-        wall_point_array[:, 0] = True
-        wall_point_array[:, BOARD_LEN] = True
+        wall_point_array[0, :] = 1
+        wall_point_array[BOARD_LEN, :] = 1
+        wall_point_array[:, 0] = 1
+        wall_point_array[:, BOARD_LEN] = 1
 
-        wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] = self.row_wall
-        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] = self.row_wall
-        wall_point_array[2:, 1:BOARD_LEN] = self.row_wall
-        wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] = self.column_wall
-        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] = self.column_wall
-        wall_point_array[1:BOARD_LEN, 2:] = self.column_wall
+        wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] += np.array(self.row_wall, dtype=DTYPE)
+        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] += np.array(self.row_wall, dtype=DTYPE)
+        wall_point_array[2:, 1:BOARD_LEN] += np.array(self.row_wall, dtype=DTYPE)
+        wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] += np.array(self.column_wall, dtype=DTYPE)
+        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] += np.array(self.column_wall, dtype=DTYPE)
+        wall_point_array[1:BOARD_LEN, 2:] += np.array(self.column_wall, dtype=DTYPE)
 
-        self.must_be_checked_x = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        self.must_be_checked_y = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        wall_point_array = np.array(wall_point_array >= 1, dtype=DTYPE)
+
+        count_array_x = wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[2:, 1:BOARD_LEN]
+        count_array_y = wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 2:]
+
+        self.must_be_checked_x = (count_array_x >= 2)
+        self.must_be_checked_y = (count_array_y >= 2)
 
         for x in range(BOARD_LEN - 1):
             for y in range(BOARD_LEN - 1):
@@ -1382,6 +1389,7 @@ cdef class State:
         #print(np.all(placabler1 == placabler2) and np.all(placablec1 == placablec2))
         if not (np.all(placabler1 == placabler2) and np.all(placablec1 == placablec2)):
             print("")
+            print("="*50)
             print("{},{},{},{}".format(self.Bx, self.By, self.Wx, self.Wy))
             for y in range(8):
                 for x in range(8):
@@ -1396,15 +1404,28 @@ cdef class State:
                     if x != 7:
                         print(",", end="")
                 print("")
-            print("row")
+
+            placabler1 = np.array(placabler1, dtype=int)
+            placablec1 = np.array(placablec1, dtype=int)
+            placabler2 = np.array(placabler2, dtype=int)
+            placablec2 = np.array(placablec2, dtype=int)
+
+            print()
+            print("row correctness")
             print(placabler1.T == placabler2.T)
+            print("row answer")
             print(placabler1.T)
+            print("row pred")
             print(placabler2.T)
-            print("column")
+
+            print()
+            print("column correctness")
             print(placablec1.T == placablec2.T)
+            print("column answer")
             print(placablec1.T)
+            print("column pred")
             print(placablec2.T)
-            print("失敗")
+            print("check_placable_array_algo failed")
             exit()
 
     def feature_int(self):
