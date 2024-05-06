@@ -14,9 +14,9 @@ for i in test_case_list:
     for x in range(8):
         for y in range(8):
             if state.row_wall[x, y]:
-                state.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
+                state.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
             if state.column_wall[x, y]:
-                state.column_wall_bit[x * BIT_BOARD_LEN + y] = 1  
+                state.column_wall_bit[x + y * BIT_BOARD_LEN] = 1  
     if os.path.exists(os.path.join(TEST_DIR, "{}/p.txt".format(i))):
         p = np.loadtxt(os.path.join(TEST_DIR, "{}/p.txt".format(i)), delimiter=",")
         p = np.asarray(p, dtype="int8")
