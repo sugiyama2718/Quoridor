@@ -1,5 +1,5 @@
 # coding:utf-8
-from State import State
+from State import State, BIT_BOARD_LEN
 import numpy as np
 import os
 
@@ -11,6 +11,12 @@ for i in test_case_list:
     state = State()
     state.row_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/r.txt".format(i)), delimiter=",").T
     state.column_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/c.txt".format(i)), delimiter=",").T
+    for x in range(8):
+        for y in range(8):
+            if state.row_wall[x, y]:
+                state.row_wall_bit[x * BIT_BOARD_LEN + y] = 1
+            if state.column_wall[x, y]:
+                state.column_wall_bit[x * BIT_BOARD_LEN + y] = 1  
     if os.path.exists(os.path.join(TEST_DIR, "{}/p.txt".format(i))):
         p = np.loadtxt(os.path.join(TEST_DIR, "{}/p.txt".format(i)), delimiter=",")
         p = np.asarray(p, dtype="int8")
