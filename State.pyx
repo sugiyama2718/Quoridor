@@ -1273,39 +1273,25 @@ cdef class State:
             #         print(cross_bitarrs[i][x + y * BIT_BOARD_LEN], end="")
             #     print()
 
-        if isleft and goal_y == 0:
-            p_list = self.P_LIST_CAND1
-        elif not isleft and goal_y == 0:
-            p_list = self.P_LIST_CAND2
-        elif isleft and goal_y == BOARD_LEN - 1:
-            p_list = self.P_LIST_CAND3
-        else:
-            p_list = self.P_LIST_CAND4
+        seen_bitarr = bitarray(BITARRAY_SIZE)
+        seen_bitarr_prev = bitarray(BITARRAY_SIZE)
+        seen_bitarr[x + y * BIT_BOARD_LEN] = 1
+        seen_bitarr_prev[x + y * BIT_BOARD_LEN] = 1
 
-        self.x_stack[0] = x
-        self.y_stack[0] = y
-        stack_index = 1
-        while stack_index > 0:
-            stack_index -= 1
-            x = self.x_stack[stack_index]
-            y = self.y_stack[stack_index]
-            self.seen[x, y] = 1
-            if y == goal_y:
+        while True:
+            seen_bitarr |= (seen_bitarr_prev & cross_bitarrs[UP]) << BIT_BOARD_LEN  # 上に移動できるマスについては、上にシフトしたarrayを足す
+            seen_bitarr |= (seen_bitarr_prev & cross_bitarrs[RIGHT]) >> 1
+            seen_bitarr |= (seen_bitarr_prev & cross_bitarrs[DOWN]) >> BIT_BOARD_LEN
+            seen_bitarr |= (seen_bitarr_prev & cross_bitarrs[LEFT]) << 1
+            seen_bitarr &= bitarray_mask
+
+            if (goal_y == 0 and seen_bitarr[:BOARD_LEN].count(1) >= 1) or (
+                goal_y == BOARD_LEN - 1 and seen_bitarr[(BOARD_LEN - 1) * BIT_BOARD_LEN:(BOARD_LEN - 1) * BIT_BOARD_LEN + BOARD_LEN].count(1) >= 1):
                 return True
-
-            # cross[0] = y != 0 and not self.seen[x, y - 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y - 1] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y - 1]))
-            # cross[1] = x != BOARD_LEN - 1 and not self.seen[x + 1, y] and (not (self.column_wall_bit[x * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[x * BIT_BOARD_LEN + max(y - 1, 0)]))
-            # cross[2] = y != BOARD_LEN - 1 and not self.seen[x, y + 1] and (not (self.row_wall_bit[min(x, BOARD_LEN - 2) * BIT_BOARD_LEN + y] or self.row_wall_bit[max(x - 1, 0) * BIT_BOARD_LEN + y]))
-            # cross[3] = x != 0 and not self.seen[x - 1, y] and (not (self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + min(y, BOARD_LEN - 2)] or self.column_wall_bit[(x - 1) * BIT_BOARD_LEN + max(y - 1, 0)]))
-
-            for i, dx, dy in p_list:
-                x2 = x + dx
-                y2 = y + dy
-                if cross_bitarrs[i][x + y * BIT_BOARD_LEN] and not self.seen[x2, y2]:
-                    self.x_stack[stack_index] = x2
-                    self.y_stack[stack_index] = y2
-                    stack_index += 1
-        return False
+            elif seen_bitarr_prev == seen_bitarr:
+                return False
+            else:
+                seen_bitarr_prev[:] = seen_bitarr
 
     def old_display_cui(self, check_algo=True, official=True, p1_atmark=False):
         sys.stdout.write(" ")
