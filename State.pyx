@@ -88,7 +88,7 @@ cdef class State:
     cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
-    cdef public row_wall_bit, column_wall_bit, cross_bitarrs, left_edge, right_edge
+    cdef public row_wall_bit, column_wall_bit, cross_bitarrs, left_edge, right_edge, seen_bitarr, seen_bitarr_prev
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -123,6 +123,8 @@ cdef class State:
         self.cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
         self.left_edge = bitarray(BITARRAY_SIZE)
         self.right_edge = bitarray(BITARRAY_SIZE)
+        self.seen_bitarr = bitarray(BITARRAY_SIZE)
+        self.seen_bitarr_prev = bitarray(BITARRAY_SIZE)
 
         for i in range(BOARD_LEN):
             self.left_edge[i * BIT_BOARD_LEN] = 1
@@ -777,10 +779,6 @@ cdef class State:
         dist[dist == -1] = np.max(dist) + 1
         return dist
 
-    def arrivable(self, x, y, goal_y, isleft=True):
-        self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
-        return self.arrivable_(x, y, goal_y, isleft)
-
     def getroute(self, x, y, goal_y, isleft):
         self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
         self.prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
@@ -891,7 +889,7 @@ cdef class State:
         self.prev = prev
         return False
 
-    def arrivable_(self, int x, int y, int goal_y, int isleft):
+    def arrivable(self, int x, int y, int goal_y):
         cdef int stack_index, i, dx, dy, x2, y2
         
         for cross_bitarr in self.cross_bitarrs:
@@ -922,25 +920,25 @@ cdef class State:
             #         print(self.cross_bitarrs[i][x + y * BIT_BOARD_LEN], end="")
             #     print()
 
-        seen_bitarr = bitarray(BITARRAY_SIZE)
-        seen_bitarr_prev = bitarray(BITARRAY_SIZE)
-        seen_bitarr[x + y * BIT_BOARD_LEN] = 1
-        seen_bitarr_prev[x + y * BIT_BOARD_LEN] = 1
+        self.seen_bitarr.setall(0)
+        self.seen_bitarr_prev.setall(0)
+        self.seen_bitarr[x + y * BIT_BOARD_LEN] = 1
+        self.seen_bitarr_prev[x + y * BIT_BOARD_LEN] = 1
 
         while True:
-            seen_bitarr |= (seen_bitarr_prev & self.cross_bitarrs[UP]) << BIT_BOARD_LEN  # 上に移動できるマスについては、上にシフトしたarrayを足す
-            seen_bitarr |= (seen_bitarr_prev & self.cross_bitarrs[RIGHT]) >> 1
-            seen_bitarr |= (seen_bitarr_prev & self.cross_bitarrs[DOWN]) >> BIT_BOARD_LEN
-            seen_bitarr |= (seen_bitarr_prev & self.cross_bitarrs[LEFT]) << 1
-            seen_bitarr &= bitarray_mask
+            self.seen_bitarr |= (self.seen_bitarr_prev & self.cross_bitarrs[UP]) << BIT_BOARD_LEN  # 上に移動できるマスについては、上にシフトしたarrayを足す
+            self.seen_bitarr |= (self.seen_bitarr_prev & self.cross_bitarrs[RIGHT]) >> 1
+            self.seen_bitarr |= (self.seen_bitarr_prev & self.cross_bitarrs[DOWN]) >> BIT_BOARD_LEN
+            self.seen_bitarr |= (self.seen_bitarr_prev & self.cross_bitarrs[LEFT]) << 1
+            self.seen_bitarr &= bitarray_mask
 
-            if (goal_y == 0 and seen_bitarr[:BOARD_LEN].count(1) >= 1) or (
-                goal_y == BOARD_LEN - 1 and seen_bitarr[(BOARD_LEN - 1) * BIT_BOARD_LEN:(BOARD_LEN - 1) * BIT_BOARD_LEN + BOARD_LEN].count(1) >= 1):
+            if (goal_y == 0 and self.seen_bitarr[:BOARD_LEN].count(1) >= 1) or (
+                goal_y == BOARD_LEN - 1 and self.seen_bitarr[(BOARD_LEN - 1) * BIT_BOARD_LEN:(BOARD_LEN - 1) * BIT_BOARD_LEN + BOARD_LEN].count(1) >= 1):
                 return True
-            elif seen_bitarr_prev == seen_bitarr:
+            elif self.seen_bitarr_prev == self.seen_bitarr:
                 return False
             else:
-                seen_bitarr_prev[:] = seen_bitarr
+                self.seen_bitarr_prev[:] = self.seen_bitarr
 
     def old_display_cui(self, check_algo=True, official=True, p1_atmark=False):
         sys.stdout.write(" ")
