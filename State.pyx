@@ -1,3 +1,4 @@
+from sys import exit
 # coding:utf-8
 #cython: language_level=3, boundscheck=False
 # cython: profile=True
@@ -395,11 +396,6 @@ cdef class State:
         ret[LEFT] = (not (x == 0 or self.column_wall[x - 1, min(y, BOARD_LEN - 2)] or self.column_wall[x - 1, max(y - 1, 0)]))
         return ret
 
-    # def cross_movable_array(self):
-    #     if self.cross_movable_arr is None:
-    #         self.cross_movable_arr = self.cross_movable_array2(self.row_wall, self.column_wall)
-    #     return np.copy(self.cross_movable_arr)
-
     def set_state_by_wall(self):
         # row_wallなどを直接指定して状態を作るときに用いる
         # 差分計算している部分を計算する
@@ -436,26 +432,6 @@ cdef class State:
                 ret[x, y, 1] = (not (x == BOARD_LEN - 1 or column_wall[x, min(y, BOARD_LEN - 2)] or column_wall[x, max(y - 1, 0)]))
                 ret[x, y, 2] = (not (y == BOARD_LEN - 1 or row_wall[min(x, BOARD_LEN - 2), y] or row_wall[max(x - 1, 0), y]))
                 ret[x, y, 3] = (not (x == 0 or column_wall[x - 1, min(y, BOARD_LEN - 2)] or column_wall[x - 1, max(y - 1, 0)]))
-
-        # ret[:, 0, UP] = 1
-        # ret[:-1, 1:, UP] += row_wall  # yはかぶらない
-        # ret[1:, 1:, UP] += row_wall  # x方向には連続して壁は置かれない
-        # ret[:, :, UP] = 1 - ret[:, :, UP]
-
-        # ret[-1, :, RIGHT] = 1
-        # ret[:-1, :-1, RIGHT] += column_wall 
-        # ret[:-1, 1:, RIGHT] += column_wall 
-        # ret[:, :, RIGHT] = 1 - ret[:, :, RIGHT]
-
-        # ret[:, -1, DOWN] = 1
-        # ret[:-1, :-1, DOWN] += row_wall 
-        # ret[1:, :-1, DOWN] += row_wall 
-        # ret[:, :, DOWN] = 1 - ret[:, :, DOWN]
-
-        # ret[0, :, LEFT] = 1
-        # ret[1:, :-1, LEFT] += column_wall 
-        # ret[1:, 1:, LEFT] += column_wall 
-        # ret[:, :, LEFT] = 1 - ret[:, :, LEFT]
 
         return ret
 
@@ -690,11 +666,6 @@ cdef class State:
             return False, False
         row_f = True
         column_f = True
-    
-        # if x == 2 and y == 2 and self.turn == 17:
-        #     print(self.row_wall)
-        #     print(self.column_wall)
-        #     print()
 
         if self.row_wall[max(x - 1, 0), y] or self.row_wall[min(x + 1, BOARD_LEN - 2), y]:
             row_f = False
@@ -842,23 +813,6 @@ cdef class State:
                 row_array[x, y] = f1
                 column_array[x, y] = f2
         return row_array, column_array
-
-    def cald_oneside_placable_cand(self, equivalence_class, graph, int x2, int y2, is_goal0):
-        cdef int x, y
-        edges = self.get_blocking_edges(equivalence_class[x2, y2], graph, is_goal0)
-
-        # 実際置けない場所を求める
-        cdef np.ndarray[DTYPE_t, ndim = 2] placable = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        for edge in edges:
-            x, y = edge[0]
-            if edge[1] == 1:
-                if x > 0:
-                    placable[x - 1, y] = 0
-                if x < BOARD_LEN - 1:
-                    placable[x, y] = 0
-            if edge[1] == 2:
-                placable[x, y] = 0
-        return placable
     
     def calc_placable_array(self, skip_calc_graph=False):
         cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
