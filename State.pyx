@@ -85,12 +85,10 @@ class Edge:
 
 cdef class State:
     draw_turn = DRAW_TURN
-    cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, row_special_cut, row_eq, column_special_cut, column_eq, dist_array1, dist_array2
+    cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
-    cdef public row_graph, column_graph
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
-    cdef public DTYPE_t[:] x_stack, y_stack
-    cdef public row_wall_bit, column_wall_bit, P_LIST_CAND1, P_LIST_CAND2, P_LIST_CAND3, P_LIST_CAND4
+    cdef public row_wall_bit, column_wall_bit, cross_bitarrs, left_edge, right_edge
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -119,22 +117,17 @@ cdef class State:
         self.pseudo_reward = 0
 
         self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
-        self.row_special_cut = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="int8")
-        self.row_eq = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
-        self.row_graph = {0: [[], {range(81)}, True, True]}
-        self.column_special_cut = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="int8")
-        self.column_eq = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
-        self.column_graph = {0: [[], {range(81)}, True, True]}
         self.dist_array1 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
         self.dist_array2 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
 
-        self.P_LIST_CAND1 = [(3, -1, 0), (0, 0, -1), (1, 1, 0), (2, 0, 1)]
-        self.P_LIST_CAND2 = [(2, 0, 1), (1, 1, 0), (0, 0, -1), (3, -1, 0)]
-        self.P_LIST_CAND3 = [(1, 1, 0), (2, 0, 1), (3, -1, 0), (0, 0, -1)]
-        self.P_LIST_CAND4 = [(0, 0, -1), (3, -1, 0), (2, 0, 1), (1, 1, 0)]
+        self.cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
+        self.left_edge = bitarray(BITARRAY_SIZE)
+        self.right_edge = bitarray(BITARRAY_SIZE)
 
-        self.x_stack = np.zeros(81, dtype=DTYPE)
-        self.y_stack = np.zeros(81, dtype=DTYPE)
+        for i in range(BOARD_LEN):
+            self.left_edge[i * BIT_BOARD_LEN] = 1
+        for i in range(BOARD_LEN):
+            self.right_edge[i * BIT_BOARD_LEN + (BOARD_LEN - 1)] = 1
 
         for y in range(BOARD_LEN):
             self.dist_array1[:, y] = y
@@ -900,33 +893,33 @@ cdef class State:
 
     def arrivable_(self, int x, int y, int goal_y, int isleft):
         cdef int stack_index, i, dx, dy, x2, y2
-        cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
+        
+        for cross_bitarr in self.cross_bitarrs:
+            cross_bitarr.setall(0)
 
-        cross_bitarrs[UP][:BOARD_LEN] = 1
-        cross_bitarrs[UP] |= self.row_wall_bit >> BIT_BOARD_LEN  # ２次元では下に一つシフトするのと等価
-        cross_bitarrs[UP] |= self.row_wall_bit >> (BIT_BOARD_LEN + 1)  # ２次元では下に一つ, 右に一つシフトするのと等価
+        self.cross_bitarrs[UP][:BOARD_LEN] = 1
+        self.cross_bitarrs[UP] |= self.row_wall_bit >> BIT_BOARD_LEN  # ２次元では下に一つシフトするのと等価
+        self.cross_bitarrs[UP] |= self.row_wall_bit >> (BIT_BOARD_LEN + 1)  # ２次元では下に一つ, 右に一つシフトするのと等価
 
-        for i in range(BOARD_LEN):
-            cross_bitarrs[RIGHT][i * BIT_BOARD_LEN + (BOARD_LEN - 1)] = 1
-        cross_bitarrs[RIGHT] |= self.column_wall_bit
-        cross_bitarrs[RIGHT] |= self.column_wall_bit >> BIT_BOARD_LEN
+        self.cross_bitarrs[RIGHT] |= self.right_edge
+        self.cross_bitarrs[RIGHT] |= self.column_wall_bit
+        self.cross_bitarrs[RIGHT] |= self.column_wall_bit >> BIT_BOARD_LEN
 
-        cross_bitarrs[DOWN][(BOARD_LEN - 1) * BIT_BOARD_LEN:(BOARD_LEN - 1) * BIT_BOARD_LEN + BOARD_LEN] = 1
-        cross_bitarrs[DOWN] |= self.row_wall_bit
-        cross_bitarrs[DOWN] |= self.row_wall_bit >> 1
+        self.cross_bitarrs[DOWN][(BOARD_LEN - 1) * BIT_BOARD_LEN:(BOARD_LEN - 1) * BIT_BOARD_LEN + BOARD_LEN] = 1
+        self.cross_bitarrs[DOWN] |= self.row_wall_bit
+        self.cross_bitarrs[DOWN] |= self.row_wall_bit >> 1
 
-        for i in range(BOARD_LEN):
-            cross_bitarrs[LEFT][i * BIT_BOARD_LEN] = 1
-        cross_bitarrs[LEFT] |= self.column_wall_bit >> 1
-        cross_bitarrs[LEFT] |= self.column_wall_bit >> (BIT_BOARD_LEN + 1)
+        self.cross_bitarrs[LEFT] |= self.left_edge
+        self.cross_bitarrs[LEFT] |= self.column_wall_bit >> 1
+        self.cross_bitarrs[LEFT] |= self.column_wall_bit >> (BIT_BOARD_LEN + 1)
 
         for i in range(4):
-            cross_bitarrs[i] = ~cross_bitarrs[i]
-            cross_bitarrs[i] &= bitarray_mask
+            self.cross_bitarrs[i] = ~self.cross_bitarrs[i]
+            self.cross_bitarrs[i] &= bitarray_mask
             # print()
             # for y in range(BOARD_LEN):
             #     for x in range(BOARD_LEN):
-            #         print(cross_bitarrs[i][x + y * BIT_BOARD_LEN], end="")
+            #         print(self.cross_bitarrs[i][x + y * BIT_BOARD_LEN], end="")
             #     print()
 
         seen_bitarr = bitarray(BITARRAY_SIZE)
@@ -935,10 +928,10 @@ cdef class State:
         seen_bitarr_prev[x + y * BIT_BOARD_LEN] = 1
 
         while True:
-            seen_bitarr |= (seen_bitarr_prev & cross_bitarrs[UP]) << BIT_BOARD_LEN  # 上に移動できるマスについては、上にシフトしたarrayを足す
-            seen_bitarr |= (seen_bitarr_prev & cross_bitarrs[RIGHT]) >> 1
-            seen_bitarr |= (seen_bitarr_prev & cross_bitarrs[DOWN]) >> BIT_BOARD_LEN
-            seen_bitarr |= (seen_bitarr_prev & cross_bitarrs[LEFT]) << 1
+            seen_bitarr |= (seen_bitarr_prev & self.cross_bitarrs[UP]) << BIT_BOARD_LEN  # 上に移動できるマスについては、上にシフトしたarrayを足す
+            seen_bitarr |= (seen_bitarr_prev & self.cross_bitarrs[RIGHT]) >> 1
+            seen_bitarr |= (seen_bitarr_prev & self.cross_bitarrs[DOWN]) >> BIT_BOARD_LEN
+            seen_bitarr |= (seen_bitarr_prev & self.cross_bitarrs[LEFT]) << 1
             seen_bitarr &= bitarray_mask
 
             if (goal_y == 0 and seen_bitarr[:BOARD_LEN].count(1) >= 1) or (

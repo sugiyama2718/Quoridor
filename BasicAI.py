@@ -177,14 +177,6 @@ def state_copy(s):
     ret.reward = s.reward
     ret.pseudo_terminate = s.pseudo_terminate
     ret.pseudo_reward = s.pseudo_reward
-    ret.row_special_cut = np.copy(s.row_special_cut)
-    ret.row_eq = np.copy(s.row_eq)
-    ret.row_graph = s.row_graph
-    #ret.row_graph = copy.deepcopy(s.row_graph)  # deepcopyは大変遅い
-    ret.column_special_cut = np.copy(s.column_special_cut)
-    ret.column_eq = np.copy(s.column_eq)
-    ret.column_graph = s.column_graph
-    #ret.column_graph = copy.deepcopy(s.column_graph)
     ret.dist_array1 = np.copy(s.dist_array1)
     ret.dist_array2 = np.copy(s.dist_array2)
     ret.cross_movable_arr = np.copy(s.cross_movable_arr)
