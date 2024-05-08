@@ -39,7 +39,7 @@ lib = ctypes.CDLL('./State_util.dll')
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
-arrivable_.argtypes = [ctypes.c_longlong, ctypes.c_longlong, ctypes.c_longlong, ctypes.c_longlong, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+arrivable_.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 arrivable_.restype = ctypes.c_bool
 
 
@@ -901,6 +901,10 @@ cdef class State:
     def arrivable(self, int x, int y, int goal_y):
         cdef int stack_index, i, dx, dy, x2, y2
 
+        print(BITARRAY_SIZE//2, self.row_wall_bit)
+        print(self.row_wall_bit[:BITARRAY_SIZE//2])
+        print(self.row_wall_bit[BITARRAY_SIZE//2:])
+        print(ba2int(self.row_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.row_wall_bit[BITARRAY_SIZE//2:]))
         arrivable_(ba2int(self.row_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.row_wall_bit[BITARRAY_SIZE//2:]),
                    ba2int(self.column_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.column_wall_bit[BITARRAY_SIZE//2:]),
                    x, y, goal_y)
