@@ -10,6 +10,7 @@ import copy
 import collections
 import math
 from bitarray import bitarray
+from bitarray.util import ba2int
 import ctypes
 
 DTYPE = np.int32
@@ -38,7 +39,7 @@ lib = ctypes.CDLL('./State_util.dll')
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
-arrivable_.argtypes = [ctypes.c_longlong, ctypes.c_longlong]
+arrivable_.argtypes = [ctypes.c_longlong, ctypes.c_longlong, ctypes.c_longlong, ctypes.c_longlong, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 arrivable_.restype = ctypes.c_bool
 
 
@@ -900,7 +901,9 @@ cdef class State:
     def arrivable(self, int x, int y, int goal_y):
         cdef int stack_index, i, dx, dy, x2, y2
 
-        arrivable_(0, 50)
+        arrivable_(ba2int(self.row_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.row_wall_bit[BITARRAY_SIZE//2:]),
+                   ba2int(self.column_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.column_wall_bit[BITARRAY_SIZE//2:]),
+                   x, y, goal_y)
         
         for cross_bitarr in self.cross_bitarrs:
             cross_bitarr.setall(0)
