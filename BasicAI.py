@@ -1,6 +1,6 @@
 # coding:utf-8
 #from memory_profiler import profile
-from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid
+from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
 from State import select_action
@@ -16,7 +16,7 @@ from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from config import *
-from util import Glendenning2Official
+from util import Glendenning2Official, Official2Glendenning
 
 num2str = {0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i"}
 
@@ -350,7 +350,7 @@ def calc_next_state(x):
 
 class BasicAI(Agent):
     def __init__(self, color, search_nodes=1, C_puct=5, tau=1, n_parallel=N_PARALLEL, virtual_loss_n=1, use_estimated_V=True, V_ema_w=0.01, 
-                 shortest_only=False, use_average_Q=False, random_playouts=False, tau_mult=2, tau_decay=6, is_mimic_AI=False, tau_peak=6):
+                 shortest_only=False, use_average_Q=False, random_playouts=False, tau_mult=2, tau_decay=6, is_mimic_AI=False, tau_peak=6, force_opening=None):
         super(BasicAI, self).__init__(color)
         self.search_nodes = search_nodes
         self.C_puct = C_puct
@@ -368,6 +368,7 @@ class BasicAI(Agent):
         self.tau_decay = tau_decay
         self.is_mimic_AI = is_mimic_AI  # 指定された後手AIは、先手を追い越すまでの間、回転対称になるように先手の手を真似する
         self.tau_peak = tau_peak  # ランダム性を一番高くするターン数。初手に壁置くのを読むのは無駄だが、向かい合ったときにいろいろな壁の起き方をするのは有意義だろうという考え
+        self.force_opening = force_opening
 
     def init_prev(self, state=None):
         # 試合前に毎回実行
@@ -703,6 +704,20 @@ class BasicAI(Agent):
 
         if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.W, root_tree.N, root_v):
             max_node = SELFPLAY_SEARCHNODES_MAX
+
+        # force_openingがある場合、合法手である限りは必ず指す
+        if self.force_opening is not None and state.turn < len(self.force_opening):
+            force_action = Official2Glendenning(self.force_opening[state.turn])
+            force_action_id = str2actionid(state, force_action)
+            if not illegal[force_action_id]:
+                pi_ret = np.zeros((137))
+                pi_ret[force_action_id] = 1.0
+                self.prev_wall_num = wall_num
+                self.prev_tree = None
+                if return_root_tree:
+                    return force_action_id, Tree(state, pi_ret)
+                else:
+                    return force_action_id, pi_ret, root_v, 0.0, 1  # 探索はしていないので探索後のvは0にしておく、またpolicyの学習への影響を最小限にする
 
         while node_num < max_node and root_tree.result == 0:
             # select
