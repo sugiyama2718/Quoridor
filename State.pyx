@@ -1,6 +1,6 @@
 from sys import exit
-# coding:utf-8
-#cython: language_level=3, boundscheck=False
+# coding: utf-8
+# cython: language_level=3, boundscheck=False
 # cython: profile=True
 import numpy as np
 cimport numpy as np
@@ -10,6 +10,7 @@ import copy
 import collections
 import math
 from bitarray import bitarray
+import ctypes
 
 DTYPE = np.int32
 ctypedef np.int32_t DTYPE_t
@@ -32,6 +33,13 @@ BIT_BOARD_LEN = 11
 bitarray_mask = bitarray(BITARRAY_SIZE)
 for i in range(BOARD_LEN):
     bitarray_mask[i * BIT_BOARD_LEN:i * BIT_BOARD_LEN + BOARD_LEN] = 1
+
+lib = ctypes.CDLL('./State_util.dll')
+
+# dll中の関数の引数と戻り値の型を指定
+arrivable_ = lib.arrivable_
+arrivable_.argtypes = [ctypes.c_longlong, ctypes.c_longlong]
+arrivable_.restype = ctypes.c_bool
 
 
 def select_action(DTYPE_float[:] Q, DTYPE_float[:] N, DTYPE_float[:] P, float C_puct, use_estimated_V, float estimated_V, color, turn, use_average_Q):
@@ -891,6 +899,8 @@ cdef class State:
 
     def arrivable(self, int x, int y, int goal_y):
         cdef int stack_index, i, dx, dy, x2, y2
+
+        arrivable_(0, 50)
         
         for cross_bitarr in self.cross_bitarrs:
             cross_bitarr.setall(0)
