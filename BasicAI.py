@@ -93,7 +93,7 @@ def get_graphviz_tree_for_shared_tree(tree, g, threshold=5, root=True, color=Non
                 node_id += 1
                 g.edge(str(tree.node_id), str(value.node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
 
-                get_graphviz_tree_for_shared_tree(value, g, root=False, color=color, visited=visited)
+                get_graphviz_tree_for_shared_tree(value, g, threshold=threshold, root=False, color=color, visited=visited)
 
         else:
             if int(tree.N[key]) >= threshold:
@@ -135,7 +135,7 @@ def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
                 if int(tree.N[key]) >= threshold:
                     g.edge(str(parent_count), str(count), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
 
-                    get_graphviz_tree_for_shared_tree(value, g, count, root=False, color=color)
+                    get_graphviz_tree(value, g, count, root=False, color=color)
                 count += int(np.sum(value.N)) + 1
             else:
                 if int(tree.N[key]) >= threshold:
@@ -960,6 +960,8 @@ class BasicAI(Agent):
         g = Digraph(format='png')
         g.attr('node', shape='circle')
 
-        get_graphviz_tree_for_shared_tree(self.tree_for_visualize, g)
+        config = read_application_config()
+
+        get_graphviz_tree_for_shared_tree(self.tree_for_visualize, g, threshold=config["graphviz_threshold"])
 
         return g
