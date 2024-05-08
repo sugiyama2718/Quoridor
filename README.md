@@ -55,4 +55,11 @@ pyinstaller --log-level=INFO xxx.spec
 python setup.py build_ext --inplace
 ```
 
+## Compile C++ program
+
+```sh
+g++ -fPIC -shared -o State_util.dll State_util.cpp
+```
+
+
 
