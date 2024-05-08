@@ -38,7 +38,7 @@ from Agent import Agent
 from decimal import Decimal
 import random
 import json
-from util import Glendenning2Official, Official2Glendenning, RECORDS_PATH, mirror_action, get_normalized_action_list, get_opening_node_from_state, move_to_child
+from util import Glendenning2Official, Official2Glendenning, RECORDS_PATH, mirror_action, get_normalized_action_list, get_opening_node_from_state, move_to_child, get_normalized_state
 import math
 from Tree import OpeningTree, load_dict_to_opening_tree
 import copy
@@ -327,7 +327,7 @@ class Quoridor(Widget):
             if i > 0:
                 print("\r{}/{} {:.2f}min".format(i + 1, len(target_nodes), (len(target_nodes) - i) * (time.time() - start) / i / 60), end="")
                 
-            state, _, _ = self.get_normalized_state(action_list)
+            state, _, _ = get_normalized_state(action_list)
 
             self.analyze_one_node(node, state)
 
@@ -433,7 +433,7 @@ class Quoridor(Widget):
             self.prev_prev_str = prev_str
 
             if node.search_text is not None:
-                _, _, is_mirror = self.get_normalized_state(list(map(Official2Glendenning, all_actions)))
+                _, _, is_mirror = get_normalized_state(list(map(Official2Glendenning, all_actions)))
                 if is_mirror:
                     search_text = self.mirror_text(node.search_text)
                 else:
@@ -473,18 +473,13 @@ class Quoridor(Widget):
         node.search_nodes = self.search_nodes
         node.search_text = search_text
 
-    def get_state_from_action_list(self, action_list):
-        state = State()
-        for a in action_list:
-            state.accept_action_str(a)
-        return state
     
     def analyze_this_turn_opening(self):
         print("analyze_this_turn_opening")
 
         node = self.register(is_display=False)
 
-        state, _, is_mirror = self.get_normalized_state(self.action_history[1:self.turn + 1])
+        state, _, is_mirror = get_normalized_state(self.action_history[1:self.turn + 1])
 
         if node.score is None or node.epoch < self.target_epoch or node.search_nodes < self.search_nodes:
             self.analyze_one_node(node, state)
@@ -539,19 +534,6 @@ class Quoridor(Widget):
         with open(DEFAULT_OPENING_JSONFILEPATH, "w") as fout:
             json.dump(self.opening_tree.to_dict(), fout)
 
-    def get_normalized_state(self, action_list):
-        mirror_action_list = list(map(mirror_action, action_list))
-
-        state = self.get_state_from_action_list(action_list)
-        mirror_state = self.get_state_from_action_list(mirror_action_list)
-
-        state_vec = tuple(state.feature_int().flatten())
-        mirror_state_vec = tuple(mirror_state.feature_int().flatten())
-
-        if state_vec <= mirror_state_vec:
-            return state, state_vec, False
-        else:
-            return mirror_state, mirror_state_vec, True
 
     def register(self, is_display=True):
         print("register")
@@ -572,7 +554,7 @@ class Quoridor(Widget):
             key = Glendenning2Official(a)
 
             if key not in node.children.keys():
-                state, _, _ = self.get_normalized_state(action_list[:i+1])  # 毎回normalized_stateを得るとn^2の遅さになりそう
+                state, _, _ = get_normalized_state(action_list[:i+1])  # 毎回normalized_stateを得るとn^2の遅さになりそう
                 node.children[key] = get_opening_node_from_state(state, self.statevec2node)
 
             node = move_to_child(node, key, self.statevec2node)
@@ -826,7 +808,7 @@ class Quoridor(Widget):
             if node is None:
                 break
         if node is not None and node.search_text is not None:
-            _, _, is_mirror = self.get_normalized_state(self.action_history[1:self.turn + 1])
+            _, _, is_mirror = get_normalized_state(self.action_history[1:self.turn + 1])
             if is_mirror:
                 output_text = self.mirror_text(node.search_text)
             else:
