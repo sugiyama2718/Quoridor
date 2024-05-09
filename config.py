@@ -125,8 +125,9 @@ MIMIC_N_RATIO = 0.01  # この割合以下しか読まれていない手は真�
 FORCE_MIMIC_TURN = 10  # 最初のこのターンは↑に引っかかっていても真似する
 MIMIC_AI_RATIO = 0.02  # 自己対戦においてmimic AIにする割合
 
-FORCE_OPENING_RATE = 0.03  # 探索してほしい定跡をやる割合
+FORCE_OPENING_RATE = 0.04  # 探索してほしい定跡をやる割合
 FORCE_OPENING_LIST = [  # Official notation
+    ["e2", "e8", "e3", "e7", "e4", "e6", "a3h"],
     ["e2", "e8", "e3", "e7", "e4", "e6", "d3h", "c6h", "d5v"],
     ["e2", "e8", "e3", "e7", "e4", "e6", "d3h", "c6h", "e6v"],
     ["e2", "e8", "e3", "e7", "e4", "d4v"]
