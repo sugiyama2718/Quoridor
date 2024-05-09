@@ -5,6 +5,12 @@
 
 const int BOARD_LEN = 9;
 const int BIT_BOARD_LEN = 11;
+enum DIRECTION {
+    UP,
+    RIGHT,
+    DOWN,
+    LEFT
+};
 const __uint128_t BIT_BOARD_MASK = ((__uint128_t)0xFF9FF3FE7FCFF9FFULL << 64) | 0x3FE7FCFF80000000ULL;
 const __uint128_t UP_EDGE = ((__uint128_t)0xFF80000000000000ULL << 64) | 0x0000000000000000ULL;
 const __uint128_t RIGHT_EDGE = ((__uint128_t)0x80100200400801ULL << 64) | 0x0020040080000000ULL;
@@ -57,10 +63,34 @@ int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t colum
     __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
     __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
     
+    __uint128_t cross_bitarrs[4];
+    
+    cross_bitarrs[UP] = UP_EDGE;
+    cross_bitarrs[UP] |= down_shift(row_bitarr);
+    cross_bitarrs[UP] |= right_down_shift(row_bitarr);
+
+    cross_bitarrs[RIGHT] = RIGHT_EDGE;
+    cross_bitarrs[RIGHT] |= column_bitarr;
+    cross_bitarrs[RIGHT] |= down_shift(column_bitarr);
+
+    cross_bitarrs[DOWN] = DOWN_EDGE;
+    cross_bitarrs[DOWN] |= row_bitarr;
+    cross_bitarrs[DOWN] |= right_shift(row_bitarr);
+
+    cross_bitarrs[LEFT] = LEFT_EDGE;
+    cross_bitarrs[LEFT] |= right_shift(column_bitarr);
+    cross_bitarrs[LEFT] |= right_down_shift(column_bitarr);
+
+    for(int i = 0; i < 4; i++) {
+        cross_bitarrs[i] = ~cross_bitarrs[i];
+        cross_bitarrs[i] &= BIT_BOARD_MASK;
+    }
+
     printf("----------\n");
-    print_full_bitarray(UP_EDGE);
-    // printf("\n");
-    // print_full_bitarray(RIGHT_EDGE);
+    for(int i = 0; i < 4; i++) {
+        print_bitarray(cross_bitarrs[i]);
+        printf("\n");
+    }
 
     return (row_bitarr < 100);
 }
