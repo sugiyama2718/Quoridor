@@ -901,10 +901,6 @@ cdef class State:
     def arrivable(self, int x, int y, int goal_y):
         cdef int stack_index, i, dx, dy, x2, y2
 
-        print(BITARRAY_SIZE//2, self.row_wall_bit)
-        print(self.row_wall_bit[:BITARRAY_SIZE//2])
-        print(self.row_wall_bit[BITARRAY_SIZE//2:])
-        print(ba2int(self.row_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.row_wall_bit[BITARRAY_SIZE//2:]))
         arrivable_(ba2int(self.row_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.row_wall_bit[BITARRAY_SIZE//2:]),
                    ba2int(self.column_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.column_wall_bit[BITARRAY_SIZE//2:]),
                    x, y, goal_y)
