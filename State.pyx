@@ -35,7 +35,10 @@ bitarray_mask = bitarray(BITARRAY_SIZE)
 for i in range(BOARD_LEN):
     bitarray_mask[i * BIT_BOARD_LEN:i * BIT_BOARD_LEN + BOARD_LEN] = 1
 
-lib = ctypes.CDLL('./State_util.dll')
+if os.name == "nt":
+    lib = ctypes.CDLL('./State_util.dll')
+else:
+    lib = ctypes.CDLL('./State_util.so')
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
@@ -899,8 +902,8 @@ cdef class State:
         return False
 
     def arrivable(self, int x, int y, int goal_y):
-        return arrivable_(ba2int(self.row_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.row_wall_bit[BITARRAY_SIZE//2:]),
-                   ba2int(self.column_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.column_wall_bit[BITARRAY_SIZE//2:]),
+        return arrivable_(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
+                   ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]),
                    x, y, goal_y)
 
     def old_display_cui(self, check_algo=True, official=True, p1_atmark=False):
