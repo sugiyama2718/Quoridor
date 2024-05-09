@@ -899,59 +899,9 @@ cdef class State:
         return False
 
     def arrivable(self, int x, int y, int goal_y):
-        cdef int stack_index, i, dx, dy, x2, y2
-
-        arrivable_(ba2int(self.row_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.row_wall_bit[BITARRAY_SIZE//2:]),
+        return arrivable_(ba2int(self.row_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.row_wall_bit[BITARRAY_SIZE//2:]),
                    ba2int(self.column_wall_bit[:BITARRAY_SIZE//2]), ba2int(self.column_wall_bit[BITARRAY_SIZE//2:]),
                    x, y, goal_y)
-        
-        for cross_bitarr in self.cross_bitarrs:
-            cross_bitarr.setall(0)
-
-        self.cross_bitarrs[UP][:BOARD_LEN] = 1
-        self.cross_bitarrs[UP] |= self.row_wall_bit >> BIT_BOARD_LEN  # ２次元では下に一つシフトするのと等価
-        self.cross_bitarrs[UP] |= self.row_wall_bit >> (BIT_BOARD_LEN + 1)  # ２次元では下に一つ, 右に一つシフトするのと等価
-
-        self.cross_bitarrs[RIGHT] |= self.right_edge
-        self.cross_bitarrs[RIGHT] |= self.column_wall_bit
-        self.cross_bitarrs[RIGHT] |= self.column_wall_bit >> BIT_BOARD_LEN
-
-        self.cross_bitarrs[DOWN][(BOARD_LEN - 1) * BIT_BOARD_LEN:(BOARD_LEN - 1) * BIT_BOARD_LEN + BOARD_LEN] = 1
-        self.cross_bitarrs[DOWN] |= self.row_wall_bit
-        self.cross_bitarrs[DOWN] |= self.row_wall_bit >> 1
-
-        self.cross_bitarrs[LEFT] |= self.left_edge
-        self.cross_bitarrs[LEFT] |= self.column_wall_bit >> 1
-        self.cross_bitarrs[LEFT] |= self.column_wall_bit >> (BIT_BOARD_LEN + 1)
-
-        for i in range(4):
-            self.cross_bitarrs[i] = ~self.cross_bitarrs[i]
-            self.cross_bitarrs[i] &= bitarray_mask
-            # print()
-            # for y in range(BOARD_LEN):
-            #     for x in range(BOARD_LEN):
-            #         print(self.cross_bitarrs[i][x + y * BIT_BOARD_LEN], end="")
-            #     print()
-
-        self.seen_bitarr.setall(0)
-        self.seen_bitarr_prev.setall(0)
-        self.seen_bitarr[x + y * BIT_BOARD_LEN] = 1
-        self.seen_bitarr_prev[x + y * BIT_BOARD_LEN] = 1
-
-        while True:
-            self.seen_bitarr |= (self.seen_bitarr_prev & self.cross_bitarrs[UP]) << BIT_BOARD_LEN  # 上に移動できるマスについては、上にシフトしたarrayを足す
-            self.seen_bitarr |= (self.seen_bitarr_prev & self.cross_bitarrs[RIGHT]) >> 1
-            self.seen_bitarr |= (self.seen_bitarr_prev & self.cross_bitarrs[DOWN]) >> BIT_BOARD_LEN
-            self.seen_bitarr |= (self.seen_bitarr_prev & self.cross_bitarrs[LEFT]) << 1
-            self.seen_bitarr &= bitarray_mask
-
-            if (goal_y == 0 and self.seen_bitarr[:BOARD_LEN].count(1) >= 1) or (
-                goal_y == BOARD_LEN - 1 and self.seen_bitarr[(BOARD_LEN - 1) * BIT_BOARD_LEN:(BOARD_LEN - 1) * BIT_BOARD_LEN + BOARD_LEN].count(1) >= 1):
-                return True
-            elif self.seen_bitarr_prev == self.seen_bitarr:
-                return False
-            else:
-                self.seen_bitarr_prev[:] = self.seen_bitarr
 
     def old_display_cui(self, check_algo=True, official=True, p1_atmark=False):
         sys.stdout.write(" ")
