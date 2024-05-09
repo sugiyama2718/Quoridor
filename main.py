@@ -994,8 +994,8 @@ if __name__ == '__main__':
         # AIs[1].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
         # AIs[0].load(os.path.join(path, "post.ckpt"))
         # AIs[1].load(os.path.join(path, "post.ckpt"))
-        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch3800.ckpt"))
-        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch3800.ckpt"))
+        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
+        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
 
         start_time = time.time()
         temp_data = generate_data(AIs, game_num, noise=NOISE, display=True, info=True)
