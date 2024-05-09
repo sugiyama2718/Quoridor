@@ -6,6 +6,10 @@
 const int BOARD_LEN = 9;
 const int BIT_BOARD_LEN = 11;
 const __uint128_t BIT_BOARD_MASK = ((__uint128_t)0xFF9FF3FE7FCFF9FFULL << 64) | 0x3FE7FCFF80000000ULL;
+const __uint128_t UP_EDGE = ((__uint128_t)0xFF80000000000000ULL << 64) | 0x0000000000000000ULL;
+const __uint128_t RIGHT_EDGE = ((__uint128_t)0x80100200400801ULL << 64) | 0x0020040080000000ULL;
+const __uint128_t DOWN_EDGE = 0xFF80000000ULL;
+const __uint128_t LEFT_EDGE = ((__uint128_t)0x8010020040080100ULL << 64) | 0x2004008000000000ULL;
 
 void print_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BOARD_LEN; y++) {
@@ -54,9 +58,9 @@ int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t colum
     __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
     
     printf("----------\n");
-    print_full_bitarray(BIT_BOARD_MASK);
+    print_full_bitarray(UP_EDGE);
     // printf("\n");
-    // print_full_bitarray(right_down_shift(row_bitarr));
+    // print_full_bitarray(RIGHT_EDGE);
 
     return (row_bitarr < 100);
 }
