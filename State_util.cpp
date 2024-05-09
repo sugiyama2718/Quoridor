@@ -16,6 +16,22 @@ void print_bitarray(__uint128_t bitarr) {
     }
 }
 
+inline __uint128_t up_shift(__uint128_t bitarr){
+    return bitarr << BIT_BOARD_LEN;
+}
+
+inline __uint128_t right_shift(__uint128_t bitarr){
+    return bitarr >> 1;
+}
+
+inline __uint128_t down_shift(__uint128_t bitarr){
+    return bitarr >> BIT_BOARD_LEN;
+}
+
+inline __uint128_t left_shift(__uint128_t bitarr){
+    return bitarr << 1;
+}
+
 extern "C" {
 int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, int pawn_x, int pawn_y, int goal_y) {
     __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
@@ -24,7 +40,14 @@ int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t colum
     printf("----------\n");
     print_bitarray(row_bitarr);
     printf("\n");
-    print_bitarray(column_bitarr);
+    print_bitarray(up_shift(row_bitarr));
+    printf("\n");
+    print_bitarray(right_shift(row_bitarr));
+    printf("\n");
+    print_bitarray(down_shift(row_bitarr));
+    printf("\n");
+    print_bitarray(left_shift(row_bitarr));
+    //print_bitarray(column_bitarr);
 
     return (row_bitarr < 100);
 }
