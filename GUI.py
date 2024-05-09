@@ -233,6 +233,8 @@ class Quoridor(Widget):
 
         self.virtual_human = GUIHuman(0)  # 対戦前の指し手用
 
+        self.add_history(self.state, None, is_record=False)
+
     def human_tab_f(self):
         print("Human vs. Human")
         self.mode = HUMAN_HUMAN_MODE

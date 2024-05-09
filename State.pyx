@@ -1,6 +1,6 @@
 from sys import exit
-# coding:utf-8
-#cython: language_level=3, boundscheck=False
+# coding: utf-8
+# cython: language_level=3, boundscheck=False
 # cython: profile=True
 import numpy as np
 cimport numpy as np
@@ -9,6 +9,9 @@ import time
 import copy
 import collections
 import math
+from bitarray import bitarray
+from bitarray.util import ba2int
+import ctypes
 
 DTYPE = np.int32
 ctypedef np.int32_t DTYPE_t
@@ -25,6 +28,22 @@ UP = 0
 RIGHT = 1
 DOWN = 2
 LEFT = 3
+BITARRAY_SIZE = 128
+BIT_BOARD_LEN = 11
+
+bitarray_mask = bitarray(BITARRAY_SIZE)
+for i in range(BOARD_LEN):
+    bitarray_mask[i * BIT_BOARD_LEN:i * BIT_BOARD_LEN + BOARD_LEN] = 1
+
+if os.name == "nt":
+    lib = ctypes.CDLL('./State_util.dll')
+else:
+    lib = ctypes.CDLL('./State_util.so')
+
+# dll中の関数の引数と戻り値の型を指定
+arrivable_ = lib.arrivable_
+arrivable_.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+arrivable_.restype = ctypes.c_bool
 
 
 def select_action(DTYPE_float[:] Q, DTYPE_float[:] N, DTYPE_float[:] P, float C_puct, use_estimated_V, float estimated_V, color, turn, use_average_Q):
@@ -78,13 +97,15 @@ class Edge:
 
 cdef class State:
     draw_turn = DRAW_TURN
-    cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, row_special_cut, row_eq, column_special_cut, column_eq, dist_array1, dist_array2
+    cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
-    cdef public row_graph, column_graph
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
+    cdef public row_wall_bit, column_wall_bit, cross_bitarrs, left_edge, right_edge, seen_bitarr, seen_bitarr_prev
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
+        self.row_wall_bit = bitarray(BITARRAY_SIZE)
+        self.column_wall_bit = bitarray(BITARRAY_SIZE)
         self.placable_r_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_c_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_rb = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -108,14 +129,19 @@ cdef class State:
         self.pseudo_reward = 0
 
         self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
-        self.row_special_cut = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="int8")
-        self.row_eq = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
-        self.row_graph = {0: [[], {range(81)}, True, True]}
-        self.column_special_cut = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="int8")
-        self.column_eq = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
-        self.column_graph = {0: [[], {range(81)}, True, True]}
         self.dist_array1 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
         self.dist_array2 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
+
+        self.cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
+        self.left_edge = bitarray(BITARRAY_SIZE)
+        self.right_edge = bitarray(BITARRAY_SIZE)
+        self.seen_bitarr = bitarray(BITARRAY_SIZE)
+        self.seen_bitarr_prev = bitarray(BITARRAY_SIZE)
+
+        for i in range(BOARD_LEN):
+            self.left_edge[i * BIT_BOARD_LEN] = 1
+        for i in range(BOARD_LEN):
+            self.right_edge[i * BIT_BOARD_LEN + (BOARD_LEN - 1)] = 1
 
         for y in range(BOARD_LEN):
             self.dist_array1[:, y] = y
@@ -209,6 +235,7 @@ cdef class State:
                 if s[2] == "h":
                     if rf and walls >= 1:
                         self.row_wall[x, y] = 1
+                        self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -218,6 +245,7 @@ cdef class State:
                 elif s[2] == "v":
                     if cf and walls >= 1:
                         self.column_wall[x, y] = 1
+                        self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -230,6 +258,7 @@ cdef class State:
                 if s[2] == "h":
                     if walls >= 1:
                         self.row_wall[x, y] = 1
+                        self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -239,6 +268,7 @@ cdef class State:
                 elif s[2] == "v":
                     if walls >= 1:
                         self.column_wall[x, y] = 1
+                        self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -373,11 +403,6 @@ cdef class State:
         ret[LEFT] = (not (x == 0 or self.column_wall[x - 1, min(y, BOARD_LEN - 2)] or self.column_wall[x - 1, max(y - 1, 0)]))
         return ret
 
-    # def cross_movable_array(self):
-    #     if self.cross_movable_arr is None:
-    #         self.cross_movable_arr = self.cross_movable_array2(self.row_wall, self.column_wall)
-    #     return np.copy(self.cross_movable_arr)
-
     def set_state_by_wall(self):
         # row_wallなどを直接指定して状態を作るときに用いる
         # 差分計算している部分を計算する
@@ -414,26 +439,6 @@ cdef class State:
                 ret[x, y, 1] = (not (x == BOARD_LEN - 1 or column_wall[x, min(y, BOARD_LEN - 2)] or column_wall[x, max(y - 1, 0)]))
                 ret[x, y, 2] = (not (y == BOARD_LEN - 1 or row_wall[min(x, BOARD_LEN - 2), y] or row_wall[max(x - 1, 0), y]))
                 ret[x, y, 3] = (not (x == 0 or column_wall[x - 1, min(y, BOARD_LEN - 2)] or column_wall[x - 1, max(y - 1, 0)]))
-
-        # ret[:, 0, UP] = 1
-        # ret[:-1, 1:, UP] += row_wall  # yはかぶらない
-        # ret[1:, 1:, UP] += row_wall  # x方向には連続して壁は置かれない
-        # ret[:, :, UP] = 1 - ret[:, :, UP]
-
-        # ret[-1, :, RIGHT] = 1
-        # ret[:-1, :-1, RIGHT] += column_wall 
-        # ret[:-1, 1:, RIGHT] += column_wall 
-        # ret[:, :, RIGHT] = 1 - ret[:, :, RIGHT]
-
-        # ret[:, -1, DOWN] = 1
-        # ret[:-1, :-1, DOWN] += row_wall 
-        # ret[1:, :-1, DOWN] += row_wall 
-        # ret[:, :, DOWN] = 1 - ret[:, :, DOWN]
-
-        # ret[0, :, LEFT] = 1
-        # ret[1:, :-1, LEFT] += column_wall 
-        # ret[1:, 1:, LEFT] += column_wall 
-        # ret[:, :, LEFT] = 1 - ret[:, :, LEFT]
 
         return ret
 
@@ -643,19 +648,23 @@ cdef class State:
             column_f = False
         if row_f:
             self.row_wall[x, y] = 1
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0) 
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 0
             row_f = row_f and f
         if column_f:
             self.column_wall[x, y] = 1
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0)
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 0
             column_f = column_f and f
         return row_f, column_f
     
@@ -671,13 +680,17 @@ cdef class State:
             column_f = False
         if row_f and self.must_be_checked_y[x, y]:
             self.row_wall[x, y] = 1
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 0
             row_f = row_f and f
         if column_f and self.must_be_checked_x[x, y]:
             self.column_wall[x, y] = 1
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 0
             column_f = column_f and f
         return row_f, column_f
 
@@ -690,8 +703,10 @@ cdef class State:
             row_f = False
         if row_f and self.must_be_checked_y[x, y]:
             self.row_wall[x, y] = 1
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
+            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 0
             row_f = row_f and f
         return row_f
 
@@ -704,8 +719,10 @@ cdef class State:
             column_f = False
         if column_f and self.must_be_checked_x[x, y]:
             self.column_wall[x, y] = 1
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
+            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 0
             column_f = column_f and f
         return column_f
 
@@ -774,15 +791,10 @@ cdef class State:
         dist[dist == -1] = np.max(dist) + 1
         return dist
 
-    def arrivable(self, x, y, goal_y, isleft=True):
-        self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
-        self.prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
-        return self.arrivable_(x, y, goal_y, isleft)
-
     def getroute(self, x, y, goal_y, isleft):
         self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
         self.prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
-        self.arrivable_(x, y, goal_y, isleft)
+        self.arrivable_with_prev(x, y, goal_y, isleft)
         x2 = np.argmax(self.seen[:, goal_y])
         y2 = goal_y
         route = []
@@ -792,56 +804,6 @@ cdef class State:
         route.append((x, y))
         route = route[::-1]
         return route
-
-    # この関数が返すedgeはEdgeクラスではなく(p, type)のタプルのリスト
-    def get_blocking_edges(self, index, graph, is_goal_0):
-        _, edgess = self.get_blocking_edges_rec(index, graph, is_goal_0, np.zeros((BOARD_LEN * BOARD_LEN), dtype="bool"), {})
-        #print(edgess)
-        n = len(edgess)
-        part_edgess = []
-        for x in edgess:
-            part_edgess.append(list(set([(edge.p, edge.type) for edge in x])))
-        part_edges = []
-        for edges in part_edgess:
-            part_edges.extend(edges)
-        counter = collections.Counter(part_edges)
-        ret_edges = []
-        for edge, c in counter.items():
-            if c >= n:
-                ret_edges.append(edge)
-        return ret_edges
-
-    def get_blocking_edges_rec(self, index, graph, is_goal_0, seen, goal, prev_id=-1):
-        seen[index] = True
-        if is_goal_0 and graph[index][2]:
-            goal[index] = []
-            return True, []
-        if not is_goal_0 and graph[index][3]:
-            goal[index] = []
-            return True, []
-
-        ret_edgess = []
-        ret_f = False
-        for edge in graph[index][0]:
-            if edge.n == prev_id:
-                continue
-            if edge.n in goal.keys():
-                ret_f = True
-                goal[index] = [edge] + goal[edge.n]
-                ret_edgess.append([edge] + goal[edge.n])
-                continue
-            if seen[edge.n]:
-                continue
-            f, edgess = self.get_blocking_edges_rec(edge.n, graph, is_goal_0, seen, goal, index)
-            ret_f = ret_f or f
-            if f:
-                goal[index] = [edge] + goal[edge.n]
-                if len(edgess) == 0:
-                    ret_edgess.append([edge])
-                else:
-                    ret_edgess.extend([[edge] + edges for edges in edgess])
-        seen[index] = False
-        return ret_f, ret_edgess
     
     def calc_oneside_placable_cand_from_color(self, color):
         # どちらかのプレイヤー（colorで指定）の路だけで壁置きの可能性を判定する。勝利の確定判定などに用いる。各種内部変数は計算済みと仮定する。
@@ -854,71 +816,34 @@ cdef class State:
                 row_array[x, y] = f1
                 column_array[x, y] = f2
         return row_array, column_array
-
-    def cald_oneside_placable_cand(self, equivalence_class, graph, int x2, int y2, is_goal0):
-        cdef int x, y
-        edges = self.get_blocking_edges(equivalence_class[x2, y2], graph, is_goal0)
-
-        # 実際置けない場所を求める
-        cdef np.ndarray[DTYPE_t, ndim = 2] placable = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        for edge in edges:
-            x, y = edge[0]
-            if edge[1] == 1:
-                if x > 0:
-                    placable[x - 1, y] = 0
-                if x < BOARD_LEN - 1:
-                    placable[x, y] = 0
-            if edge[1] == 2:
-                placable[x, y] = 0
-        return placable
-
+    
     def calc_placable_array(self, skip_calc_graph=False):
-        cdef np.ndarray[DTYPE_t, ndim = 3] arr
-        cdef np.ndarray[DTYPE_t, ndim = 2] row_array, column_array
-        cdef DTYPE_t[:, :, :] cross_arr, cross_arr_copy
-        cdef int x, y
-        cross_arr = np.copy(self.cross_movable_arr)
-        cross_arr_copy = np.copy(cross_arr)
-        cdef np.ndarray[DTYPE_t, ndim = 2] row_cut1 = np.zeros((BOARD_LEN, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] row_cut2 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] column_cut1 = np.zeros((BOARD_LEN - 1, BOARD_LEN), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] column_cut2 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] column_cut1T, column_cut2T
-        cdef np.ndarray[DTYPE_t, ndim = 3] cross_arr2 = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
-        for arr in self.get_all_cycles(cross_arr):
-            row_cut1 = row_cut1 | (arr[:, 1:, UP] & arr[:, :-1, DOWN])
-            row_cut2 = row_cut2 | (arr[:-1, 1:, UP] & arr[1:, :-1, DOWN])
-            column_cut1 = column_cut1 | (arr[:-1, :, RIGHT] & arr[1:, :, LEFT])
-            column_cut2 = column_cut2 | (arr[:-1, :-1, RIGHT] & arr[1:, 1:, LEFT])
+        cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] wall_point_array = np.zeros((BOARD_LEN + 1, BOARD_LEN + 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] count_array_x = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] count_array_y = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
 
-        if skip_calc_graph:
-            row_array = self.placable_cand(self.row_eq, self.row_graph, self.Bx, self.By, self.Wx, self.Wy)
-        else:
-            row_array, self.row_special_cut, self.row_eq, self.row_graph = self.calc_placable_row_array(row_cut1, row_cut2, cross_arr, self.Bx, self.By, self.Wx, self.Wy, True)
+        # 周囲を囲む
+        wall_point_array[0, :] = 1
+        wall_point_array[BOARD_LEN, :] = 1
+        wall_point_array[:, 0] = 1
+        wall_point_array[:, BOARD_LEN] = 1
 
-        if skip_calc_graph:
-            column_array = self.placable_cand(self.column_eq, self.column_graph, self.By, self.Bx, self.Wy, self.Wx)
-            column_array = column_array.T
-        else:
-            cross_arr = cross_arr_copy
-            for x in range(BOARD_LEN):
-                for y in range(BOARD_LEN):
-                    cross_arr2[y, x, LEFT] = cross_arr[x, y, UP]
-                    cross_arr2[y, x, DOWN] = cross_arr[x, y, RIGHT]
-                    cross_arr2[y, x, RIGHT] = cross_arr[x, y, DOWN]
-                    cross_arr2[y, x, UP] = cross_arr[x, y, LEFT]
-            # cross_arr2[:, :, LEFT] = cross_arr[:, :, UP].T
-            # cross_arr2[:, :, DOWN] = cross_arr[:, :, RIGHT].T
-            # cross_arr2[:, :, RIGHT] = cross_arr[:, :, DOWN].T
-            # cross_arr2[:, :, UP] = cross_arr[:, :, LEFT].T
-            column_cut1T = column_cut1.T
-            column_cut2T = column_cut2.T
-            column_array, self.column_special_cut, self.column_eq, self.column_graph = self.calc_placable_row_array(column_cut1T, column_cut2T, cross_arr2, self.By, self.Bx, self.Wy, self.Wx, False)
-            column_array = column_array.T
-            self.column_special_cut = self.column_special_cut.T
+        wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] += np.array(self.row_wall, dtype=DTYPE)
+        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] += np.array(self.row_wall, dtype=DTYPE)
+        wall_point_array[2:, 1:BOARD_LEN] += np.array(self.row_wall, dtype=DTYPE)
+        wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] += np.array(self.column_wall, dtype=DTYPE)
+        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] += np.array(self.column_wall, dtype=DTYPE)
+        wall_point_array[1:BOARD_LEN, 2:] += np.array(self.column_wall, dtype=DTYPE)
 
-        self.must_be_checked_x = column_array & self.column_special_cut
-        self.must_be_checked_y = row_array & self.row_special_cut
+        wall_point_array = np.array(wall_point_array >= 1, dtype=DTYPE)
+
+        count_array_x = wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 2:]
+        count_array_y = wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[2:, 1:BOARD_LEN]
+        
+        self.must_be_checked_x = (count_array_x >= 2)
+        self.must_be_checked_y = (count_array_y >= 2)
 
         for x in range(BOARD_LEN - 1):
             for y in range(BOARD_LEN - 1):
@@ -936,184 +861,7 @@ cdef class State:
                     row_array[x, y] = column_array[x, y] = False
         return row_array, column_array
 
-    def get_graph(self, DTYPE_t[:, :, :] cross_arr, int isgoaly):
-        cdef int stack_p, i, dx, dy, xnext, ynext, x, y, x2, y2
-        graph = {}
-        cdef DTYPE_t[:, :] seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype=DTYPE)
-        cdef DTYPE_t[:] stack = np.zeros((BOARD_LEN * BOARD_LEN), dtype=DTYPE)
-        for y in range(BOARD_LEN):
-            for x in range(BOARD_LEN):
-                index = y * BOARD_LEN + x
-                if not seen[x, y]:
-                    graph[index] = [[], set([]), False, False]
-                    stack[0] = index
-                    stack_p = 0
-                    while stack_p >= 0:
-                        index2 = stack[stack_p]
-                        stack_p -= 1
-                        graph[index][1].add(index2)
-                        x2 = index2 % BOARD_LEN
-                        y2 = index2 // BOARD_LEN
-                        if isgoaly and y2 == 0 or not isgoaly and x2 == 0:
-                            graph[index][2] = True
-                        if isgoaly and y2 == BOARD_LEN - 1 or not isgoaly and x2 == BOARD_LEN - 1:
-                            graph[index][3] = True
-                        seen[x2, y2] = 1
-                        for i, dx, dy in ((0, 0, -1), (1, 1, 0), (2, 0, 1), (3, -1, 0)):
-                            xnext = x2 + dx
-                            ynext = y2 + dy
-                            if cross_arr[x2, y2, i] and not seen[xnext, ynext]:
-                                stack_p += 1
-                                stack[stack_p] = ynext * BOARD_LEN + xnext
-        return graph
-
-    def placable_cand(self, equivalence_class, graph, int Bx, int By, int Wx, int Wy):
-        cdef int x, y
-        edges1 = self.get_blocking_edges(equivalence_class[Bx, By], graph, True)
-        edges2 = self.get_blocking_edges(equivalence_class[Wx, Wy], graph, False)
-        edgess = [edges1, edges2]
-
-        # 実際置けない場所を求める
-        cdef np.ndarray[DTYPE_t, ndim = 2] placable = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        for edges in edgess:
-            for edge in edges:
-                x, y = edge[0]
-                if edge[1] == 1:
-                    if x > 0:
-                        placable[x - 1, y] = 0
-                    if x < BOARD_LEN - 1:
-                        placable[x, y] = 0
-                if edge[1] == 2:
-                    placable[x, y] = 0
-        return placable
-
-    def calc_placable_row_array(self, np.ndarray[DTYPE_t, ndim = 2] row_cut1, np.ndarray[DTYPE_t, ndim = 2] row_cut2, DTYPE_t[:, :, :] cross_arr, int Bx, int By, int Wx, int Wy, int isgoaly):
-        cdef int x, y, index, index2, id1, id2
-        global total_time1, total_time2
-
-        #cdef np.ndarray[DTYPE_t, ndim = 2] intersection = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        #intersection[:-1, :] = row_cut2[:-1, :] & row_cut2[1:, :]
-        # exception1 = row_cut1[:-1, :] & row_cut1[1:, :]
-        # exception2 = 
-        #exception = ((row_cut1[:-1, :] & row_cut1[1:, :]) | (~row_cut1[:-1, :] & ~row_cut1[1:, :])) & row_cut2
-
-        # cdef np.ndarray[DTYPE_t, ndim = 2] exception = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        # exception[:-1, :] = row_cut2[:-1, :] & row_cut2[1:, :]
-        # exception[1:, :] = exception[1:, :] | (row_cut2[:-1, :] & row_cut2[1:, :])
-
-        # print("a"*30)
-        # print(row_cut1)
-        # print(row_cut2)
-        # print(exception)
-
-        # special_row_cut2 = row_cut2 & exception
-        # row_cut2 = row_cut2 & ~exception
-
-        cdef np.ndarray[DTYPE_t, ndim = 2] intersection = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        intersection[:-1, :] = row_cut2[:-1, :] & row_cut2[1:, :]
-        exception = (row_cut1[:-1, :] | row_cut1[1:, :]) | intersection
-        special_row_cut2 = row_cut2 & exception
-        row_cut2 = row_cut2 & ~exception
-
-        for y in range(BOARD_LEN - 1):
-            for x in range(BOARD_LEN):
-                if row_cut1[x, y]:
-                    cross_arr[x, y, DOWN] = 0
-                    cross_arr[x, y + 1, UP] = 0
-                if x < BOARD_LEN - 1 and row_cut2[x, y]:
-                    cross_arr[x, y, DOWN] = 0
-                    cross_arr[x, y + 1, UP] = 0
-                    cross_arr[x + 1, y, DOWN] = 0
-                    cross_arr[x + 1, y + 1, UP] = 0
-
-        start_time = time.time()
-        # graph作成
-        graph = self.get_graph(cross_arr, isgoaly)  # [edgeリスト, 所属マスset, goal情報1, goal2] ただしy=0含むならgoal1がTrue, y=8ならgoal2がTrue
-        total_time2 += time.time() - start_time
-
-        # equivalence class作成
-        cdef np.ndarray[DTYPE_t, ndim = 2] equivalence_class = np.zeros((BOARD_LEN, BOARD_LEN), dtype=DTYPE)
-        for id1, v in graph.items():
-            for id2 in v[1]:
-                x = id2 % BOARD_LEN
-                y = id2 // BOARD_LEN
-                equivalence_class[x, y] = id1
-        #print(equivalence_class)
-
-        # edge接続
-        for y in range(BOARD_LEN - 1):
-            for x in range(BOARD_LEN):
-                if row_cut1[x, y]:
-                    id1 = equivalence_class[x, y]
-                    id2 = equivalence_class[x, y + 1]
-                    graph[id1][0].append(Edge(id2, (x, y), 1))
-                    graph[id2][0].append(Edge(id1, (x, y), 1))
-                elif x < BOARD_LEN - 1 and row_cut2[x, y]:
-                    id1s = {equivalence_class[x, y], equivalence_class[x + 1, y]}
-                    id2s = {equivalence_class[x, y + 1], equivalence_class[x + 1, y + 1]}
-                    if len(id1s) == 1 or len(id2s) == 1:
-                        for id1 in id1s:
-                            for id2 in id2s:
-                                graph[id1][0].append(Edge(id2, (x, y), 2))
-                                graph[id2][0].append(Edge(id1, (x, y), 2))
-                    else:
-                        for id1, id2 in ((equivalence_class[x, y], equivalence_class[x, y + 1]), (equivalence_class[x + 1, y], equivalence_class[x + 1, y + 1])):
-                            graph[id1][0].append(Edge(id2, (x, y), 2))
-                            graph[id2][0].append(Edge(id1, (x, y), 2))
-
-        placable = self.placable_cand(equivalence_class, graph, Bx, By, Wx, Wy)
-
-        return placable, special_row_cut2, equivalence_class, graph
-
-    def get_all_cycles(self, DTYPE_t[:, :, :] cross_arr):
-        cdef int x, y, i
-        cdef np.ndarray[DTYPE_t, ndim = 3] direction_array
-        cdef np.ndarray[DTYPE_t, ndim = 3] seen = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
-        ret = []
-        for x in range(BOARD_LEN):
-            for y in range(BOARD_LEN):
-                for i in range(4):
-                    if not seen[x, y, i] and cross_arr[x, y, i] and not cross_arr[x, y, (i - 1) % 4]:
-                        direction_array = self.one_cycle(x, y, i, cross_arr)
-                        ret.append(direction_array)
-                        seen = seen | direction_array
-        return ret
-
-    def one_cycle(self, int x, int y, int first_direction, DTYPE_t[:, :, :] cross_arr):
-        cdef int x1, y1, x2, y2, isstart, x_start, y_start, direction, index, first_move_direction
-        directions = [(UP, 0, -1), (RIGHT, 1, 0), (DOWN, 0, 1), (LEFT, -1, 0)]
-        cdef np.ndarray[DTYPE_t, ndim = 3]direction_array = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
-
-        x1 = x
-        y1 = y
-        x_start = x
-        y_start = y
-        direction = first_direction
-        isstart = True
-        while True:
-            index = directions[direction][0]
-            while not cross_arr[x1, y1, index]:
-                direction = (direction + 1) % 4
-                index = directions[direction][0]
-            if isstart:
-                first_move_direction = direction
-            direction_array[x1, y1, index] = 1
-
-            if not isstart and x1 == x_start and y1 == y_start and direction == first_move_direction:
-                break
-
-            x2 = x1 + directions[direction][1]
-            y2 = y1 + directions[direction][2]
-
-            x1 = x2
-            y1 = y2
-
-            direction = (direction - 1) % 4
-            isstart = False
-
-        return direction_array
-
-    def arrivable_(self, int x, int y, int goal_y, int isleft):
+    def arrivable_with_prev(self, int x, int y, int goal_y, int isleft):
         #cdef np.ndarray[DTYPE_t, ndim = 3] cross_arr
         cdef DTYPE_t[:, :, :] prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
         cdef DTYPE_t[:] cross = np.zeros((4,), dtype="int32")
@@ -1152,6 +900,11 @@ cdef class State:
         #self.seen = seen
         self.prev = prev
         return False
+
+    def arrivable(self, int x, int y, int goal_y):
+        return arrivable_(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
+                   ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]),
+                   x, y, goal_y)
 
     def old_display_cui(self, check_algo=True, official=True, p1_atmark=False):
         sys.stdout.write(" ")
@@ -1310,13 +1063,13 @@ cdef class State:
         #         for x in range(BOARD_LEN):
         #             print(self.cross_movable_arr[x, y, i], end=" ")
         #         print("")
-        if check_algo:
-            self.check_placable_array_algo()
-
         if ret_str:
             return ret
         else:
             sys.stdout.write(ret)
+
+        if check_algo:
+            self.check_placable_array_algo()
 
     def check_placable_array_algo(self):
         placabler1, placablec1 = self.old_calc_placable_array()
@@ -1324,6 +1077,7 @@ cdef class State:
         #print(np.all(placabler1 == placabler2) and np.all(placablec1 == placablec2))
         if not (np.all(placabler1 == placabler2) and np.all(placablec1 == placablec2)):
             print("")
+            print("="*50)
             print("{},{},{},{}".format(self.Bx, self.By, self.Wx, self.Wy))
             for y in range(8):
                 for x in range(8):
@@ -1338,15 +1092,28 @@ cdef class State:
                     if x != 7:
                         print(",", end="")
                 print("")
-            print("row")
+
+            placabler1 = np.array(placabler1, dtype=int)
+            placablec1 = np.array(placablec1, dtype=int)
+            placabler2 = np.array(placabler2, dtype=int)
+            placablec2 = np.array(placablec2, dtype=int)
+
+            print()
+            print("row correctness")
             print(placabler1.T == placabler2.T)
+            print("row answer")
             print(placabler1.T)
+            print("row pred")
             print(placabler2.T)
-            print("column")
+
+            print()
+            print("column correctness")
             print(placablec1.T == placablec2.T)
+            print("column answer")
             print(placablec1.T)
+            print("column pred")
             print(placablec2.T)
-            print("失敗")
+            print("check_placable_array_algo failed")
             exit()
 
     def feature_int(self):

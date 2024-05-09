@@ -16,6 +16,7 @@ graphviz = "*"
 cython = "*"
 beautifulsoup4 = "*"
 numba = "*"
+bitarray = "*"
 
 [dev-packages]
 

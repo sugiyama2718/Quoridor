@@ -479,7 +479,7 @@ def train_without_selfplay():
     print("レート{:.4f}".format(rate))
 
 
-def generate_h5(h5_id, display, AI_id, search_nodes, epoch):
+def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
     seed = h5_id * 10000
     random.seed(seed)
@@ -492,9 +492,8 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch):
         # AIs = [CNNAI(0, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000),
         #        CNNAI(1, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000)]
     else:
-        is_mimic_AI = random.random() < MIMIC_AI_RATIO
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True),
-               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True, is_mimic_AI=is_mimic_AI)]
+               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True)]
         AIs[0].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
         AIs[1].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
 
@@ -505,13 +504,23 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch):
 
     all_data = []
     for _ in range(GAME_NUM_IN_H5):
+        is_mimic_AI = False
+        force_opening = None
+        if random.random() < MIMIC_AI_RATIO:
+            is_mimic_AI = True
+        elif MIMIC_AI_RATIO <= random.random() < MIMIC_AI_RATIO + FORCE_OPENING_RATE:
+            force_opening = random.choice(FORCE_OPENING_LIST)
+        AIs[0].force_opening = force_opening
+        AIs[1].is_mimic_AI = is_mimic_AI
+        AIs[1].force_opening = force_opening
+
         if h5_id < H5_NUM:
-            temp_data = generate_data(AIs, 1, noise=1., id_=h5_id)
+            temp_data = generate_data(AIs, 1, noise=1., id_=h5_id, display=is_test, info=is_test)
         else:
             # display = False
             # if h5_id == 326919:
             #     display = True
-            temp_data = generate_data(AIs, 1, noise=NOISE, id_=h5_id)
+            temp_data = generate_data(AIs, 1, noise=NOISE, id_=h5_id, display=is_test, info=is_test)
         all_data.extend(temp_data)
 
         if len(temp_data) == 0:
@@ -542,11 +551,12 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch):
     #     sys.stderr.write('\r\033[Kepoch{}:data={}/{} B{}win W{}win {}draw'.format(epoch + 1, index, STEP, b_win, w_win, draw))
     #     sys.stderr.flush()
 
-    h5file = h5py.File(os.path.join(DATA_DIR, str(epoch), "{}.h5".format(h5_id)), "w")
-    for h5_name, data in zip(H5_NAME_LIST, data_list):
-        h5file.create_dataset(h5_name, data=data, compression="gzip", compression_opts=1)
-    h5file.flush()
-    h5file.close()
+    if not is_test:
+        h5file = h5py.File(os.path.join(DATA_DIR, str(epoch), "{}.h5".format(h5_id)), "w")
+        for h5_name, data in zip(H5_NAME_LIST, data_list):
+            h5file.create_dataset(h5_name, data=data, compression="gzip", compression_opts=1)
+        h5file.flush()
+        h5file.close()
 
     del AIs
     return b_win, w_win, draw, sum(turn_list) / len(turn_list)
@@ -959,6 +969,12 @@ if __name__ == '__main__':
         print(sum(turn_list))
         print("elapsed time = {:.3f}s".format(time.time() - start))
 
+    elif sys.argv[1] == "generate_h5_test":
+        epoch = 4000
+        h5_id = epoch * EPOCH_H5_NUM
+        AI_id = epoch
+        generate_h5(h5_id, True, AI_id, search_nodes, epoch, is_test=True)
+
     elif sys.argv[1] == "measure":
         np.random.seed(0)
         game_num = 2
@@ -978,8 +994,8 @@ if __name__ == '__main__':
         # AIs[1].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
         # AIs[0].load(os.path.join(path, "post.ckpt"))
         # AIs[1].load(os.path.join(path, "post.ckpt"))
-        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch3800.ckpt"))
-        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch3800.ckpt"))
+        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
+        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
 
         start_time = time.time()
         temp_data = generate_data(AIs, game_num, noise=NOISE, display=True, info=True)
@@ -995,16 +1011,18 @@ if __name__ == '__main__':
         np.random.seed(0)
         game_num = 2
         seed = 0
-        search_nodes = 800
-        AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed),
-               CNNAI(1, search_nodes=search_nodes, seed=seed)]
+        search_nodes = 500
+        AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, tau=0.32),
+               CNNAI(1, search_nodes=search_nodes, seed=seed, tau=0.32)]
         path = PARAMETER_DIR
-        epoch = 73
-        # AIs[0].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
-        # AIs[1].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
+        epoch = 3985
+
+        AIs[0].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
+        AIs[1].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
 
         start_time = time.time()
         temp_data = evaluate(AIs, game_num, display=True)
+        print("{:.2f}s".format(time.time() - start_time))
 
     elif sys.argv[1] == "train_from_existing_data":
         # モデルを大きくしたとき等に良いパラメータの初期値を得るため、自己対戦データを順に学習していく
