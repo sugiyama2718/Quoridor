@@ -86,12 +86,24 @@ int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t colum
         cross_bitarrs[i] &= BIT_BOARD_MASK;
     }
 
-    printf("----------\n");
-    for(int i = 0; i < 4; i++) {
-        print_bitarray(cross_bitarrs[i]);
-        printf("\n");
-    }
+    __uint128_t seen_bitarr = ((__uint128_t)1 << (127 - (pawn_x + pawn_y * BIT_BOARD_LEN)));
+    __uint128_t seen_bitarr_prev = ((__uint128_t)1 << (127 - (pawn_x + pawn_y * BIT_BOARD_LEN)));
 
-    return (row_bitarr < 100);
+    do {
+        seen_bitarr_prev = seen_bitarr;
+        seen_bitarr |= up_shift(seen_bitarr_prev & cross_bitarrs[UP]);
+        seen_bitarr |= right_shift(seen_bitarr_prev & cross_bitarrs[RIGHT]);
+        seen_bitarr |= down_shift(seen_bitarr_prev & cross_bitarrs[DOWN]);
+        seen_bitarr |= left_shift(seen_bitarr_prev & cross_bitarrs[LEFT]);
+        seen_bitarr &= BIT_BOARD_MASK;
+
+        if(goal_y == 0) {
+            if((seen_bitarr & UP_EDGE) > 0) return true;
+        } else {
+            if((seen_bitarr & DOWN_EDGE) > 0) return true;
+        }
+    } while(seen_bitarr != seen_bitarr_prev);
+
+    return false;
 }
 }
