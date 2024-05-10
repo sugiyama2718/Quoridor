@@ -126,9 +126,12 @@ BitArrayPair calc_placable_array_(uint64_t row_bitarr_high, uint64_t row_bitarr_
 int pawn_1p_x, int pawn_1p_y, int pawn_2p_x, int pawn_2p_y) {
     printf("calc_placable_array_\n");
 
+    __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
+    __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
+
     BitArrayPair ret;
-    ret.bitarr1 = (__uint128_t)3 << 64 | 2;
-    ret.bitarr2 = (__uint128_t)5 << 64 | 6;
+    ret.bitarr1 = up_shift(row_bitarr);
+    ret.bitarr2 = up_shift(column_bitarr);
 
     return ret;
 }

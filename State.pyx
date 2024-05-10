@@ -10,7 +10,7 @@ import copy
 import collections
 import math
 from bitarray import bitarray
-from bitarray.util import ba2int
+from bitarray.util import ba2int, int2ba
 import ctypes
 
 DTYPE = np.int32
@@ -53,6 +53,14 @@ arrivable_.restype = ctypes.c_bool
 calc_placable_array_ = lib.calc_placable_array_
 calc_placable_array_.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 calc_placable_array_.restype = BitArrayPair
+
+
+def print_bitarr(bitarr):
+    print()
+    for y in range(BOARD_LEN):
+        for x in range(BOARD_LEN):
+            print(bitarr[x + y * BIT_BOARD_LEN], end="")
+        print()
 
 
 def select_action(DTYPE_float[:] Q, DTYPE_float[:] N, DTYPE_float[:] P, float C_puct, use_estimated_V, float estimated_V, color, turn, use_average_Q):
@@ -804,8 +812,14 @@ cdef class State:
         ret = calc_placable_array_(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
                                    ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]),
                                    self.Bx, self.By, self.Wx, self.Wy)
-        print(ret.bitarr1[0], ret.bitarr1[1])
-        print(ret.bitarr2[0], ret.bitarr2[1])
+        row_placable_bitarr = bitarray(128)
+        column_placable_bitarr = bitarray(128)
+        row_placable_bitarr[:64] = int2ba(ret.bitarr1[1], length=64)
+        row_placable_bitarr[64:] = int2ba(ret.bitarr1[0], length=64)
+        column_placable_bitarr[:64] = int2ba(ret.bitarr2[1], length=64)
+        column_placable_bitarr[64:] = int2ba(ret.bitarr2[0], length=64)
+        print_bitarr(row_placable_bitarr)
+        print_bitarr(column_placable_bitarr)
 
         # 周囲を囲む
         wall_point_array[0, :] = 1
