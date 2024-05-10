@@ -28,6 +28,11 @@ inline __uint128_t left_shift(__uint128_t bitarr);
 inline __uint128_t right_down_shift(__uint128_t bitarr);
 int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, int pawn_x, int pawn_y, int goal_y);
 
+struct BitArrayPair {
+    __uint128_t bitarr1;
+    __uint128_t bitarr2;
+};
+
 void print_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BOARD_LEN; y++) {
         for(int x = 0; x < BOARD_LEN; x++) {
@@ -116,4 +121,16 @@ int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t colum
 
     return false;
 }
+
+BitArrayPair calc_placable_array_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, 
+int pawn_1p_x, int pawn_1p_y, int pawn_2p_x, int pawn_2p_y) {
+    printf("calc_placable_array_\n");
+
+    BitArrayPair ret;
+    ret.bitarr1 = (__uint128_t)3 << 64 | 2;
+    ret.bitarr2 = (__uint128_t)5 << 64 | 6;
+
+    return ret;
+}
+
 }

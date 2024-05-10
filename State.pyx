@@ -40,10 +40,19 @@ if os.name == "nt":
 else:
     lib = ctypes.CDLL('./State_util.so')
 
+# C++で定義された構造体に対応するPythonクラスを定義
+class BitArrayPair(ctypes.Structure):
+    _fields_ = [("bitarr1", ctypes.c_uint64 * 2),  # __uint128_tを2つのuint64として扱う。bitarr1[0]に右側の64bit、bitarr1[1]に左側の64bitが格納されることに注意する
+                ("bitarr2", ctypes.c_uint64 * 2)]
+
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
 arrivable_.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 arrivable_.restype = ctypes.c_bool
+
+calc_placable_array_ = lib.calc_placable_array_
+calc_placable_array_.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+calc_placable_array_.restype = BitArrayPair
 
 
 def select_action(DTYPE_float[:] Q, DTYPE_float[:] N, DTYPE_float[:] P, float C_puct, use_estimated_V, float estimated_V, color, turn, use_average_Q):
@@ -791,6 +800,12 @@ cdef class State:
         cdef np.ndarray[DTYPE_t, ndim = 2] wall_point_array = np.zeros((BOARD_LEN + 1, BOARD_LEN + 1), dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim = 2] count_array_x = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim = 2] count_array_y = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+
+        ret = calc_placable_array_(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
+                                   ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]),
+                                   self.Bx, self.By, self.Wx, self.Wy)
+        print(ret.bitarr1[0], ret.bitarr1[1])
+        print(ret.bitarr2[0], ret.bitarr2[1])
 
         # 周囲を囲む
         wall_point_array[0, :] = 1
