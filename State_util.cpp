@@ -3,6 +3,8 @@
 #include <cinttypes>
 //#include <iostream>  //Could not find moduleが出る
 
+extern "C" {
+
 const int BOARD_LEN = 9;
 const int BIT_BOARD_LEN = 11;
 enum DIRECTION {
@@ -16,6 +18,15 @@ const __uint128_t UP_EDGE = ((__uint128_t)0xFF80000000000000ULL << 64) | 0x00000
 const __uint128_t RIGHT_EDGE = ((__uint128_t)0x80100200400801ULL << 64) | 0x0020040080000000ULL;
 const __uint128_t DOWN_EDGE = 0xFF80000000ULL;
 const __uint128_t LEFT_EDGE = ((__uint128_t)0x8010020040080100ULL << 64) | 0x2004008000000000ULL;
+
+void print_bitarray(__uint128_t bitarr);
+void print_full_bitarray(__uint128_t bitarr);
+inline __uint128_t up_shift(__uint128_t bitarr);
+inline __uint128_t right_shift(__uint128_t bitarr);
+inline __uint128_t down_shift(__uint128_t bitarr);
+inline __uint128_t left_shift(__uint128_t bitarr);
+inline __uint128_t right_down_shift(__uint128_t bitarr);
+int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, int pawn_x, int pawn_y, int goal_y);
 
 void print_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BOARD_LEN; y++) {
@@ -38,27 +49,26 @@ void print_full_bitarray(__uint128_t bitarr) {
     printf("last=%d\n", (uint64_t)(bitarr & 0xFFFFFFFFFFFFFFFF) & 0x7F);
 }
 
-inline __uint128_t up_shift(__uint128_t bitarr){
+inline __uint128_t up_shift(__uint128_t bitarr) {
     return bitarr << BIT_BOARD_LEN;
 }
 
-inline __uint128_t right_shift(__uint128_t bitarr){
+inline __uint128_t right_shift(__uint128_t bitarr) {
     return bitarr >> 1;
 }
 
-inline __uint128_t down_shift(__uint128_t bitarr){
+inline __uint128_t down_shift(__uint128_t bitarr) {
     return bitarr >> BIT_BOARD_LEN;
 }
 
-inline __uint128_t left_shift(__uint128_t bitarr){
+inline __uint128_t left_shift(__uint128_t bitarr) {
     return bitarr << 1;
 }
 
-inline __uint128_t right_down_shift(__uint128_t bitarr){
+inline __uint128_t right_down_shift(__uint128_t bitarr) {
     return bitarr >> (BIT_BOARD_LEN + 1);
 }
 
-extern "C" {
 int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, int pawn_x, int pawn_y, int goal_y) {
     __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
     __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
