@@ -694,38 +694,6 @@ cdef class State:
             column_f = column_f and f
         return row_f, column_f
 
-    def placable_r(self, x, y):
-        if self.row_wall[x, y]:
-            return False
-        row_f = True
-
-        if self.row_wall[max(x - 1, 0), y] or self.row_wall[min(x + 1, BOARD_LEN - 2), y]:
-            row_f = False
-        if row_f and self.must_be_checked_y[x, y]:
-            self.row_wall[x, y] = 1
-            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
-            f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.row_wall[x, y] = 0
-            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 0
-            row_f = row_f and f
-        return row_f
-
-    def placable_c(self, x, y):
-        if self.column_wall[x, y]:
-            return False
-        column_f = True
-
-        if self.column_wall[x, max(y - 1, 0)] or self.column_wall[x, min(y + 1, BOARD_LEN - 2)]:
-            column_f = False
-        if column_f and self.must_be_checked_x[x, y]:
-            self.column_wall[x, y] = 1
-            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
-            f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.column_wall[x, y] = 0
-            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 0
-            column_f = column_f and f
-        return column_f
-
     def shortest(self, x, y, goal_y):
         dist = np.ones((BOARD_LEN, BOARD_LEN)) * BOARD_LEN * BOARD_LEN * 2
         prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int8")
@@ -847,18 +815,9 @@ cdef class State:
 
         for x in range(BOARD_LEN - 1):
             for y in range(BOARD_LEN - 1):
-                if row_array[x, y] and column_array[x, y]:
-                    f1, f2 = self.placable(x, y)
-                    row_array[x, y] = f1
-                    column_array[x, y] = f2
-                elif row_array[x, y]:  # columnはFalse
-                    row_array[x, y] = self.placable_r(x, y)
-                    column_array[x, y] = False
-                elif column_array[x, y]:
-                    row_array[x, y] = False
-                    column_array[x, y] = self.placable_c(x, y)
-                else:
-                    row_array[x, y] = column_array[x, y] = False
+                f1, f2 = self.placable(x, y)
+                row_array[x, y] = f1
+                column_array[x, y] = f2
         return row_array, column_array
 
     def arrivable_with_prev(self, int x, int y, int goal_y, int isleft):
