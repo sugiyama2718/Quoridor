@@ -87,10 +87,7 @@ inline __uint128_t right_down_down_shift(__uint128_t bitarr) {
     return bitarr >> (BIT_BOARD_LEN * 2 + 1);
 }
 
-int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, int pawn_x, int pawn_y, int goal_y) {
-    __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
-    __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
-    
+int arrivable_by_uint128(__uint128_t row_bitarr, __uint128_t column_bitarr, int pawn_x, int pawn_y, int goal_y) {
     __uint128_t cross_bitarrs[4];
     
     cross_bitarrs[UP] = UP_EDGE;
@@ -133,6 +130,13 @@ int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t colum
     } while(seen_bitarr != seen_bitarr_prev);
 
     return false;
+}
+
+int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, int pawn_x, int pawn_y, int goal_y) {
+    __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
+    __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
+    
+    return arrivable_by_uint128(row_bitarr, column_bitarr, pawn_x, pawn_y, goal_y);
 }
 
 BitArrayPair calc_placable_array_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, 
