@@ -165,16 +165,28 @@ int pawn_1p_x, int pawn_1p_y, int pawn_2p_x, int pawn_2p_y) {
     must_be_checked_x &= BIT_BOARD_MASK;
     must_be_checked_y &= BIT_BOARD_MASK;
 
-    // 既においてある壁とぶつかるのを除外
-    must_be_checked_x &= ~(row_bitarr | column_bitarr | up_shift(column_bitarr) | down_shift(column_bitarr));
-    must_be_checked_y &= ~(row_bitarr | column_bitarr | left_shift(row_bitarr) | right_shift(row_bitarr));
-
-    print_full_bitarray(must_be_checked_x);
-    print_full_bitarray(must_be_checked_y);
-
     BitArrayPair ret;
-    ret.bitarr1 = up_shift(row_bitarr);
-    ret.bitarr2 = up_shift(column_bitarr);
+    ret.bitarr1 = ~(row_bitarr | column_bitarr | left_shift(row_bitarr) | right_shift(row_bitarr));
+    ret.bitarr2 = ~(row_bitarr | column_bitarr | up_shift(column_bitarr) | down_shift(column_bitarr));
+
+    // 既においてある壁とぶつかるのを除外
+    must_be_checked_x &= ret.bitarr2;
+    must_be_checked_y &= ret.bitarr1;
+
+    __uint128_t virtual_row_wall, virtual_column_wall;
+    for(int i = 0;i < 128;i++) {
+        virtual_row_wall = ((__uint128_t)1 << i) & must_be_checked_y;
+        if(virtual_row_wall > 0) {
+            if(!arrivable_by_uint128(row_bitarr | virtual_row_wall, column_bitarr, pawn_1p_x, pawn_1p_y, 0)
+            || !arrivable_by_uint128(row_bitarr | virtual_row_wall, column_bitarr, pawn_2p_x, pawn_2p_y, BOARD_LEN - 1)) ret.bitarr1 &= ~((__uint128_t)1 << i);
+        }
+
+        virtual_column_wall = ((__uint128_t)1 << i) & must_be_checked_x;
+        if(virtual_column_wall > 0) {
+            if(!arrivable_by_uint128(row_bitarr, column_bitarr | virtual_column_wall, pawn_1p_x, pawn_1p_y, 0)
+            || !arrivable_by_uint128(row_bitarr, column_bitarr | virtual_column_wall, pawn_2p_x, pawn_2p_y, BOARD_LEN - 1)) ret.bitarr2 &= ~((__uint128_t)1 << i);
+        }
+    }
 
     return ret;
 }

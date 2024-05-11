@@ -803,11 +803,12 @@ cdef class State:
         return row_array, column_array
     
     def calc_placable_array(self, skip_calc_graph=False):
-        cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim = 2] wall_point_array = np.zeros((BOARD_LEN + 1, BOARD_LEN + 1), dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim = 2] count_array_x = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim = 2] count_array_y = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
+        cdef int x, y
 
         ret = calc_placable_array_(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
                                    ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]),
@@ -818,35 +819,14 @@ cdef class State:
         row_placable_bitarr[64:] = int2ba(ret.bitarr1[0], length=64)
         column_placable_bitarr[:64] = int2ba(ret.bitarr2[1], length=64)
         column_placable_bitarr[64:] = int2ba(ret.bitarr2[0], length=64)
-        print_bitarr(row_placable_bitarr)
-        print_bitarr(column_placable_bitarr)
-
-        # 周囲を囲む
-        wall_point_array[0, :] = 1
-        wall_point_array[BOARD_LEN, :] = 1
-        wall_point_array[:, 0] = 1
-        wall_point_array[:, BOARD_LEN] = 1
-
-        wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] += np.array(self.row_wall, dtype=DTYPE)
-        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] += np.array(self.row_wall, dtype=DTYPE)
-        wall_point_array[2:, 1:BOARD_LEN] += np.array(self.row_wall, dtype=DTYPE)
-        wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] += np.array(self.column_wall, dtype=DTYPE)
-        wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] += np.array(self.column_wall, dtype=DTYPE)
-        wall_point_array[1:BOARD_LEN, 2:] += np.array(self.column_wall, dtype=DTYPE)
-
-        wall_point_array = np.array(wall_point_array >= 1, dtype=DTYPE)
-
-        count_array_x = wall_point_array[1:BOARD_LEN, :BOARD_LEN - 1] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 2:]
-        count_array_y = wall_point_array[:BOARD_LEN - 1, 1:BOARD_LEN] + wall_point_array[1:BOARD_LEN, 1:BOARD_LEN] + wall_point_array[2:, 1:BOARD_LEN]
-        
-        self.must_be_checked_x = (count_array_x >= 2)
-        self.must_be_checked_y = (count_array_y >= 2)
+        # print_bitarr(row_placable_bitarr)
+        # print_bitarr(column_placable_bitarr)
 
         for x in range(BOARD_LEN - 1):
             for y in range(BOARD_LEN - 1):
-                f1, f2 = self.placable(x, y)
-                row_array[x, y] = f1
-                column_array[x, y] = f2
+                row_array[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
+                column_array[x, y] = column_placable_bitarr[x + y * BIT_BOARD_LEN]
+
         return row_array, column_array
 
     def arrivable_with_prev(self, int x, int y, int goal_y, int isleft):
