@@ -141,8 +141,6 @@ int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t colum
 
 BitArrayPair calc_placable_array_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, 
 int pawn_1p_x, int pawn_1p_y, int pawn_2p_x, int pawn_2p_y) {
-    printf("calc_placable_array_\n");
-
     __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
     __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
 
