@@ -31,14 +31,12 @@ import sys
 import numpy as np
 import gc
 import os
-from main import normal_play
-from multiprocessing import Process
 from Agent import Agent
-from decimal import Decimal
 import random
 import pickle
 from util import Glendenning2Official, RECORDS_PATH
 from datetime import datetime
+from engine_util import prepare_AI
 
 touched = False
 action = ""
@@ -412,26 +410,6 @@ class Quoridor(Widget):
         self.record_folder_name = os.path.join(RECORDS_PATH, now.strftime("%Y%m%d_%H%M%S"))
         os.makedirs(self.record_folder_name)
 
-        per_process_gpu_memory_fraction = 0.2
-
-        def prepare_AI(color, search_nodes, tau, level, seed):
-            files = os.listdir(PARAMETER_PATH)
-            files = [x for x in files if x.startswith("epoch")]
-            epochs = [int(x.split(".")[0][5:]) for x in files]
-            epochs = list(set(epochs))
-            epochs = sorted(epochs)
-            print(epochs)
-            print(f"seed={seed}")
-            if level == 0:
-                agent = CNNAI(color, search_nodes=search_nodes, tau=tau, seed=seed,
-                              per_process_gpu_memory_fraction=per_process_gpu_memory_fraction, p_is_almost_flat=True, all_parameter_zero=True)
-            else:
-                agent = CNNAI(color, search_nodes=search_nodes, tau=tau, seed=seed,
-                              per_process_gpu_memory_fraction=per_process_gpu_memory_fraction)
-                target_epoch = epochs[level - 1]
-                agent.load(os.path.join(PARAMETER_PATH, f"epoch{target_epoch}.ckpt"))
-            return agent
-
         self.remaining_time_str = ""
 
         if self.mode == HUMAN_HUMAN_MODE:
@@ -440,15 +418,13 @@ class Quoridor(Widget):
         elif self.mode == HUMAN_AI_MODE:
             if self.teban_1p.state == "down":
                 agent1 = GUIHuman(0)
-                agent2 = prepare_AI(1, self.search_nodes, self.tau, self.level, seed=int(time.time()))
+                agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes, self.tau, self.level, seed=int(time.time()))
             else:
-                agent1 = prepare_AI(0, self.search_nodes, self.tau, self.level, seed=int(time.time()))
+                agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes, self.tau, self.level, seed=int(time.time()))
                 agent2 = GUIHuman(1)
         elif self.mode == AI_AI_MODE:
-            agent1 = prepare_AI(0, self.search_nodes_1p, self.tau_1p, self.level_1p, seed=int(time.time()))
-            agent2 = prepare_AI(1, self.search_nodes_2p, self.tau_2p, self.level_2p, seed=int(time.time()))
-            # agent1 = prepare_AI(0, self.search_nodes_1p, self.tau_1p, self.level_1p, seed=1673859226)
-            # agent2 = prepare_AI(1, self.search_nodes_2p, self.tau_2p, self.level_2p, seed=1673859228)
+            agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes_1p, self.tau_1p, self.level_1p, seed=int(time.time()))
+            agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes_2p, self.tau_2p, self.level_2p, seed=int(time.time()))
         elif self.mode == TRAINING_MODE:
             if self.low_time.state == "down":
                 self.remaining_time = TRAINING_LOW_TIME
@@ -480,10 +456,10 @@ class Quoridor(Widget):
             if self.training_game_num % 2 == 0:
                 self.training_color = 0
                 agent1 = GUIHuman(0)
-                agent2 = prepare_AI(1, training_search_nodes, 0.32, training_index, seed=int(time.time()))
+                agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()))
             else:
                 self.training_color = 1
-                agent1 = prepare_AI(0, training_search_nodes, 0.32, training_index, seed=int(time.time()))
+                agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()))
                 agent2 = GUIHuman(1)
 
             training_info_text = "You are "
