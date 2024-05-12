@@ -132,6 +132,21 @@ int arrivable_by_uint128(__uint128_t row_bitarr, __uint128_t column_bitarr, int 
     return false;
 }
 
+uint8_t dist_array_ret[BOARD_LEN * BOARD_LEN];
+
+uint8_t* calc_dist_array(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, int goal_y) {
+    __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
+    __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
+
+    printf("dist array");
+    for(int y = 0;y < BOARD_LEN;y++) {
+        for(int x = 0;x < BOARD_LEN;x++) {
+            dist_array_ret[x + y * BOARD_LEN] = x + y;
+        }
+    }
+    return dist_array_ret;
+}
+
 int arrivable_(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint64_t column_bitarr_high, uint64_t column_bitarr_low, int pawn_x, int pawn_y, int goal_y) {
     __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
     __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
