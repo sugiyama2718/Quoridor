@@ -1,6 +1,7 @@
 import os, sys
 from State import State
-from Agent import actionid2str
+from Agent import actionid2str, str2actionid
+from BasicAI import state_copy
 from util import Glendenning2Official, Official2Glendenning
 
 # tensorflowのログを抑制
@@ -43,7 +44,7 @@ class UCIEngine:
 
         color = self.state.turn % 2
         action_id, _, _, v_post, _ = self.AIs[color].act_and_get_pi(self.state, use_prev_tree=self.use_prev_trees[color])
-        print("score= {}, use_prev_tree={}".format(int(1000 * v_post), self.use_prev_trees[color]))
+        #print("score= {}, use_prev_tree={}".format(int(1000 * v_post), self.use_prev_trees[color]))
         action = Glendenning2Official(actionid2str(self.state, action_id))
         print(f"bestmove {action}")
         self.bestmoves[color] = action
@@ -55,15 +56,16 @@ class UCIEngine:
             self.handle_newgame()
 
         color = self.state.turn % 2
+        state_backup = state_copy(self.state)
 
         if not self.state.accept_action_str(Official2Glendenning(action)):
             print(action)
             print("this action is impossible")
             return
         
+        self.AIs[1 - color].prev_action = str2actionid(state_backup, Official2Glendenning(action))
         if self.bestmoves[color] is not None and self.bestmoves[color] == action:
             self.use_prev_trees[color] = True
-            self.AIs[1 - color].prev_action = action
         else:
             self.use_prev_trees[color] = False
 
