@@ -23,20 +23,28 @@ class UCIEngine:
         self.use_prev_trees = [None, None]
 
         self.bestmoves = [None, None]
+        self.search_nodes = 1000
 
     def handle_uci(self):
         print("id name ka Quoridor")
         print("id author Kanta Sugiyama")
         print("uciok")
 
+    def handle_setoption(self, search_nodes):
+        self.search_nodes = search_nodes
+        if self.AIs is not None:
+            for AI in self.AIs:
+                AI.search_nodes = self.search_nodes
+
     def handle_newgame(self):
         self.AIs = [
-            prepare_AI(PARAMETER_PATH, 0, search_nodes=1000, tau=0.32, level=-1, seed=int(time.time())),
-            prepare_AI(PARAMETER_PATH, 1, search_nodes=1000, tau=0.32, level=-1, seed=int(time.time()))
+            prepare_AI(PARAMETER_PATH, 0, search_nodes=self.search_nodes, tau=0.32, level=-1, seed=int(time.time())),
+            prepare_AI(PARAMETER_PATH, 1, search_nodes=self.search_nodes, tau=0.32, level=-1, seed=int(time.time()))
         ]
         self.state = State()
         self.use_prev_trees = [True, True]
         self.bestmoves = [None, None]
+        print("info ready")
 
     def handle_go(self):
         if self.AIs is None:
@@ -44,7 +52,7 @@ class UCIEngine:
 
         color = self.state.turn % 2
         action_id, _, _, v_post, _ = self.AIs[color].act_and_get_pi(self.state, use_prev_tree=self.use_prev_trees[color])
-        #print("score= {}, use_prev_tree={}".format(int(1000 * v_post), self.use_prev_trees[color]))
+        print("info root_score= {}".format(v_post[0]))
         action = Glendenning2Official(actionid2str(self.state, action_id))
         print(f"bestmove {action}")
         self.bestmoves[color] = action
@@ -87,6 +95,8 @@ class UCIEngine:
 
             if cmd == "uci":
                 self.handle_uci()
+            elif cmd == "setoption":
+                self.handle_setoption(int(tokens[4]))
             elif cmd == "newgame":
                 self.handle_newgame()
             elif cmd == "go":
