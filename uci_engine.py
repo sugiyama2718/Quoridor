@@ -1,7 +1,7 @@
 import os, sys
 from State import State
 from Agent import actionid2str
-from util import Glendenning2Official
+from util import Glendenning2Official, Official2Glendenning
 
 # tensorflowのログを抑制
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -36,11 +36,17 @@ class UCIEngine:
         if self.AIs is None:
             self.handle_newgame()
 
-        color = self.state.turn & 2
+        color = self.state.turn % 2
         action_id, _, _, v_post, _ = self.AIs[color].act_and_get_pi(self.state, use_prev_tree=True)
         #print("score= {}, use_prev_tree={}".format(int(1000 * v_post), self.use_prev_tree))
         action = Glendenning2Official(actionid2str(self.state, action_id))
         print(f"bestmove {action}")
+
+    def handle_makemove(self, action):
+        # official notation
+        if not self.state.accept_action_str(Official2Glendenning(action)):
+            print(action)
+            print("this action is impossible")
 
     def handle_quit(self):
         print("Quitting the program")
@@ -65,7 +71,7 @@ class UCIEngine:
             elif cmd == "go":
                 self.handle_go()
             elif cmd == "makemove":
-                pass
+                self.handle_makemove(tokens[1])
             elif cmd == "quit":
                 quit_received = self.handle_quit()
 
