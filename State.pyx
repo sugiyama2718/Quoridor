@@ -54,6 +54,9 @@ calc_placable_array_ = lib.calc_placable_array_
 calc_placable_array_.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 calc_placable_array_.restype = BitArrayPair
 
+calc_dist_array = lib.calc_dist_array
+calc_dist_array.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int]
+calc_dist_array.restype = ctypes.POINTER(ctypes.c_uint8)
 
 def print_bitarr(bitarr):
     print()
@@ -759,6 +762,10 @@ cdef class State:
     def dist_array(self, int goal_y, DTYPE_t[:, :, :] cross_arr):
         cdef int x, x2, y2, x3, y3, i, dx, dy
         cdef np.ndarray[DTYPE_t, ndim = 2] dist = np.ones((BOARD_LEN, BOARD_LEN), dtype=DTYPE) * BOARD_LEN * BOARD_LEN * 2
+    
+        # array_ptr = calc_dist_array(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
+        #                             ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]), 0)
+        # print([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)])
 
         queue = []
         for x in range(BOARD_LEN):
@@ -805,9 +812,6 @@ cdef class State:
     def calc_placable_array(self, skip_calc_graph=False):
         cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] wall_point_array = np.zeros((BOARD_LEN + 1, BOARD_LEN + 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] count_array_x = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] count_array_y = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         cdef int x, y
 
         ret = calc_placable_array_(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
