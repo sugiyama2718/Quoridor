@@ -649,22 +649,15 @@ class BasicAI(Agent):
             ret.W = -np.copy(tree.W)
             ret.Q = -np.copy(tree.Q)
             assert count <= max_node, "negate_treeで無限再帰の可能性" 
-            # if showNQ and count >= 30:
-            #     print("negate tree start")
-            #     tree.s.display_cui()
             for key, child_tree in tree.children.items():
-                # if showNQ and count >= 30:
-                #     print("s", count, key)
                 ret.children[key] = negate_tree(child_tree, count + 1)
-                # if showNQ and count >= 30:
-                #     print("e", count, key)
             return ret
 
         if use_prev_tree:
             if self.prev_tree is not None and opponent_prev_tree is None:
                 root_tree = self.prev_tree
                 root_tree.s = state
-                if self.prev_action is not None and self.prev_action in root_tree.children.keys():
+                if self.prev_action is not None and self.prev_action in root_tree.children.keys() and state.turn == root_tree.s.turn:
                     root_tree = root_tree.children[self.prev_action]
                 else:
                     root_tree = Tree(state, p)

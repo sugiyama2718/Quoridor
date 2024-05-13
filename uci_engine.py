@@ -58,6 +58,8 @@ class UCIEngine:
         print(f"bestmove {action}")
         self.bestmoves[color] = action
 
+        self.use_prev_trees[color] = False  # 2回以上連続でgoが呼ばれたときには木を使い回さないことで意図しない動作を予防
+
     def handle_makemove(self, action):
         # official notation
 
@@ -103,9 +105,12 @@ class UCIEngine:
             elif cmd == "go":
                 self.handle_go()
             elif cmd == "makemove":
-                self.handle_makemove(tokens[1])
+                for token in tokens[1:]:
+                    self.handle_makemove(token)
             elif cmd == "quit":
                 quit_received = self.handle_quit()
+
+            sys.stdout.flush()
 
 if __name__ == "__main__":
     uciengine = UCIEngine()
