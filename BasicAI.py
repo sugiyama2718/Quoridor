@@ -664,12 +664,11 @@ class BasicAI(Agent):
             if self.prev_tree is not None and opponent_prev_tree is None:
                 root_tree = self.prev_tree
                 root_tree.s = state
-                if self.prev_action is not None:
-                    if self.prev_action in root_tree.children.keys():
-                        root_tree = root_tree.children[self.prev_action]
-                    else:
-                        root_tree = Tree(state, p)
-                        self.state2node_per_turn = {}
+                if self.prev_action is not None and self.prev_action in root_tree.children.keys():
+                    root_tree = root_tree.children[self.prev_action]
+                else:
+                    root_tree = Tree(state, p)
+                    self.state2node_per_turn = {}
             elif opponent_prev_tree is not None:
                 if self.prev_tree is not None:
                     del self.prev_tree
