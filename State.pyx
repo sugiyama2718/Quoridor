@@ -763,9 +763,9 @@ cdef class State:
         cdef int x, x2, y2, x3, y3, i, dx, dy
         cdef np.ndarray[DTYPE_t, ndim = 2] dist = np.ones((BOARD_LEN, BOARD_LEN), dtype=DTYPE) * BOARD_LEN * BOARD_LEN * 2
     
-        array_ptr = calc_dist_array(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
-                                    ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]), 0)
-        print([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)])
+        # array_ptr = calc_dist_array(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
+        #                             ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]), 0)
+        # print([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)])
 
         queue = []
         for x in range(BOARD_LEN):
