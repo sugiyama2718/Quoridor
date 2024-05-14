@@ -779,10 +779,10 @@ cdef class State:
         dist[dist == -1] = np.max(dist) + 1
         return dist
 
-    def calc_dist_array(self, int goal_y):
+    cdef np.ndarray[DTYPE_t, ndim = 2] calc_dist_array(self, int goal_y):
         array_ptr = calc_dist_array(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
                                     ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]), goal_y)
-        return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)]).reshape(BOARD_LEN, BOARD_LEN).T
+        return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
     def getroute(self, x, y, goal_y, isleft):
         self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
