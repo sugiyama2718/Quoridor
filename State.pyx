@@ -309,8 +309,8 @@ cdef class State:
             
             # dist_arrayも計算しなおし
             if CALC_DIST_ARRAY:
-                self.dist_array1 = self.dist_array(0, self.cross_movable_arr)
-                self.dist_array2 = self.dist_array(BOARD_LEN - 1, self.cross_movable_arr)
+                self.dist_array1 = self.calc_dist_array(0)
+                self.dist_array2 = self.calc_dist_array(BOARD_LEN - 1)
         self.turn += 1
 
         if self.By == 0:
@@ -473,7 +473,7 @@ cdef class State:
                 else:
                     dist_arr = self.dist_array2
             else:
-                dist_arr = self.dist_array(0 if self.turn % 2 == 0 else BOARD_LEN - 1, self.cross_movable_arr)
+                dist_arr = self.calc_dist_array(0 if self.turn % 2 == 0 else BOARD_LEN - 1)
         for i, p in enumerate([(0, -1), (1, 0), (0, 1), (-1, 0)]):
             if not cross[i]:
                 continue
@@ -762,10 +762,6 @@ cdef class State:
     def dist_array(self, int goal_y, DTYPE_t[:, :, :] cross_arr):
         cdef int x, x2, y2, x3, y3, i, dx, dy
         cdef np.ndarray[DTYPE_t, ndim = 2] dist = np.ones((BOARD_LEN, BOARD_LEN), dtype=DTYPE) * BOARD_LEN * BOARD_LEN * 2
-    
-        # array_ptr = calc_dist_array(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
-        #                             ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]), 0)
-        # print([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)])
 
         queue = []
         for x in range(BOARD_LEN):
@@ -782,6 +778,11 @@ cdef class State:
         dist[dist == BOARD_LEN * BOARD_LEN * 2] = -1
         dist[dist == -1] = np.max(dist) + 1
         return dist
+
+    def calc_dist_array(self, int goal_y):
+        array_ptr = calc_dist_array(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
+                                    ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]), goal_y)
+        return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)]).reshape(BOARD_LEN, BOARD_LEN).T
 
     def getroute(self, x, y, goal_y, isleft):
         self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")

@@ -25,12 +25,22 @@ for i in test_case_list:
         state.Wx = p[2]
         state.Wy = p[3]
     state.display_cui(check_algo=True)
-    
+
     # np.savetxt(os.path.join(TEST_DIR, f"{i}/dist_0.csv"), state.dist_array(0, state.cross_movable_array2(state.row_wall, state.column_wall)),delimiter=",")
     # np.savetxt(os.path.join(TEST_DIR, f"{i}/dist_8.csv"), state.dist_array(8, state.cross_movable_array2(state.row_wall, state.column_wall)),delimiter=",")
     if os.path.exists(os.path.join(TEST_DIR, f"{i}/dist_0.csv")):
         dist_0 = np.loadtxt(os.path.join(TEST_DIR, f"{i}/dist_0.csv"), delimiter=",")
         dist_8 = np.loadtxt(os.path.join(TEST_DIR, f"{i}/dist_8.csv"), delimiter=",")
-        assert np.all(state.dist_array(0, state.cross_movable_array2(state.row_wall, state.column_wall)) == dist_0)
-        assert np.all(state.dist_array(8, state.cross_movable_array2(state.row_wall, state.column_wall)) == dist_8)
+        dist_0_pred = state.dist_array(0, state.cross_movable_array2(state.row_wall, state.column_wall))
+        dist_8_pred = state.dist_array(8, state.cross_movable_array2(state.row_wall, state.column_wall))
+        if not np.all(dist_0_pred == dist_0):
+            print("dist_0")
+            print(dist_0)
+            print(dist_0_pred)
+            assert False
+        if not np.all(dist_8_pred == dist_8):
+            print("dist_8")
+            print(dist_8)
+            print(dist_8_pred)
+            assert False
 
