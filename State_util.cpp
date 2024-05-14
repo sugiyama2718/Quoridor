@@ -34,6 +34,10 @@ struct BitArrayPair {
     __uint128_t bitarr2;
 };
 
+struct Point {
+    uint8_t x, y;
+};
+
 void print_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BOARD_LEN; y++) {
         for(int x = 0; x < BOARD_LEN; x++) {
@@ -138,12 +142,26 @@ uint8_t* calc_dist_array(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint
     __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
     __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
 
-    printf("dist array");
-    for(int y = 0;y < BOARD_LEN;y++) {
-        for(int x = 0;x < BOARD_LEN;x++) {
-            dist_array_ret[x + y * BOARD_LEN] = x + y;
-        }
+    Point point_queue[BOARD_LEN * BOARD_LEN];
+    int q_s = 0, q_e = 0;
+    uint8_t x2, y2, x3, y3;
+
+    for(int i = 0;i < BOARD_LEN * BOARD_LEN;i++) dist_array_ret[i] = 0xFF;
+
+    for(int x = 0;x < BOARD_LEN;x++) {
+        dist_array_ret[x + goal_y * BOARD_LEN] = 0;
+        point_queue[q_e].x = x;
+        point_queue[q_e].y = goal_y;
+        q_e++;
     }
+
+    while(q_e - q_s > 0) {
+        x2 = point_queue[q_s].x;
+        y2 = point_queue[q_s].y;
+        q_s++;
+        printf("%d,%d ", x2, y2);
+    }
+
     return dist_array_ret;
 }
 

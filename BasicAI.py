@@ -545,7 +545,7 @@ class BasicAI(Agent):
         else:
             node_num_expectation = max_node
 
-        root_v = self.v(state)
+        root_v = self.v(state)[0]
 
         wall_num = state.black_walls + state.white_walls
 
@@ -883,7 +883,7 @@ class BasicAI(Agent):
             display_parameter(np.asarray(root_tree.N, dtype="int32"))
             print("Q=")
             display_parameter(np.asarray(root_tree.Q * 1000, dtype="int32"))
-            print("prev v={:.3f}, post v={:.3f}".format(root_v[0], np.sum(root_tree.W) / np.sum(root_tree.N)))
+            print("prev v={:.3f}, post v={:.3f}".format(root_v, np.sum(root_tree.W) / np.sum(root_tree.N)))
             print("root_tree result = {}".format(root_tree.result))
 
         if root_tree.result != 0:  # 勝敗決定の場合
