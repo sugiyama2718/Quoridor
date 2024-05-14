@@ -52,8 +52,8 @@ class UCIEngine:
 
         color = self.state.turn % 2
         action_id, _, _, v_post, _ = self.AIs[color].act_and_get_pi(self.state, use_prev_tree=self.use_prev_trees[color])
-        print("info root_score {}".format(v_post[0]))
-        print("info score {}".format(v_post[0]))
+        print("info root_score {}".format(v_post))
+        print("info score {}".format(v_post))
         action = Glendenning2Official(actionid2str(self.state, action_id))
         print(f"bestmove {action}")
         self.bestmoves[color] = action
