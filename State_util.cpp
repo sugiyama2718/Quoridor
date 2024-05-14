@@ -19,6 +19,7 @@ const __uint128_t RIGHT_EDGE = ((__uint128_t)0x80100200400801ULL << 64) | 0x0020
 const __uint128_t DOWN_EDGE = 0xFF80000000ULL;
 const __uint128_t LEFT_EDGE = ((__uint128_t)0x8010020040080100ULL << 64) | 0x2004008000000000ULL;
 const __uint128_t BOX_10 = ((__uint128_t)0XFFD00A0140280500ULL << 64) | 0xA01402805FF80000ULL;
+__uint128_t cross_bitarrs[4];
 
 void print_bitarray(__uint128_t bitarr);
 void print_full_bitarray(__uint128_t bitarr);
@@ -37,6 +38,10 @@ struct BitArrayPair {
 struct Point {
     uint8_t x, y;
 };
+
+inline bool get_bit(__uint128_t bitarr, int x, int y) {
+    return (bitarr & ((__uint128_t)1 << (127 - (x + y * BIT_BOARD_LEN)))) > 0;
+}
 
 void print_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BOARD_LEN; y++) {
@@ -91,9 +96,7 @@ inline __uint128_t right_down_down_shift(__uint128_t bitarr) {
     return bitarr >> (BIT_BOARD_LEN * 2 + 1);
 }
 
-int arrivable_by_uint128(__uint128_t row_bitarr, __uint128_t column_bitarr, int pawn_x, int pawn_y, int goal_y) {
-    __uint128_t cross_bitarrs[4];
-    
+void calc_cross_bitarrs(__uint128_t row_bitarr, __uint128_t column_bitarr) {
     cross_bitarrs[UP] = UP_EDGE;
     cross_bitarrs[UP] |= down_shift(row_bitarr);
     cross_bitarrs[UP] |= right_down_shift(row_bitarr);
@@ -114,6 +117,10 @@ int arrivable_by_uint128(__uint128_t row_bitarr, __uint128_t column_bitarr, int 
         cross_bitarrs[i] = ~cross_bitarrs[i];
         cross_bitarrs[i] &= BIT_BOARD_MASK;
     }
+}
+
+int arrivable_by_uint128(__uint128_t row_bitarr, __uint128_t column_bitarr, int pawn_x, int pawn_y, int goal_y) {
+    calc_cross_bitarrs(row_bitarr, column_bitarr);
 
     __uint128_t seen_bitarr = ((__uint128_t)1 << (127 - (pawn_x + pawn_y * BIT_BOARD_LEN)));
     __uint128_t seen_bitarr_prev = ((__uint128_t)1 << (127 - (pawn_x + pawn_y * BIT_BOARD_LEN)));
@@ -142,9 +149,14 @@ uint8_t* calc_dist_array(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint
     __uint128_t row_bitarr = ((__uint128_t)row_bitarr_high << 64) | row_bitarr_low;
     __uint128_t column_bitarr = ((__uint128_t)column_bitarr_high << 64) | column_bitarr_low;
 
+    calc_cross_bitarrs(row_bitarr, column_bitarr);
+
     Point point_queue[BOARD_LEN * BOARD_LEN];
     int q_s = 0, q_e = 0;
-    uint8_t x2, y2, x3, y3;
+    int x2, y2, x3, y3, dx, dy;
+    uint8_t max_dist = 0;
+    static const int dxs[4] = {0, 1, 0, -1};
+    static const int dys[4] = {-1, 0, 1, 0};
 
     for(int i = 0;i < BOARD_LEN * BOARD_LEN;i++) dist_array_ret[i] = 0xFF;
 
@@ -159,7 +171,26 @@ uint8_t* calc_dist_array(uint64_t row_bitarr_high, uint64_t row_bitarr_low, uint
         x2 = point_queue[q_s].x;
         y2 = point_queue[q_s].y;
         q_s++;
-        printf("%d,%d ", x2, y2);
+        for(int i = 0;i < 4;i++) {
+            dx = dxs[i];
+            dy = dys[i];
+            x3 = x2 + dx;
+            y3 = y2 + dy;
+
+            if(!(x3 < 0 || x3 >= BOARD_LEN || y3 < 0 || y3 >= BOARD_LEN) && 
+            get_bit(cross_bitarrs[i], x2, y2) && (dist_array_ret[x3 + y3 * BOARD_LEN] > dist_array_ret[x2 + y2 * BOARD_LEN] + 1)) {
+                max_dist = dist_array_ret[x3 + y3 * BOARD_LEN] = dist_array_ret[x2 + y2 * BOARD_LEN] + 1;
+                point_queue[q_e].x = x3;
+                point_queue[q_e].y = y3;
+                q_e++;
+            }
+        }
+    }
+
+    max_dist++;
+
+    for(int i = 0;i < BOARD_LEN * BOARD_LEN;i++) {
+        if(dist_array_ret[i] == 0xFF) dist_array_ret[i] = max_dist;
     }
 
     return dist_array_ret;
