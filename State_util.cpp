@@ -1,12 +1,14 @@
 #include <cstdio>
 #include <cstdint>
 #include <cinttypes>
+#include <cmath>
 //#include <iostream>  //Could not find moduleが出る
 
 extern "C" {
 
 const int BOARD_LEN = 9;
 const int BIT_BOARD_LEN = 11;
+const int ACTION_NUM = 137;
 enum DIRECTION {
     UP,
     RIGHT,
@@ -94,6 +96,36 @@ inline __uint128_t right_right_down_shift(__uint128_t bitarr) {
 
 inline __uint128_t right_down_down_shift(__uint128_t bitarr) {
     return bitarr >> (BIT_BOARD_LEN * 2 + 1);
+}
+
+int select_action(float Q[ACTION_NUM], float N[ACTION_NUM], float P[ACTION_NUM],
+float C_puct, float estimated_V, int color, int turn) {
+    int N_sum = 0;
+    for(int i = 0;i < ACTION_NUM;i++) {
+        N_sum += N[i];
+    }
+    float N_sum_sqrt = std::sqrt(1 + N_sum);
+
+    int a = -1;
+    float x_max = -2.0;
+    float Qi, x;
+    for(int i = 0;i < ACTION_NUM;i++) {
+        if(P[i] == 0.0) continue;
+
+        if(N[i] == 0) Qi = estimated_V;
+        else Qi = Q[i];
+
+        if(color == turn % 2) x = Qi;
+        else x = -Qi;
+
+        x = x + C_puct * P[i] * N_sum_sqrt / (1 + N[i]);
+        if(x > x_max) {
+            a = i;
+            x_max = x;
+        }
+    }
+    
+    return a;
 }
 
 void calc_cross_bitarrs(__uint128_t row_bitarr, __uint128_t column_bitarr) {

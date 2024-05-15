@@ -66,42 +66,6 @@ def print_bitarr(bitarr):
         print()
 
 
-def select_action(DTYPE_float[:] Q, DTYPE_float[:] N, DTYPE_float[:] P, float C_puct, use_estimated_V, float estimated_V, color, turn, use_average_Q):
-    if use_estimated_V:
-        pass
-    else:
-        print("not implemented")
-        exit()
-
-    N_sum = 0
-    for i in range(N.shape[0]):
-        N_sum += N[i]
-    #N_sum = sum(N)
-    N_sum_sqrt = math.sqrt(1 + N_sum)
-    a = -1
-    x_max = -2.0
-    for i in range(Q.shape[0]):
-        if P[i] == 0.0:
-            continue
-
-        Ni = N[i]
-        if Ni == 0:
-            Qi = estimated_V
-        else:
-            Qi = Q[i]
-
-        if color == turn % 2:
-            x = Qi
-        else:
-            x = -Qi
-
-        x = x + C_puct * P[i] * N_sum_sqrt / (1 + Ni)
-        if x > x_max:
-            a = i
-            x_max = x
-    return a
-
-
 class Edge:
     def __init__(self, n, p, type_):
         self.n = n

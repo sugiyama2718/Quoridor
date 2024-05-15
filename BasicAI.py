@@ -3,7 +3,6 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import select_action
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -13,12 +12,22 @@ import time
 from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
-import threading
-from concurrent.futures import ThreadPoolExecutor
 from config import *
 from util import Glendenning2Official, Official2Glendenning
+import ctypes
 
 num2str = {0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i"}
+
+if os.name == "nt":
+    lib = ctypes.CDLL('./State_util.dll')
+else:
+    lib = ctypes.CDLL('./State_util.so')
+
+select_action = lib.select_action
+select_action.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
+                              ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int)
+select_action.restype = ctypes.c_int
+
 
 def get_state_vec(state):
     # stateを固定長タプルにしてdictのkeyにするために使う。state.turnを入れているのは、turnの異なる状態を区別して無限ループを避けるため
@@ -481,7 +490,8 @@ class BasicAI(Agent):
 
             # 負けノードは探索しない
             #a = select_action(t.Q, t.N, t.P, C_puct, self.use_estimated_V, self.estimated_V, self.color, t.s.turn, self.use_average_Q)
-            a = select_action(t.Q, t.N, t.P_without_loss, C_puct, self.use_estimated_V, self.estimated_V, self.color, t.s.turn, self.use_average_Q)
+            a = select_action(t.Q.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), t.N.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                              C_puct, self.estimated_V, self.color, t.s.turn)
 
             nodes.append(t)
             actions.append(a)
