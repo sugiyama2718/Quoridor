@@ -481,7 +481,7 @@ def train_without_selfplay():
 
 def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-    seed = h5_id * 10000
+    seed = h5_id * 10000 % (2**30)
     random.seed(seed)
     is_random_AI = (AI_id == 0)
     #print(h5_id, display, AI_id, search_nodes, is_random_AI)
@@ -492,8 +492,8 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
         # AIs = [CNNAI(0, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000),
         #        CNNAI(1, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000)]
     else:
-        AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True),
-               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True)]
+        AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True),
+               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True)]
         AIs[0].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
         AIs[1].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
 
@@ -626,7 +626,7 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
         # for x in tqdm([(old_AI_id, search_nodes, j * 10000, AI_load_name) for j in range(play_num_half)]):
         #     evaluate_2game_process(x)
         with Pool(processes=PROCESS_NUM) as p:
-            imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000, AI_load_name) for j in range(play_num_half)])
+            imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name) for j in range(play_num_half)])
             ret = list(tqdm(imap, total=play_num_half))
         new_ai_win_num = play_num - sum(ret)
         win_num_list.append(new_ai_win_num)
@@ -944,7 +944,7 @@ if __name__ == '__main__':
         play_num = 4
         play_num_half = play_num // 2
         with Pool(processes=1) as p:
-            imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 for j in range(play_num_half)])
+            imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
             ret = list(tqdm(imap, total=play_num_half))
         print(sum(ret), play_num - sum(ret))
         
