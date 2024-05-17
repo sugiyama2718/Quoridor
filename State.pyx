@@ -69,6 +69,10 @@ calc_dist_array = lib.calc_dist_array
 calc_dist_array.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int]
 calc_dist_array.restype = ctypes.POINTER(ctypes.c_uint8)
 
+print_state = lib.print_state
+print_state.argtypes = [ctypes.POINTER(State_c)]
+print_state.restype = None
+
 def print_bitarr(bitarr):
     print()
     for y in range(BOARD_LEN):
@@ -131,7 +135,7 @@ cdef class State:
 
         self.state_c = State_c()
         State_init(self.state_c)
-        print(self.state_c.turn, self.state_c.black_walls)
+        print_state(self.state_c)
 
         for y in range(BOARD_LEN):
             self.dist_array1[:, y] = y

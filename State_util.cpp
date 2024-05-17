@@ -73,6 +73,16 @@ void print_bitarray(__uint128_t bitarr) {
     }
 }
 
+void print_state(State* state) {
+    printf("row_wall\n");
+    print_bitarray(state->row_wall_bitarr);
+    printf("column_wall\n");
+    print_bitarray(state->column_wall_bitarr);
+    printf("Bx, By, Wx, Wy = %d, %d, %d, %d\n", state->Bx, state->By, state->Wx, state->Wy);
+    printf("turn=%d", state->turn);
+    printf("black_walls=%d, white_walls=%d\n", state->black_walls, state->white_walls);
+}
+
 void print_full_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BIT_BOARD_LEN; y++) {
         for(int x = 0; x < BIT_BOARD_LEN; x++) {
