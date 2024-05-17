@@ -44,6 +44,9 @@ struct Point {
 // State中の__uint128_tの変数はすべてbitarray
 struct State {
     __uint128_t row_wall_bitarr, column_wall_bitarr;
+    int Bx, By, Wx, Wy;  // Bが先手、Wが後手。BGAと逆になっているが、昔実装したときに混同した名残。
+    int turn;
+    int black_walls, white_walls;
 };
 
 // int State_test(State* state) {

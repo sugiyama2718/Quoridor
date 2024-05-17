@@ -47,7 +47,10 @@ class BitArrayPair(ctypes.Structure):
     
 class State_c(ctypes.Structure):
     _fields_ = [("row_wall_bitarr", ctypes.c_uint64 * 2),
-                ("column_wall_bitarr", ctypes.c_uint64 * 2)]
+                ("column_wall_bitarr", ctypes.c_uint64 * 2),
+                ("Bx", ctypes.c_int), ("By", ctypes.c_int), ("Wx", ctypes.c_int), ("Wy", ctypes.c_int),
+                ("turn", ctypes.c_int),
+                ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int)]
 
 # State_test = lib.State_test
 # State_test.argtypes = [ctypes.POINTER(State_c)]
@@ -92,7 +95,7 @@ cdef class State:
     cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
-    cdef public row_wall_bit, column_wall_bit, cross_bitarrs, left_edge, right_edge, state_c
+    cdef public row_wall_bit, column_wall_bit, cross_bitarrs, state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -125,15 +128,8 @@ cdef class State:
         self.dist_array2 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
 
         self.cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
-        self.left_edge = bitarray(BITARRAY_SIZE)
-        self.right_edge = bitarray(BITARRAY_SIZE)
 
         self.state_c = State_c()
-
-        for i in range(BOARD_LEN):
-            self.left_edge[i * BIT_BOARD_LEN] = 1
-        for i in range(BOARD_LEN):
-            self.right_edge[i * BIT_BOARD_LEN + (BOARD_LEN - 1)] = 1
 
         for y in range(BOARD_LEN):
             self.dist_array1[:, y] = y
