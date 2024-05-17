@@ -41,6 +41,15 @@ struct Point {
     uint8_t x, y;
 };
 
+// State中の__uint128_tの変数はすべてbitarray
+struct State {
+    __uint128_t row_wall_bitarr, column_wall_bitarr;
+};
+
+// int State_test(State* state) {
+//     return state->value * 2;
+// }
+
 inline bool get_bit(__uint128_t bitarr, int x, int y) {
     return (bitarr & ((__uint128_t)1 << (127 - (x + y * BIT_BOARD_LEN)))) > 0;
 }

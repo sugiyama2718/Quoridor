@@ -44,6 +44,14 @@ else:
 class BitArrayPair(ctypes.Structure):
     _fields_ = [("bitarr1", ctypes.c_uint64 * 2),  # __uint128_tを2つのuint64として扱う。bitarr1[0]に右側の64bit、bitarr1[1]に左側の64bitが格納されることに注意する
                 ("bitarr2", ctypes.c_uint64 * 2)]
+    
+class State_c(ctypes.Structure):
+    _fields_ = [("row_wall_bitarr", ctypes.c_uint64 * 2),
+                ("column_wall_bitarr", ctypes.c_uint64 * 2)]
+
+# State_test = lib.State_test
+# State_test.argtypes = [ctypes.POINTER(State_c)]
+# State_c.restype = ctypes.c_int
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
@@ -84,7 +92,7 @@ cdef class State:
     cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
-    cdef public row_wall_bit, column_wall_bit, cross_bitarrs, left_edge, right_edge, seen_bitarr, seen_bitarr_prev
+    cdef public row_wall_bit, column_wall_bit, cross_bitarrs, left_edge, right_edge, state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -119,8 +127,8 @@ cdef class State:
         self.cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
         self.left_edge = bitarray(BITARRAY_SIZE)
         self.right_edge = bitarray(BITARRAY_SIZE)
-        self.seen_bitarr = bitarray(BITARRAY_SIZE)
-        self.seen_bitarr_prev = bitarray(BITARRAY_SIZE)
+
+        self.state_c = State_c()
 
         for i in range(BOARD_LEN):
             self.left_edge[i * BIT_BOARD_LEN] = 1
