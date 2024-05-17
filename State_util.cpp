@@ -51,7 +51,10 @@ struct State {
 
 void State_init(State* state) {
     state->row_wall_bitarr = state->column_wall_bitarr = 0;
-    state->Bx = state->By = state->Wx = state->Wy = 0;
+    state->Bx = 4;
+    state->By = 8;
+    state->Wx = 4;
+    state->Wy = 0;
     state->turn = 0;
     state->black_walls = state->white_walls = 10;
 }
