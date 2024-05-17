@@ -49,9 +49,12 @@ struct State {
     int black_walls, white_walls;
 };
 
-// int State_test(State* state) {
-//     return state->value * 2;
-// }
+void State_init(State* state) {
+    state->row_wall_bitarr = state->column_wall_bitarr = 0;
+    state->Bx = state->By = state->Wx = state->Wy = 0;
+    state->turn = 0;
+    state->black_walls = state->white_walls = 10;
+}
 
 inline bool get_bit(__uint128_t bitarr, int x, int y) {
     return (bitarr & ((__uint128_t)1 << (127 - (x + y * BIT_BOARD_LEN)))) > 0;

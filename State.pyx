@@ -52,9 +52,9 @@ class State_c(ctypes.Structure):
                 ("turn", ctypes.c_int),
                 ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int)]
 
-# State_test = lib.State_test
-# State_test.argtypes = [ctypes.POINTER(State_c)]
-# State_c.restype = ctypes.c_int
+State_init = lib.State_init
+State_init.argtypes = [ctypes.POINTER(State_c)]
+State_c.restype = None
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
@@ -130,6 +130,8 @@ cdef class State:
         self.cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
 
         self.state_c = State_c()
+        State_init(self.state_c)
+        print(self.state_c.turn, self.state_c.black_walls)
 
         for y in range(BOARD_LEN):
             self.dist_array1[:, y] = y
