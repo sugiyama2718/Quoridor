@@ -59,6 +59,10 @@ void State_init(State* state) {
     state->black_walls = state->white_walls = 10;
 }
 
+void copy_state(State* new_state, State* old_state) {
+    *new_state = *old_state;
+}
+
 inline bool get_bit(__uint128_t bitarr, int x, int y) {
     return (bitarr & ((__uint128_t)1 << (127 - (x + y * BIT_BOARD_LEN)))) > 0;
 }

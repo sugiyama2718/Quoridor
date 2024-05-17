@@ -135,7 +135,7 @@ cdef class State:
 
         self.state_c = State_c()
         State_init(self.state_c)
-        print_state(self.state_c)
+        # print_state(self.state_c)
 
         for y in range(BOARD_LEN):
             self.dist_array1[:, y] = y
