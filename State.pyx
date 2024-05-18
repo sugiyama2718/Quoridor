@@ -212,11 +212,12 @@ cdef class State:
                 if not mv[dx, dy]:
                     return False
             if self.turn % 2 == 0:
-                self.Bx = x
-                self.By = y
+                self.Bx = self.state_c.Bx = x
+                self.By = self.state_c.By = y
+                
             else:
-                self.Wx = x
-                self.Wy = y
+                self.Wx = self.state_c.Wx = x
+                self.Wy = self.state_c.Wy = y
 
             # placable_arrayを更新
             if calc_placable_array:

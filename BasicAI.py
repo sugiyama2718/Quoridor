@@ -267,10 +267,10 @@ def calc_optimal_move_by_DP(s):
             y = Wy
             d = Wd
             s.turn = 1
-        s.Bx = Bx
-        s.By = By
-        s.Wx = Wx
-        s.Wy = Wy
+        s.Bx = s.state_c.Bx = Bx
+        s.By = s.state_c.By = By
+        s.Wx = s.state_c.Wx = Wx
+        s.Wy = s.state_c.Wy = Wy
         movable_array = s.movable_array(x, y, shortest_only=True)
         if not np.any(movable_array):
             movable_array = s.movable_array(x, y, shortest_only=False)
