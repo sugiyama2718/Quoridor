@@ -3,6 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
+from State import State_c
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -27,6 +28,10 @@ select_action = lib.select_action
 select_action.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
                               ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int)
 select_action.restype = ctypes.c_int
+
+copy_state_c = lib.copy_state
+copy_state_c.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
+copy_state_c.restype = None
 
 
 def get_state_vec(state):
@@ -165,8 +170,6 @@ def state_copy(s):
     ret.seen = copy.copy(s.seen)
     ret.row_wall = copy.copy(s.row_wall)
     ret.column_wall = copy.copy(s.column_wall)
-    ret.row_wall_bit = copy.copy(s.row_wall_bit)
-    ret.column_wall_bit = copy.copy(s.column_wall_bit)
     ret.must_be_checked_x = copy.copy(s.must_be_checked_x)
     ret.must_be_checked_y = copy.copy(s.must_be_checked_y)
     ret.placable_r_ = copy.copy(s.placable_r_)
@@ -189,6 +192,7 @@ def state_copy(s):
     ret.dist_array1 = np.copy(s.dist_array1)
     ret.dist_array2 = np.copy(s.dist_array2)
     ret.cross_movable_arr = np.copy(s.cross_movable_arr)
+    copy_state_c(ret.state_c, s.state_c)
     return ret
 
 def calc_optimal_move_by_DP(s):
