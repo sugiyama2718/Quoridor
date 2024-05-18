@@ -54,24 +54,38 @@ class State_c(ctypes.Structure):
 
 State_init = lib.State_init
 State_init.argtypes = [ctypes.POINTER(State_c)]
-State_c.restype = None
+State_init.restype = None
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
-arrivable_.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+arrivable_.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
 arrivable_.restype = ctypes.c_bool
 
 calc_placable_array_ = lib.calc_placable_array_
-calc_placable_array_.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+calc_placable_array_.argtypes = [ctypes.POINTER(State_c)]
 calc_placable_array_.restype = BitArrayPair
 
 calc_dist_array = lib.calc_dist_array
-calc_dist_array.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int]
+calc_dist_array.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
 calc_dist_array.restype = ctypes.POINTER(ctypes.c_uint8)
 
 print_state = lib.print_state
 print_state.argtypes = [ctypes.POINTER(State_c)]
 print_state.restype = None
+
+set_row_wall_1 = lib.set_row_wall_1
+set_row_wall_1.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_row_wall_1.restype = None
+set_row_wall_0 = lib.set_row_wall_0
+set_row_wall_0.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_row_wall_0.restype = None
+
+set_column_wall_1 = lib.set_column_wall_1
+set_column_wall_1.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_column_wall_1.restype = None
+set_column_wall_0 = lib.set_column_wall_0
+set_column_wall_0.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_column_wall_0.restype = None
 
 def print_bitarr(bitarr):
     print()
@@ -99,12 +113,10 @@ cdef class State:
     cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
-    cdef public row_wall_bit, column_wall_bit, cross_bitarrs, state_c
+    cdef public cross_bitarrs, state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.row_wall_bit = bitarray(BITARRAY_SIZE)
-        self.column_wall_bit = bitarray(BITARRAY_SIZE)
         self.placable_r_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_c_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_rb = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -229,7 +241,7 @@ cdef class State:
                 if s[2] == "h":
                     if rf and walls >= 1:
                         self.row_wall[x, y] = 1
-                        self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
+                        set_row_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -239,7 +251,7 @@ cdef class State:
                 elif s[2] == "v":
                     if cf and walls >= 1:
                         self.column_wall[x, y] = 1
-                        self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
+                        set_column_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -252,7 +264,7 @@ cdef class State:
                 if s[2] == "h":
                     if walls >= 1:
                         self.row_wall[x, y] = 1
-                        self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
+                        set_row_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -262,7 +274,7 @@ cdef class State:
                 elif s[2] == "v":
                     if walls >= 1:
                         self.column_wall[x, y] = 1
-                        self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
+                        set_column_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
                         else:
@@ -400,6 +412,17 @@ cdef class State:
     def set_state_by_wall(self):
         # row_wallなどを直接指定して状態を作るときに用いる
         # 差分計算している部分を計算する
+
+        for x in range(BOARD_LEN - 1):
+            for y in range(BOARD_LEN - 1):
+                if self.row_wall[x, y]:
+                    set_row_wall_1(self.state_c, x, y)
+                else:
+                    set_row_wall_0(self.state_c, x, y)
+                if self.column_wall[x, y]:
+                    set_column_wall_1(self.state_c, x, y)
+                else:
+                    set_column_wall_0(self.state_c, x, y)
 
         self.cross_movable_arr = self.cross_movable_array2(self.row_wall, self.column_wall)
         self.dist_array1 = self.dist_array(0, self.cross_movable_arr)
@@ -642,23 +665,22 @@ cdef class State:
             column_f = False
         if row_f:
             self.row_wall[x, y] = 1
-            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
+            set_row_wall_1(self.state_c, x, y)
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0) 
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.row_wall[x, y] = 0
-            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 0
+            set_row_wall_0(self.state_c, x, y)
             row_f = row_f and f
         if column_f:
             self.column_wall[x, y] = 1
-            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
+            set_column_wall_1(self.state_c, x, y)
             if color == 0:
                 f = self.arrivable(self.Bx, self.By, 0)
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
-            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 0
+            set_column_wall_0(self.state_c, x, y)
             column_f = column_f and f
         return row_f, column_f
     
@@ -674,17 +696,16 @@ cdef class State:
             column_f = False
         if row_f and self.must_be_checked_y[x, y]:
             self.row_wall[x, y] = 1
-            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 1
+            set_row_wall_1(self.state_c, x, y)
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.row_wall[x, y] = 0
-            self.row_wall_bit[x + y * BIT_BOARD_LEN] = 0
+            set_row_wall_0(self.state_c, x, y)
             row_f = row_f and f
         if column_f and self.must_be_checked_x[x, y]:
             self.column_wall[x, y] = 1
-            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 1
+            set_column_wall_1(self.state_c, x, y)
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
-            self.column_wall_bit[x + y * BIT_BOARD_LEN] = 0
+            set_column_wall_0(self.state_c, x, y)
             column_f = column_f and f
         return row_f, column_f
 
@@ -754,8 +775,7 @@ cdef class State:
         return dist
 
     cdef np.ndarray[DTYPE_t, ndim = 2] calc_dist_array(self, int goal_y):
-        array_ptr = calc_dist_array(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
-                                    ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]), goal_y)
+        array_ptr = calc_dist_array(self.state_c, goal_y)
         return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
     def getroute(self, x, y, goal_y, isleft):
@@ -789,17 +809,16 @@ cdef class State:
         cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
         cdef int x, y
 
-        ret = calc_placable_array_(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
-                                   ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]),
-                                   self.Bx, self.By, self.Wx, self.Wy)
+        ret = calc_placable_array_(self.state_c)
+
         row_placable_bitarr = bitarray(128)
         column_placable_bitarr = bitarray(128)
         row_placable_bitarr[:64] = int2ba(ret.bitarr1[1], length=64)
         row_placable_bitarr[64:] = int2ba(ret.bitarr1[0], length=64)
         column_placable_bitarr[:64] = int2ba(ret.bitarr2[1], length=64)
         column_placable_bitarr[64:] = int2ba(ret.bitarr2[0], length=64)
-        # print_bitarr(row_placable_bitarr)
-        # print_bitarr(column_placable_bitarr)
+        print_bitarr(row_placable_bitarr)
+        print_bitarr(column_placable_bitarr)
 
         for x in range(BOARD_LEN - 1):
             for y in range(BOARD_LEN - 1):
@@ -849,9 +868,7 @@ cdef class State:
         return False
 
     def arrivable(self, int x, int y, int goal_y):
-        return arrivable_(ba2int(self.row_wall_bit[:64]), ba2int(self.row_wall_bit[64:]),
-                   ba2int(self.column_wall_bit[:64]), ba2int(self.column_wall_bit[64:]),
-                   x, y, goal_y)
+        return arrivable_(self.state_c, x, y, goal_y)
 
     def old_display_cui(self, check_algo=True, official=True, p1_atmark=False):
         sys.stdout.write(" ")
