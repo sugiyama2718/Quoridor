@@ -306,10 +306,10 @@ BitArrayPair calc_placable_array_(State* state) {
     must_be_checked_x &= ret.bitarr2;
     must_be_checked_y &= ret.bitarr1;
 
-    print_full_bitarray(state->row_wall_bitarr);
-    print_full_bitarray(state->column_wall_bitarr);
-    print_full_bitarray(BIT_SMALL_BOARD_MASK);
-    print_bitarray(ret.bitarr1);
+    // print_full_bitarray(state->row_wall_bitarr);
+    // print_full_bitarray(state->column_wall_bitarr);
+    // print_full_bitarray(BIT_SMALL_BOARD_MASK);
+    // print_bitarray(ret.bitarr1);
 
     __uint128_t virtual_row_wall, virtual_column_wall;
     for(int i = 0;i < 128;i++) {

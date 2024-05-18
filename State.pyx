@@ -670,6 +670,7 @@ cdef class State:
                 f = self.arrivable(self.Bx, self.By, 0) 
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
+            self.row_wall[x, y] = 0
             set_row_wall_0(self.state_c, x, y)
             row_f = row_f and f
         if column_f:
@@ -698,6 +699,7 @@ cdef class State:
             self.row_wall[x, y] = 1
             set_row_wall_1(self.state_c, x, y)
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
+            self.row_wall[x, y] = 0
             set_row_wall_0(self.state_c, x, y)
             row_f = row_f and f
         if column_f and self.must_be_checked_x[x, y]:
@@ -817,8 +819,8 @@ cdef class State:
         row_placable_bitarr[64:] = int2ba(ret.bitarr1[0], length=64)
         column_placable_bitarr[:64] = int2ba(ret.bitarr2[1], length=64)
         column_placable_bitarr[64:] = int2ba(ret.bitarr2[0], length=64)
-        print_bitarr(row_placable_bitarr)
-        print_bitarr(column_placable_bitarr)
+        # print_bitarr(row_placable_bitarr)
+        # print_bitarr(column_placable_bitarr)
 
         for x in range(BOARD_LEN - 1):
             for y in range(BOARD_LEN - 1):
