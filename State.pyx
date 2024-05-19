@@ -91,19 +91,6 @@ def print_bitarr(bitarr):
         print()
 
 
-class Edge:
-    def __init__(self, n, p, type_):
-        self.n = n
-        self.p = p
-        self.type = type_
-
-    #def __eq__(self, edge):
-    #    return self.n == edge.n
-
-    def __repr__(self):
-        return "{} {} {}".format(self.n, self.p, self.type)
-
-
 cdef class State:
     draw_turn = DRAW_TURN
     cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
