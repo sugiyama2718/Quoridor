@@ -31,8 +31,8 @@ for dir in dirs:
     state.Wy = state.state_c.Wy = int(pos_arr[3])
     state.row_wall = row_wall
     state.column_wall = column_wall
-    state.black_walls = p1_walls
-    state.white_walls = p2_walls
+    state.black_walls = state.state_c.black_walls = p1_walls
+    state.white_walls = state.state_c.white_walls = p2_walls
     state.set_state_by_wall()
 
     state.display_cui()

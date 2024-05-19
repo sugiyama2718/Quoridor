@@ -245,8 +245,10 @@ cdef class State:
                         set_row_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
+                            self.state_c.black_walls -= 1
                         else:
                             self.white_walls -= 1
+                            self.state_c.white_walls -= 1
                     else:
                         return False
                 elif s[2] == "v":
@@ -255,8 +257,10 @@ cdef class State:
                         set_column_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
+                            self.state_c.black_walls -= 1
                         else:
                             self.white_walls -= 1
+                            self.state_c.white_walls -= 1
                     else:
                         return False
                 else:
@@ -268,8 +272,10 @@ cdef class State:
                         set_row_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
+                            self.state_c.black_walls -= 1
                         else:
                             self.white_walls -= 1
+                            self.state_c.white_walls -= 1
                     else:
                         return False
                 elif s[2] == "v":
@@ -278,8 +284,10 @@ cdef class State:
                         set_column_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
+                            self.state_c.black_walls -= 1
                         else:
                             self.white_walls -= 1
+                            self.state_c.white_walls -= 1
                     else:
                         return False
                 else:
