@@ -1,5 +1,5 @@
 from BasicAI import calc_optimal_move_by_DP
-from State import State
+from State import State, State_init
 from main import normal_play
 import numpy as np
 import os
@@ -37,6 +37,7 @@ for dir in dirs:
     p1_walls, p2_walls = np.loadtxt(os.path.join(path, f"{turn}_w.txt"))
 
     state = State()
+    State_init(state)
     state.turn = turn
     state.Bx = int(pos_arr[0])
     state.By = int(pos_arr[1])

@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import pandas as pd
 
-SAVE_DIR = os.path.join("other_records", "240412_rate")
+SAVE_DIR = os.path.join("other_records", "240507_rate")
 
 if __name__ == "__main__":
     rate_df = pd.read_csv(os.path.join(SAVE_DIR, "estimated_rate.csv"), index_col=0)

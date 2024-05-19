@@ -31,6 +31,9 @@ LEFT = 3
 BITARRAY_SIZE = 128
 BIT_BOARD_LEN = 11
 
+# ------------------------------
+# c++の関数群の定義
+
 if os.name == "nt":
     lib = ctypes.CDLL('./State_util.dll')
 else:
@@ -48,9 +51,9 @@ class State_c(ctypes.Structure):
                 ("turn", ctypes.c_int),
                 ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int)]
 
-State_init = lib.State_init
-State_init.argtypes = [ctypes.POINTER(State_c)]
-State_init.restype = None
+State_init_ = lib.State_init
+State_init_.argtypes = [ctypes.POINTER(State_c)]
+State_init_.restype = None
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
@@ -83,13 +86,20 @@ set_column_wall_0 = lib.set_column_wall_0
 set_column_wall_0.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
 set_column_wall_0.restype = None
 
+# -------------------------------------------
+# TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
+
+def State_init(state):
+    pass  # pythonではコンストラクタで初期化されるから何もしない
+
+# -----------------------------------------
+
 def print_bitarr(bitarr):
     print()
     for y in range(BOARD_LEN):
         for x in range(BOARD_LEN):
             print(bitarr[x + y * BIT_BOARD_LEN], end="")
         print()
-
 
 cdef class State:
     draw_turn = DRAW_TURN
@@ -127,7 +137,7 @@ cdef class State:
         self.dist_array2 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
 
         self.state_c = State_c()
-        State_init(self.state_c)
+        State_init_(self.state_c)
         # print_state(self.state_c)
 
         for y in range(BOARD_LEN):

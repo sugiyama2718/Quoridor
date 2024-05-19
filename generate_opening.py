@@ -50,8 +50,8 @@ class MaxHeap:
 if __name__ == "__main__":
     # 親子関係の存在しないノードの組のうち、各ノードの勝率が一定以上50%から離れておらず、できるだけ局面数が多くて各ノードの局面数が近くなるような組を選ぶ
     # メモリ使用量に注意。240225時点で、20エポック分で1GBほど消費。
-    target_epoch = 4067
-    epoch_num_for_joseki = 10
+    target_epoch = 4200
+    epoch_num_for_joseki = 100
 
     min_size = 6  # これより探訪数が少ない定石は除外する
     max_depth = 15  # これより深い定跡は作らない（メモリ節約のため）
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     #n_div_try = 10
 
     #target_dir = KIFU_DIR
-    target_dir = os.path.join("other_records", "240423")
+    target_dir = os.path.join("other_records", "240507_4100kifu")
     save_dir = os.path.join("application_data", "joseki")
     os.makedirs(save_dir, exist_ok=True)
 

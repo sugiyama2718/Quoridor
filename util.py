@@ -1,7 +1,7 @@
 import os
 from Tree import OpeningTree
 from tqdm import tqdm
-from State import State
+from State import State, State_init
 
 def Glendenning2Official(s):
     """
@@ -73,6 +73,7 @@ def move_to_child(node, key, statevec2node):
 
 def get_state_from_action_list(action_list):
     state = State()
+    State_init(state)
     for a in action_list:
         state.accept_action_str(a)
     return state
@@ -96,7 +97,9 @@ def get_normalized_state(action_list):
 
 def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
     statevec2node = {}
-    opening_tree = get_opening_node_from_state(State(), statevec2node)
+    add_state = State()
+    State_init(add_state)
+    opening_tree = get_opening_node_from_state(add_state, statevec2node)
     opening_tree.visited_num = 0
     opening_tree.p1_win_num = 0
     opening_tree.p2_win_num = 0
@@ -106,7 +109,9 @@ def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
     # 定跡木の作成
     for action_list in tqdm(all_kifu_list):
         state = State()
+        State_init(state)
         mirror_state = State()
+        State_init(mirror_state)
 
         normalized_action_list, _ = get_normalized_action_list(action_list)
         mirror_action_list = list(map(mirror_action, action_list))

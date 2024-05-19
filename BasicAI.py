@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c
+from State import State_c, State_init
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -387,6 +387,7 @@ class BasicAI(Agent):
         # 試合前に毎回実行
         if state is None:
             state = State.State()
+            State_init(state)
         # p = np.ones((137,)) / 137.
         # p = np.asarray(p, dtype=np.float32)
         self.prev_tree = None

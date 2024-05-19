@@ -1,5 +1,5 @@
 # coding:utf-8
-from State import State, BIT_BOARD_LEN, State_c
+from State import State, BIT_BOARD_LEN, State_c, State_init
 import numpy as np
 import os
 import ctypes
@@ -32,20 +32,10 @@ print_state = lib.print_state
 print_state.argtypes = [ctypes.POINTER(State_c)]
 print_state.restype = None
 
-# state = State()
-# set_row_wall_1(state.state_c, 3, 1)
-# set_row_wall_1(state.state_c, 4, 1)
-# set_column_wall_1(state.state_c, 2, 2)
-# set_column_wall_1(state.state_c, 2, 3)
-# print_state(state.state_c)
-# set_row_wall_0(state.state_c, 3, 1)
-# set_column_wall_0(state.state_c, 2, 3)
-# print_state(state.state_c)
-# exit()
-
 results = []
 for i in test_case_list:
     state = State()
+    State_init(state)
     state.row_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/r.txt".format(i)), delimiter=",").T
     state.column_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/c.txt".format(i)), delimiter=",").T
     state.set_state_by_wall()
@@ -77,9 +67,3 @@ for i in test_case_list:
             print(dist_8_pred)
             assert False
 
-state = State()
-state2 = State()
-state.state_c.turn = 5
-
-state3 = state_copy(state)
-print(state.state_c.turn, state2.state_c.turn, state3.state_c.turn)

@@ -22,7 +22,7 @@ from kivy.core.window import Window
 from kivy.lang import Builder
 
 from Agent import actionid2str, str2actionid
-from State import State, CHANNEL
+from State import State, CHANNEL, State_init
 from State import DRAW_TURN
 from CNNAI import CNNAI
 from BasicAI import state_copy
@@ -157,6 +157,7 @@ class Quoridor(Widget):
     def __init__(self, **kwargs):
         super(Quoridor, self).__init__(**kwargs)
         self.state = State()
+        State_init(self.state)
         self.agents = [GUIHuman(0), CNNAI(1, search_nodes=self.search_nodes, tau=0.5)]
         self.playing_game = False
 
@@ -482,6 +483,7 @@ class Quoridor(Widget):
 
         if self.mode == TRAINING_MODE or self.state.terminate:
             self.state = State()
+            State_init(self.state)
             self.turn = 0
             self.state_history = None
             self.add_history(self.state, None)

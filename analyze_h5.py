@@ -10,7 +10,7 @@ from config import *
 from collections import Counter
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from State import RIGHT, DOWN, State, BOARD_LEN
+from State import RIGHT, DOWN, State, BOARD_LEN, State_init
 import pickle
 import argparse
 from BasicAI import display_parameter
@@ -192,6 +192,7 @@ def get_state_from_feature(feature, turn):
                 after = False
 
     state = State()
+    State_init(state)
     state.black_walls = int(feature[0, 0, 2] * 10)
     state.white_walls = int(feature[0, 0, 3] * 10)
     state.turn = turn
