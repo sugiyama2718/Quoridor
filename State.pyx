@@ -703,33 +703,6 @@ cdef class State:
             column_f = column_f and f
         return row_f, column_f
 
-    def shortest(self, x, y, goal_y):
-        dist = np.ones((BOARD_LEN, BOARD_LEN)) * BOARD_LEN * BOARD_LEN * 2
-        prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int8")
-        seen = np.zeros((BOARD_LEN, BOARD_LEN))
-        dist[x, y] = 0
-        while np.sum(seen) < BOARD_LEN * BOARD_LEN:
-            x2, y2 = np.unravel_index(np.argmin(dist + seen * BOARD_LEN * BOARD_LEN * 3, axis=None), dist.shape)
-            seen[x2, y2] = 1
-            cross = self.cross_movable(x2, y2)
-            for i, p in enumerate([(0, -1), (1, 0), (0, 1), (-1, 0)]):
-                x3 = x2 + p[0]
-                y3 = y2 + p[1]
-                if cross[i]:
-                    if dist[x3, y3] > dist[x2, y2] + 1:
-                        dist[x3, y3] = dist[x2, y2] + 1
-                        prev[x3, y3, 0] = x2
-                        prev[x3, y3, 1] = y2
-        x4 = np.argmin(dist[:, goal_y])
-        y4 = goal_y
-        route = []
-        while not (x4 == x and y4 == y):
-            route.append((x4, y4))
-            x4, y4 = prev[x4, y4]
-        route.append((x, y))
-        route = route[::-1]
-        return route
-
     def shortest_path_len(self, x, y, goal_y, cross_arr):
         dist = np.ones((BOARD_LEN, BOARD_LEN)) * BOARD_LEN * BOARD_LEN * 2
         prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int8")
@@ -1005,32 +978,6 @@ cdef class State:
         feature[6] = self.turn % 2
         feature[7:7 + 64] = self.row_wall.flatten()
         feature[7 + 64:] = self.column_wall.flatten()
-        return feature
-
-    def feature(self):
-        feature = np.zeros((135,))
-        feature[0] = self.Bx / 8
-        feature[1] = self.By / 8
-        feature[2] = self.Wx / 8
-        feature[3] = self.Wy / 8
-        feature[4] = self.black_walls / 10
-        feature[5] = self.white_walls / 10
-        feature[6] = self.turn % 2
-        feature[7:7 + 64] = self.row_wall.flatten()
-        feature[7 + 64:] = self.column_wall.flatten()
-        return feature
-
-    def feature_rev(self):
-        feature = np.zeros((135,))
-        feature[0] = (7 - self.Bx) / 8
-        feature[1] = self.By / 8
-        feature[2] = (7 - self.Wx) / 8
-        feature[3] = self.Wy / 8
-        feature[4] = self.black_walls / 10
-        feature[5] = self.white_walls / 10
-        feature[6] = self.turn % 2
-        feature[7:7 + 64] = np.flip(self.row_wall, 0).flatten()
-        feature[7 + 64:] = np.flip(self.column_wall, 0).flatten()
         return feature
 
     def feature_CNN(self, xflip=False, yflip=False):
