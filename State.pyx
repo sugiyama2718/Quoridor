@@ -86,11 +86,22 @@ set_column_wall_0 = lib.set_column_wall_0
 set_column_wall_0.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
 set_column_wall_0.restype = None
 
+eq_state_c = lib.eq_state
+eq_state_c.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
+eq_state_c.restype = ctypes.c_bool
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
 def State_init(state):
     pass  # pythonではコンストラクタで初期化されるから何もしない
+
+def eq_state(state1, state2):
+    f = np.all(state1.row_wall == state2.row_wall) and np.all(state1.column_wall == state2.column_wall)
+    f = f and state1.Bx == state2.Bx and state1.By == state2.By and state1.Wx == state2.Wx and state1.Wy == state2.Wy
+    f = f and state1.black_walls == state2.black_walls and state1.white_walls == state2.white_walls
+    f = f and eq_state_c(state1.state_c, state2.state_c)
+    return f
 
 # -----------------------------------------
 
@@ -155,10 +166,8 @@ cdef class State:
             self.cross_movable_arr[0, y, LEFT] = 0
 
     def __eq__(self, state):
-        f = np.all(self.row_wall == state.row_wall) and np.all(self.column_wall == state.column_wall)
-        f = f and self.Bx == state.Bx and self.By == state.By and self.Wx == state.Wx and self.Wy == state.Wy
-        f = f and self.black_walls == state.black_walls and self.white_walls == state.white_walls
-        return f
+        assert False
+        return False
 
     def get_player_dist_from_goal(self):
         return self.dist_array1[self.Bx, self.By], self.dist_array2[self.Wx, self.Wy]

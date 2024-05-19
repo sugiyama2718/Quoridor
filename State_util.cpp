@@ -60,6 +60,13 @@ void State_init(State* state) {
     state->black_walls = state->white_walls = 10;
 }
 
+bool eq_state(State* state1, State* state2) {
+    return (state1->row_wall_bitarr == state2->row_wall_bitarr) && (state1->column_wall_bitarr == state2->column_wall_bitarr)
+    && (state1->Bx == state2->Bx) && (state1->By == state2->By) && (state1->Wx == state2->Wx) && (state1->Wy == state2->Wy)
+    && (state1->turn == state2->turn)
+    && (state1->black_walls == state2->black_walls) && (state1->white_walls == state2->white_walls);
+}
+
 void copy_state(State* new_state, State* old_state) {
     *new_state = *old_state;
 }
