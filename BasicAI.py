@@ -225,11 +225,11 @@ def calc_optimal_move_by_DP(s):
             if is_black:
                 x = Bx
                 y = By
-                s.turn = 0
+                s.turn = s.state_c.turn = 0
             else:
                 x = Wx
                 y = Wy
-                s.turn = 1
+                s.turn = s.state_c.turn = 1
             movable_array = s.movable_array(x, y, shortest_only=False)
             if not np.any(movable_array):
                 return False
@@ -261,12 +261,12 @@ def calc_optimal_move_by_DP(s):
             x = Bx
             y = By
             d = Bd
-            s.turn = 0
+            s.turn = s.state_c.turn = 0
         else:
             x = Wx
             y = Wy
             d = Wd
-            s.turn = 1
+            s.turn = s.state_c.turn = 1
         s.Bx = s.state_c.Bx = Bx
         s.By = s.state_c.By = By
         s.Wx = s.state_c.Wx = Wx

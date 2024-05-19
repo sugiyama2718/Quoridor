@@ -32,6 +32,17 @@ print_state = lib.print_state
 print_state.argtypes = [ctypes.POINTER(State_c)]
 print_state.restype = None
 
+eq_state = lib.eq_state
+eq_state.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
+eq_state.restype = ctypes.c_bool
+
+# s1 = State_c()
+# s2 = State_c()
+# print(eq_state(s1, s2))
+# s2.Bx = 2
+# print(eq_state(s1, s2))
+# exit()
+
 results = []
 for i in test_case_list:
     state = State()

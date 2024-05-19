@@ -24,11 +24,11 @@ for dir in dirs:
 
     state = State()
     State_init(state)
-    state.turn = turn
-    state.Bx = int(pos_arr[0])
-    state.By = int(pos_arr[1])
-    state.Wx = int(pos_arr[2])
-    state.Wy = int(pos_arr[3])
+    state.turn = state.state_c.turn = turn
+    state.Bx = state.state_c.Bx = int(pos_arr[0])
+    state.By = state.state_c.By = int(pos_arr[1])
+    state.Wx = state.state_c.Wx = int(pos_arr[2])
+    state.Wy = state.state_c.Wy = int(pos_arr[3])
     state.row_wall = row_wall
     state.column_wall = column_wall
     state.black_walls = p1_walls

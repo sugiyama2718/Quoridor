@@ -195,7 +195,7 @@ def get_state_from_feature(feature, turn):
     State_init(state)
     state.black_walls = int(feature[0, 0, 2] * 10)
     state.white_walls = int(feature[0, 0, 3] * 10)
-    state.turn = turn
+    state.turn = state.state_c.turn = turn
     state.Bx = state.state_c.Bx = Bx
     state.By = state.state_c.By = By
     state.Wx = state.state_c.Wx = Wx

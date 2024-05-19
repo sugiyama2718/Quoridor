@@ -299,6 +299,7 @@ cdef class State:
                 self.dist_array1 = self.calc_dist_array(0)
                 self.dist_array2 = self.calc_dist_array(BOARD_LEN - 1)
         self.turn += 1
+        self.state_c.turn += 1
 
         if self.By == 0:
             self.terminate = True
