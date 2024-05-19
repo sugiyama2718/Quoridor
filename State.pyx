@@ -31,10 +31,6 @@ LEFT = 3
 BITARRAY_SIZE = 128
 BIT_BOARD_LEN = 11
 
-bitarray_mask = bitarray(BITARRAY_SIZE)
-for i in range(BOARD_LEN):
-    bitarray_mask[i * BIT_BOARD_LEN:i * BIT_BOARD_LEN + BOARD_LEN] = 1
-
 if os.name == "nt":
     lib = ctypes.CDLL('./State_util.dll')
 else:
@@ -113,7 +109,7 @@ cdef class State:
     cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
-    cdef public cross_bitarrs, state_c
+    cdef public state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -142,8 +138,6 @@ cdef class State:
         self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
         self.dist_array1 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
         self.dist_array2 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
-
-        self.cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
 
         self.state_c = State_c()
         State_init(self.state_c)
