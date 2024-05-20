@@ -51,6 +51,9 @@ class State_c(ctypes.Structure):
                 ("Bx", ctypes.c_int), ("By", ctypes.c_int), ("Wx", ctypes.c_int), ("Wy", ctypes.c_int),
                 ("turn", ctypes.c_int),
                 ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int)]
+    
+class Point_c(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_int), ("y", ctypes.c_int)]
 
 State_init_ = lib.State_init
 State_init_.argtypes = [ctypes.POINTER(State_c)]
@@ -91,6 +94,10 @@ eq_state_c = lib.eq_state
 eq_state_c.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
 eq_state_c.restype = ctypes.c_bool
 
+color_p_c = lib.color_p
+color_p_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+color_p_c.restype = Point_c
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
@@ -103,6 +110,9 @@ def eq_state(state1, state2):
     f = f and state1.black_walls == state2.black_walls and state1.white_walls == state2.white_walls
     f = f and eq_state_c(state1.state_c, state2.state_c)
     return f
+
+def color_p(state, color):
+    return color_p_c(state.state_c, color)
 
 # -----------------------------------------
 
