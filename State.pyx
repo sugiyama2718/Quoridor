@@ -111,8 +111,10 @@ def eq_state(state1, state2):
     f = f and eq_state_c(state1.state_c, state2.state_c)
     return f
 
+# c++で直接２つのintを返させてそのままpythonでも２つのintを返すのは難しそう。この関数はこのまま使う。
 def color_p(state, color):
-    return color_p_c(state.state_c, color)
+    ret = color_p_c(state.state_c, color)
+    return ret.x, ret.y
 
 # -----------------------------------------
 
