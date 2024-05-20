@@ -50,7 +50,8 @@ class State_c(ctypes.Structure):
                 ("cross_bitarrs", ctypes.c_uint64 * 8),
                 ("Bx", ctypes.c_int), ("By", ctypes.c_int), ("Wx", ctypes.c_int), ("Wy", ctypes.c_int),
                 ("turn", ctypes.c_int),
-                ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int)]
+                ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int),
+                ("dist_array1", ctypes.c_uint8 * 81), ("dist_array2", ctypes.c_uint8 * 81)]
     
 class Point_c(ctypes.Structure):
     _fields_ = [("x", ctypes.c_int), ("y", ctypes.c_int)]

@@ -14,6 +14,8 @@ struct State {
     int Bx, By, Wx, Wy;  // Bが先手、Wが後手。BGAと逆になっているが、昔実装したときに混同した名残。
     int turn;
     int black_walls, white_walls;
+    uint8_t dist_array1[81];  // x + y * BOARD_LENでアクセスするものとする
+    uint8_t dist_array2[81];
 };
 
 const int BOARD_LEN = 9;
@@ -64,7 +66,16 @@ void State_init(State* state) {
     state->Wy = 0;
     state->turn = 0;
     state->black_walls = state->white_walls = 10;
+
     calc_cross_bitarrs(state, state->row_wall_bitarr, state->column_wall_bitarr);
+
+    for(int y = 0;y < BOARD_LEN;y++) {
+        for(int x = 0;x < BOARD_LEN;x++) {
+            state->dist_array1[x + y * BOARD_LEN] = y;
+            state->dist_array2[x + y * BOARD_LEN] = BOARD_LEN - 1 - y;
+        }
+    }
+
 }
 
 bool eq_state(State* state1, State* state2) {
