@@ -529,140 +529,6 @@ cdef class State:
         else:
             return self.placable_rw, self.placable_cw
 
-    def old_calc_placable_array(self):
-        ret1 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        ret2 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        must_be_checked_x1 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        must_be_checked_x2 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        must_be_checked_y1 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        must_be_checked_y2 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        routes = [self.getroute(self.Bx, self.By, 0, True), self.getroute(self.Bx, self.By, 0, False)]
-
-        pointss0r = []
-        pointss0l = []
-        pointss1d = []
-        pointss1u = []
-        for route in routes:
-            points0r = []
-            points0l = []
-            points1d = []
-            points1u = []
-            for i, p in enumerate(route):
-                if i == len(route) - 1:
-                    break
-                dx = route[i + 1][0] - route[i][0]
-                dy = route[i + 1][1] - route[i][1]
-                dx = (dx + 2) // 2 - 1
-                dy = (dy + 2) // 2 - 1
-                x_move = abs(route[i + 1][0] - route[i][0]) >= 1
-                y_move = abs(route[i + 1][1] - route[i][1]) >= 1
-                if self.inboard(p[0] + dx, p[1] + dy, BOARD_LEN - 1):
-                    if x_move and dx == 0:
-                        points0r.append((p[0] + dx, p[1] + dy))
-                    elif x_move and dx == -1:
-                        points0l.append((p[0] + dx, p[1] + dy))
-                    elif y_move and dy == 0:
-                        points1d.append((p[0] + dx, p[1] + dy))
-                    elif y_move and dy == -1:
-                        points1u.append((p[0] + dx, p[1] + dy))
-                if x_move and dx == 0 and self.inboard(p[0] + dx, p[1] + dy - 1, BOARD_LEN - 1):
-                    points0r.append((p[0] + dx, p[1] + dy - 1))
-                elif x_move and dx == -1 and self.inboard(p[0] + dx, p[1] + dy - 1, BOARD_LEN - 1):
-                    points0l.append((p[0] + dx, p[1] + dy - 1))
-                elif y_move and dy == 0 and self.inboard(p[0] + dx - 1, p[1] + dy, BOARD_LEN - 1):
-                    points1d.append((p[0] + dx - 1, p[1] + dy))
-                elif y_move and dy == -1 and self.inboard(p[0] + dx - 1, p[1] + dy, BOARD_LEN - 1):
-                    points1u.append((p[0] + dx - 1, p[1] + dy))
-            pointss0r.append(points0r)
-            pointss0l.append(points0l)
-            pointss1d.append(points1d)
-            pointss1u.append(points1u)
-        and_points0r = pointss0r[0]
-        and_points0l = pointss0l[0]
-        and_points1d = pointss1d[0]
-        and_points1u = pointss1u[0]
-        for points in pointss0r[1:]:
-            and_points0r = list(set(and_points0r) & set(points))
-        for points in pointss0l[1:]:
-            and_points0l = list(set(and_points0l) & set(points))
-        for points in pointss1d[1:]:
-            and_points1d = list(set(and_points1d) & set(points))
-        for points in pointss1u[1:]:
-            and_points1u = list(set(and_points1u) & set(points))
-        for x, y in and_points0r + and_points0l:
-            must_be_checked_x1[x, y] = True
-        for x, y in and_points1d + and_points1u:
-            must_be_checked_y1[x, y] = True
-
-        routes = [self.getroute(self.Wx, self.Wy, BOARD_LEN - 1, True), self.getroute(self.Wx, self.Wy, BOARD_LEN - 1, False)]
-
-        pointss0r = []
-        pointss0l = []
-        pointss1d = []
-        pointss1u = []
-        for route in routes:
-            points0r = []
-            points0l = []
-            points1d = []
-            points1u = []
-            for i, p in enumerate(route):
-                if i == len(route) - 1:
-                    break
-                dx = route[i + 1][0] - route[i][0]
-                dy = route[i + 1][1] - route[i][1]
-                dx = (dx + 2) // 2 - 1
-                dy = (dy + 2) // 2 - 1
-                x_move = abs(route[i + 1][0] - route[i][0]) >= 1
-                y_move = abs(route[i + 1][1] - route[i][1]) >= 1
-                if self.inboard(p[0] + dx, p[1] + dy, BOARD_LEN - 1):
-                    if x_move and dx == 0:
-                        points0r.append((p[0] + dx, p[1] + dy))
-                    elif x_move and dx == -1:
-                        points0l.append((p[0] + dx, p[1] + dy))
-                    elif y_move and dy == 0:
-                        points1d.append((p[0] + dx, p[1] + dy))
-                    elif y_move and dy == -1:
-                        points1u.append((p[0] + dx, p[1] + dy))
-                if x_move and dx == 0 and self.inboard(p[0] + dx, p[1] + dy - 1, BOARD_LEN - 1):
-                    points0r.append((p[0] + dx, p[1] + dy - 1))
-                elif x_move and dx == -1 and self.inboard(p[0] + dx, p[1] + dy - 1, BOARD_LEN - 1):
-                    points0l.append((p[0] + dx, p[1] + dy - 1))
-                elif y_move and dy == 0 and self.inboard(p[0] + dx - 1, p[1] + dy, BOARD_LEN - 1):
-                    points1d.append((p[0] + dx - 1, p[1] + dy))
-                elif y_move and dy == -1 and self.inboard(p[0] + dx - 1, p[1] + dy, BOARD_LEN - 1):
-                    points1u.append((p[0] + dx - 1, p[1] + dy))
-            pointss0r.append(points0r)
-            pointss0l.append(points0l)
-            pointss1d.append(points1d)
-            pointss1u.append(points1u)
-        and_points0r = pointss0r[0]
-        and_points0l = pointss0l[0]
-        and_points1d = pointss1d[0]
-        and_points1u = pointss1u[0]
-        for points in pointss0r[1:]:
-            and_points0r = list(set(and_points0r) & set(points))
-        for points in pointss0l[1:]:
-            and_points0l = list(set(and_points0l) & set(points))
-        for points in pointss1d[1:]:
-            and_points1d = list(set(and_points1d) & set(points))
-        for points in pointss1u[1:]:
-            and_points1u = list(set(and_points1u) & set(points))
-        for x, y in and_points0r + and_points0l:
-            must_be_checked_x2[x, y] = True
-        for x, y in and_points1d + and_points1u:
-            must_be_checked_y2[x, y] = True
-
-        self.must_be_checked_x = must_be_checked_x1 | must_be_checked_x2
-        self.must_be_checked_y = must_be_checked_y1 | must_be_checked_y2
-
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                f1, f2 = self.placable(x, y)
-                ret1[x, y] = f1
-                ret2[x, y] = f2
-
-        return ret1, ret2
-
     cdef (int, int) placable_with_color(self, x, y, color):
         # すべてarrivableで確かめる。
         if self.row_wall[x, y] or self.column_wall[x, y]:
@@ -763,20 +629,6 @@ cdef class State:
     cdef np.ndarray[DTYPE_t, ndim = 2] calc_dist_array(self, int goal_y):
         array_ptr = calc_dist_array(self.state_c, goal_y)
         return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-
-    def getroute(self, x, y, goal_y, isleft):
-        self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
-        self.prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
-        self.arrivable_with_prev(x, y, goal_y, isleft)
-        x2 = np.argmax(self.seen[:, goal_y])
-        y2 = goal_y
-        route = []
-        while not (x2 == x and y2 == y):
-            route.append((x2, y2))
-            x2, y2 = self.prev[x2, y2]
-        route.append((x, y))
-        route = route[::-1]
-        return route
     
     def calc_oneside_placable_cand_from_color(self, color):
         # どちらかのプレイヤー（colorで指定）の路だけで壁置きの可能性を判定する。勝利の確定判定などに用いる。各種内部変数は計算済みと仮定する。
@@ -812,46 +664,6 @@ cdef class State:
                 column_array[x, y] = column_placable_bitarr[x + y * BIT_BOARD_LEN]
 
         return row_array, column_array
-
-    def arrivable_with_prev(self, int x, int y, int goal_y, int isleft):
-        #cdef np.ndarray[DTYPE_t, ndim = 3] cross_arr
-        cdef DTYPE_t[:, :, :] prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
-        cdef DTYPE_t[:] cross = np.zeros((4,), dtype="int32")
-        #cross_arr = self.cross_movable_array2(self.row_wall, self.column_wall)  # 一時的にself.row_wallとかを書き換えてこの関数が呼ばれることがあるために毎回計算する必要あり
-        x_stack = [x]
-        y_stack = [y]
-        while len(x_stack) > 0:
-            x = x_stack.pop()
-            y = y_stack.pop()
-            self.seen[x, y] = 1
-            if y == goal_y:
-                #self.seen = seen
-                self.prev = prev
-                return True
-            #cross = self.cross_movable(x, y)
-            cross[0] = (not (y == 0 or self.row_wall[min(x, BOARD_LEN - 2), y - 1] or self.row_wall[max(x - 1, 0), y - 1]))
-            cross[1] = (not (x == BOARD_LEN - 1 or self.column_wall[x, min(y, BOARD_LEN - 2)] or self.column_wall[x, max(y - 1, 0)]))
-            cross[2] = (not (y == BOARD_LEN - 1 or self.row_wall[min(x, BOARD_LEN - 2), y] or self.row_wall[max(x - 1, 0), y]))
-            cross[3] = (not (x == 0 or self.column_wall[x - 1, min(y, BOARD_LEN - 2)] or self.column_wall[x - 1, max(y - 1, 0)]))
-            if isleft and goal_y == 0:
-                p_list = [(3, -1, 0), (0, 0, -1), (1, 1, 0), (2, 0, 1)]
-            elif not isleft and goal_y == 0:
-                p_list = [(2, 0, 1), (1, 1, 0), (0, 0, -1), (3, -1, 0)]
-            elif isleft and goal_y == BOARD_LEN - 1:
-                p_list = [(1, 1, 0), (2, 0, 1), (3, -1, 0), (0, 0, -1)]
-            else:
-                p_list = [(0, 0, -1), (3, -1, 0), (2, 0, 1), (1, 1, 0)]
-            for i, dx, dy in p_list:
-                x2 = x + dx
-                y2 = y + dy
-                if cross[i] and not self.seen[x2, y2]:
-                    prev[x2, y2, 0] = x
-                    prev[x2, y2, 1] = y
-                    x_stack.append(x2)
-                    y_stack.append(y2)
-        #self.seen = seen
-        self.prev = prev
-        return False
 
     def arrivable(self, int x, int y, int goal_y):
         return arrivable_(self.state_c, x, y, goal_y)
@@ -937,54 +749,6 @@ cdef class State:
             return ret
         else:
             sys.stdout.write(ret)
-
-        if check_algo:
-            self.check_placable_array_algo()
-
-    def check_placable_array_algo(self):
-        placabler1, placablec1 = self.old_calc_placable_array()
-        placabler2, placablec2 = self.calc_placable_array()
-        #print(np.all(placabler1 == placabler2) and np.all(placablec1 == placablec2))
-        if not (np.all(placabler1 == placabler2) and np.all(placablec1 == placablec2)):
-            print("")
-            print("="*50)
-            print("{},{},{},{}".format(self.Bx, self.By, self.Wx, self.Wy))
-            for y in range(8):
-                for x in range(8):
-                    print(int(self.row_wall[x, y]), end="")
-                    if x != 7:
-                        print(",", end="")
-                print("")
-            print("")
-            for y in range(8):
-                for x in range(8):
-                    print(int(self.column_wall[x, y]), end="")
-                    if x != 7:
-                        print(",", end="")
-                print("")
-
-            placabler1 = np.array(placabler1, dtype=int)
-            placablec1 = np.array(placablec1, dtype=int)
-            placabler2 = np.array(placabler2, dtype=int)
-            placablec2 = np.array(placablec2, dtype=int)
-
-            print()
-            print("row correctness")
-            print(placabler1.T == placabler2.T)
-            print("row answer")
-            print(placabler1.T)
-            print("row pred")
-            print(placabler2.T)
-
-            print()
-            print("column correctness")
-            print(placablec1.T == placablec2.T)
-            print("column answer")
-            print(placablec1.T)
-            print("column pred")
-            print(placablec2.T)
-            print("check_placable_array_algo failed")
-            exit()
 
     def feature_int(self):
         feature = np.zeros((135,), dtype=int)
