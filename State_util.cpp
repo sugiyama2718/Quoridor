@@ -268,9 +268,7 @@ int arrivable_by_cross(__uint128_t cross_bitarrs[4], int pawn_x, int pawn_y, int
     return false;
 }
 
-uint8_t dist_array_ret[BOARD_LEN * BOARD_LEN];
-
-uint8_t* calc_dist_array(State* state, int goal_y) {
+void calc_dist_array(State* state, int goal_y) {
     Point_uint8 point_queue[BOARD_LEN * BOARD_LEN];
     int q_s = 0, q_e = 0;
     int x2, y2, x3, y3, dx, dy;
@@ -278,10 +276,14 @@ uint8_t* calc_dist_array(State* state, int goal_y) {
     static const int dxs[4] = {0, 1, 0, -1};
     static const int dys[4] = {-1, 0, 1, 0};
 
-    for(int i = 0;i < BOARD_LEN * BOARD_LEN;i++) dist_array_ret[i] = 0xFF;
+    uint8_t* dist_arr_p;
+    if(goal_y == 0) dist_arr_p = state->dist_array1;
+    else dist_arr_p = state->dist_array2;
+
+    for(int i = 0;i < BOARD_LEN * BOARD_LEN;i++) dist_arr_p[i] = 0xFF;
 
     for(int x = 0;x < BOARD_LEN;x++) {
-        dist_array_ret[x + goal_y * BOARD_LEN] = 0;
+        dist_arr_p[x + goal_y * BOARD_LEN] = 0;
         point_queue[q_e].x = x;
         point_queue[q_e].y = goal_y;
         q_e++;
@@ -298,8 +300,8 @@ uint8_t* calc_dist_array(State* state, int goal_y) {
             y3 = y2 + dy;
 
             if(!(x3 < 0 || x3 >= BOARD_LEN || y3 < 0 || y3 >= BOARD_LEN) && 
-            get_bit(state->cross_bitarrs[i], x2, y2) && (dist_array_ret[x3 + y3 * BOARD_LEN] > dist_array_ret[x2 + y2 * BOARD_LEN] + 1)) {
-                max_dist = dist_array_ret[x3 + y3 * BOARD_LEN] = dist_array_ret[x2 + y2 * BOARD_LEN] + 1;
+            get_bit(state->cross_bitarrs[i], x2, y2) && (dist_arr_p[x3 + y3 * BOARD_LEN] > dist_arr_p[x2 + y2 * BOARD_LEN] + 1)) {
+                max_dist = dist_arr_p[x3 + y3 * BOARD_LEN] = dist_arr_p[x2 + y2 * BOARD_LEN] + 1;
                 point_queue[q_e].x = x3;
                 point_queue[q_e].y = y3;
                 q_e++;
@@ -310,10 +312,8 @@ uint8_t* calc_dist_array(State* state, int goal_y) {
     max_dist++;
 
     for(int i = 0;i < BOARD_LEN * BOARD_LEN;i++) {
-        if(dist_array_ret[i] == 0xFF) dist_array_ret[i] = max_dist;
+        if(dist_arr_p[i] == 0xFF) dist_arr_p[i] = max_dist;
     }
-
-    return dist_array_ret;
 }
 
 int arrivable_(State* state, int pawn_x, int pawn_y, int goal_y) {

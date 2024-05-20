@@ -71,7 +71,7 @@ calc_placable_array_.restype = BitArrayPair
 
 calc_dist_array = lib.calc_dist_array
 calc_dist_array.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
-calc_dist_array.restype = ctypes.POINTER(ctypes.c_uint8)
+calc_dist_array.restype = None
 
 print_state = lib.print_state
 print_state.argtypes = [ctypes.POINTER(State_c)]
@@ -637,7 +637,11 @@ cdef class State:
         return dist
 
     cdef np.ndarray[DTYPE_t, ndim = 2] calc_dist_array(self, int goal_y):
-        array_ptr = calc_dist_array(self.state_c, goal_y)
+        calc_dist_array(self.state_c, goal_y)
+        if goal_y == 0:
+            array_ptr = self.state_c.dist_array1
+        else:
+            array_ptr = self.state_c.dist_array2
         return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
     
     def calc_oneside_placable_cand_from_color(self, color):
