@@ -11,11 +11,11 @@ import pandas as pd
 from multiprocessing import Pool
 from tqdm import tqdm
 
-SIGMA = 1.0
+SIGMA = 1.2
 RANDOM_EPSILON = 1e-5  # 同スコアのものにランダム性を加える目的
 EPSILON = 1e-10
 FIX_EPOCH_LIST = [60, 62, 71, 91, 96, 155, 220, 465, 620, 1050, 1284, 
-                  2020, 2520, 2780, 2910, 3090, 3350, 3360, 3400, 3460, 3545, 3560, 3700, 3850, 3985, 4175]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
+                  2020, 2520, 2780, 2910, 3090, 3350, 3360, 3400, 3460, 3545, 3560, 3700, 3850, 3985, 4175, 4225]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
 
 USE_PAST_RESULT = True
 
