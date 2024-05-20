@@ -48,8 +48,12 @@ struct BitArrayPair {
     __uint128_t bitarr2;
 };
 
-struct Point {
+struct Point_uint8 {
     uint8_t x, y;
+};
+
+struct Point_int {
+    int x, y;
 };
 
 void State_init(State* state) {
@@ -68,6 +72,18 @@ bool eq_state(State* state1, State* state2) {
     && (state1->Bx == state2->Bx) && (state1->By == state2->By) && (state1->Wx == state2->Wx) && (state1->Wy == state2->Wy)
     && (state1->turn == state2->turn)
     && (state1->black_walls == state2->black_walls) && (state1->white_walls == state2->white_walls);
+}
+
+Point_int color_p(State* state, int color) {
+    Point_int ret;
+    if(color == 0) {
+        ret.x = state->Bx;
+        ret.y = state->By;
+    } else {
+        ret.x = state->Wx;
+        ret.y = state->Wy;
+    }
+    return ret;
 }
 
 void copy_state(State* new_state, State* old_state) {
@@ -244,7 +260,7 @@ int arrivable_by_cross(__uint128_t cross_bitarrs[4], int pawn_x, int pawn_y, int
 uint8_t dist_array_ret[BOARD_LEN * BOARD_LEN];
 
 uint8_t* calc_dist_array(State* state, int goal_y) {
-    Point point_queue[BOARD_LEN * BOARD_LEN];
+    Point_uint8 point_queue[BOARD_LEN * BOARD_LEN];
     int q_s = 0, q_e = 0;
     int x2, y2, x3, y3, dx, dy;
     uint8_t max_dist = 0;
