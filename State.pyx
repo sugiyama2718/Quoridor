@@ -47,6 +47,7 @@ class BitArrayPair(ctypes.Structure):
 class State_c(ctypes.Structure):
     _fields_ = [("row_wall_bitarr", ctypes.c_uint64 * 2),
                 ("column_wall_bitarr", ctypes.c_uint64 * 2),
+                ("cross_bitarrs", ctypes.c_uint64 * 8),
                 ("Bx", ctypes.c_int), ("By", ctypes.c_int), ("Wx", ctypes.c_int), ("Wy", ctypes.c_int),
                 ("turn", ctypes.c_int),
                 ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int)]

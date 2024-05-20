@@ -1,7 +1,7 @@
 # coding:utf-8
 from State import State, BIT_BOARD_LEN, State_c, State_init
 import numpy as np
-import os
+import os, sys
 import ctypes
 from BasicAI import state_copy
 
@@ -49,14 +49,15 @@ for i in test_case_list:
     State_init(state)
     state.row_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/r.txt".format(i)), delimiter=",").T
     state.column_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/c.txt".format(i)), delimiter=",").T
-    state.set_state_by_wall()
+    
     if os.path.exists(os.path.join(TEST_DIR, "{}/p.txt".format(i))):
         p = np.loadtxt(os.path.join(TEST_DIR, "{}/p.txt".format(i)), delimiter=",")
-        p = np.asarray(p, dtype="int8")
+        p = np.asarray(p, dtype=int)
         state.Bx = state.state_c.Bx = p[0]
         state.By = state.state_c.By = p[1]
         state.Wx = state.state_c.Wx = p[2]
         state.Wy = state.state_c.Wy = p[3]
+    state.set_state_by_wall()
     print_state(state.state_c)
     state.display_cui(check_algo=True)
 
@@ -77,4 +78,4 @@ for i in test_case_list:
             print(dist_8)
             print(dist_8_pred)
             assert False
-
+    sys.stdout.flush()

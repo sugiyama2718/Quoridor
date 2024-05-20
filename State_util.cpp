@@ -7,8 +7,10 @@
 extern "C" {
 
 // State中の__uint128_tの変数はすべてbitarray
+// ここを変更したらpythonの呼び出し側の定義も必ず変更すること！！！！！！
 struct State {
     __uint128_t row_wall_bitarr, column_wall_bitarr;
+    __uint128_t cross_bitarrs[4];
     int Bx, By, Wx, Wy;  // Bが先手、Wが後手。BGAと逆になっているが、昔実装したときに混同した名残。
     int turn;
     int black_walls, white_walls;
@@ -30,7 +32,6 @@ const __uint128_t RIGHT_EDGE = ((__uint128_t)0x80100200400801ULL << 64) | 0x0020
 const __uint128_t DOWN_EDGE = 0xFF80000000ULL;
 const __uint128_t LEFT_EDGE = ((__uint128_t)0x8010020040080100ULL << 64) | 0x2004008000000000ULL;
 const __uint128_t BOX_10 = ((__uint128_t)0XFFD00A0140280500ULL << 64) | 0xA01402805FF80000ULL;
-__uint128_t cross_bitarrs[4];
 
 void print_bitarray(__uint128_t bitarr);
 void print_full_bitarray(__uint128_t bitarr);
@@ -40,6 +41,7 @@ inline __uint128_t down_shift(__uint128_t bitarr);
 inline __uint128_t left_shift(__uint128_t bitarr);
 inline __uint128_t right_down_shift(__uint128_t bitarr);
 int arrivable_(State* state, int pawn_x, int pawn_y, int goal_y);
+void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column_bitarr);
 
 struct BitArrayPair {
     __uint128_t bitarr1;
@@ -58,6 +60,7 @@ void State_init(State* state) {
     state->Wy = 0;
     state->turn = 0;
     state->black_walls = state->white_walls = 10;
+    calc_cross_bitarrs(state, state->row_wall_bitarr, state->column_wall_bitarr);
 }
 
 bool eq_state(State* state1, State* state2) {
@@ -83,10 +86,22 @@ void set_1(__uint128_t* bitarr, int x, int y) {
     *bitarr |= (__uint128_t)1 << (127 - (x + y * BIT_BOARD_LEN));
 }
 
-void set_row_wall_1(State* state, int x, int y) {set_1(&state->row_wall_bitarr, x, y);}
-void set_row_wall_0(State* state, int x, int y) {set_0(&state->row_wall_bitarr, x, y);}
-void set_column_wall_1(State* state, int x, int y) {set_1(&state->column_wall_bitarr, x, y);}
-void set_column_wall_0(State* state, int x, int y) {set_0(&state->column_wall_bitarr, x, y);}
+void set_row_wall_1(State* state, int x, int y) {
+    set_1(&state->row_wall_bitarr, x, y);
+    calc_cross_bitarrs(state, state->row_wall_bitarr, state->column_wall_bitarr);
+}
+void set_row_wall_0(State* state, int x, int y) {
+    set_0(&state->row_wall_bitarr, x, y);
+    calc_cross_bitarrs(state, state->row_wall_bitarr, state->column_wall_bitarr);
+}
+void set_column_wall_1(State* state, int x, int y) {
+    set_1(&state->column_wall_bitarr, x, y);
+    calc_cross_bitarrs(state, state->row_wall_bitarr, state->column_wall_bitarr);
+}
+void set_column_wall_0(State* state, int x, int y) {
+    set_0(&state->column_wall_bitarr, x, y);
+    calc_cross_bitarrs(state, state->row_wall_bitarr, state->column_wall_bitarr);
+}
 
 void print_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BOARD_LEN; y++) {
@@ -104,7 +119,7 @@ void print_state(State* state) {
     printf("column_wall\n");
     print_bitarray(state->column_wall_bitarr);
     printf("Bx, By, Wx, Wy = %d, %d, %d, %d\n", state->Bx, state->By, state->Wx, state->Wy);
-    printf("turn=%d", state->turn);
+    printf("turn=%d\n", state->turn);
     printf("black_walls=%d, white_walls=%d\n", state->black_walls, state->white_walls);
 }
 
@@ -181,32 +196,30 @@ float C_puct, float estimated_V, int color, int turn) {
     return a;
 }
 
-void calc_cross_bitarrs(__uint128_t row_bitarr, __uint128_t column_bitarr) {
-    cross_bitarrs[UP] = UP_EDGE;
-    cross_bitarrs[UP] |= down_shift(row_bitarr);
-    cross_bitarrs[UP] |= right_down_shift(row_bitarr);
+void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column_bitarr) {
+    state->cross_bitarrs[UP] = UP_EDGE;
+    state->cross_bitarrs[UP] |= down_shift(row_bitarr);
+    state->cross_bitarrs[UP] |= right_down_shift(row_bitarr);
 
-    cross_bitarrs[RIGHT] = RIGHT_EDGE;
-    cross_bitarrs[RIGHT] |= column_bitarr;
-    cross_bitarrs[RIGHT] |= down_shift(column_bitarr);
+    state->cross_bitarrs[RIGHT] = RIGHT_EDGE;
+    state->cross_bitarrs[RIGHT] |= column_bitarr;
+    state->cross_bitarrs[RIGHT] |= down_shift(column_bitarr);
 
-    cross_bitarrs[DOWN] = DOWN_EDGE;
-    cross_bitarrs[DOWN] |= row_bitarr;
-    cross_bitarrs[DOWN] |= right_shift(row_bitarr);
+    state->cross_bitarrs[DOWN] = DOWN_EDGE;
+    state->cross_bitarrs[DOWN] |= row_bitarr;
+    state->cross_bitarrs[DOWN] |= right_shift(row_bitarr);
 
-    cross_bitarrs[LEFT] = LEFT_EDGE;
-    cross_bitarrs[LEFT] |= right_shift(column_bitarr);
-    cross_bitarrs[LEFT] |= right_down_shift(column_bitarr);
+    state->cross_bitarrs[LEFT] = LEFT_EDGE;
+    state->cross_bitarrs[LEFT] |= right_shift(column_bitarr);
+    state->cross_bitarrs[LEFT] |= right_down_shift(column_bitarr);
 
     for(int i = 0; i < 4; i++) {
-        cross_bitarrs[i] = ~cross_bitarrs[i];
-        cross_bitarrs[i] &= BIT_BOARD_MASK;
+        state->cross_bitarrs[i] = ~state->cross_bitarrs[i];
+        state->cross_bitarrs[i] &= BIT_BOARD_MASK;
     }
 }
 
-int arrivable_by_uint128(__uint128_t row_bitarr, __uint128_t column_bitarr, int pawn_x, int pawn_y, int goal_y) {
-    calc_cross_bitarrs(row_bitarr, column_bitarr);
-
+int arrivable_by_cross(__uint128_t cross_bitarrs[4], int pawn_x, int pawn_y, int goal_y) {
     __uint128_t seen_bitarr = ((__uint128_t)1 << (127 - (pawn_x + pawn_y * BIT_BOARD_LEN)));
     __uint128_t seen_bitarr_prev = ((__uint128_t)1 << (127 - (pawn_x + pawn_y * BIT_BOARD_LEN)));
 
@@ -231,8 +244,6 @@ int arrivable_by_uint128(__uint128_t row_bitarr, __uint128_t column_bitarr, int 
 uint8_t dist_array_ret[BOARD_LEN * BOARD_LEN];
 
 uint8_t* calc_dist_array(State* state, int goal_y) {
-    calc_cross_bitarrs(state->row_wall_bitarr, state->column_wall_bitarr);
-
     Point point_queue[BOARD_LEN * BOARD_LEN];
     int q_s = 0, q_e = 0;
     int x2, y2, x3, y3, dx, dy;
@@ -260,7 +271,7 @@ uint8_t* calc_dist_array(State* state, int goal_y) {
             y3 = y2 + dy;
 
             if(!(x3 < 0 || x3 >= BOARD_LEN || y3 < 0 || y3 >= BOARD_LEN) && 
-            get_bit(cross_bitarrs[i], x2, y2) && (dist_array_ret[x3 + y3 * BOARD_LEN] > dist_array_ret[x2 + y2 * BOARD_LEN] + 1)) {
+            get_bit(state->cross_bitarrs[i], x2, y2) && (dist_array_ret[x3 + y3 * BOARD_LEN] > dist_array_ret[x2 + y2 * BOARD_LEN] + 1)) {
                 max_dist = dist_array_ret[x3 + y3 * BOARD_LEN] = dist_array_ret[x2 + y2 * BOARD_LEN] + 1;
                 point_queue[q_e].x = x3;
                 point_queue[q_e].y = y3;
@@ -279,7 +290,7 @@ uint8_t* calc_dist_array(State* state, int goal_y) {
 }
 
 int arrivable_(State* state, int pawn_x, int pawn_y, int goal_y) {
-    return arrivable_by_uint128(state->row_wall_bitarr, state->column_wall_bitarr, pawn_x, pawn_y, goal_y);
+    return arrivable_by_cross(state->cross_bitarrs, pawn_x, pawn_y, goal_y);
 }
 
 BitArrayPair calc_placable_array_(State* state) {
@@ -319,17 +330,23 @@ BitArrayPair calc_placable_array_(State* state) {
     // print_bitarray(ret.bitarr1);
 
     __uint128_t virtual_row_wall, virtual_column_wall;
-    for(int i = 0;i < 128;i++) {
-        virtual_row_wall = ((__uint128_t)1 << i) & must_be_checked_y;
-        if(virtual_row_wall > 0) {
-            if(!arrivable_by_uint128(state->row_wall_bitarr | virtual_row_wall, state->column_wall_bitarr, state->Bx, state->By, 0)
-            || !arrivable_by_uint128(state->row_wall_bitarr | virtual_row_wall, state->column_wall_bitarr, state->Wx, state->Wy, BOARD_LEN - 1)) ret.bitarr1 &= ~((__uint128_t)1 << i);
-        }
+    for(int y = 0;y < BOARD_LEN - 1;y++) {
+        for(int x = 0;x < BOARD_LEN - 1;x++) {
+            virtual_row_wall = ((__uint128_t)1 << (127 - (x + y * BIT_BOARD_LEN))) & must_be_checked_y;
+            if(virtual_row_wall > 0) {
+                set_row_wall_1(state, x, y);
+                if(!arrivable_by_cross(state->cross_bitarrs, state->Bx, state->By, 0)
+                || !arrivable_by_cross(state->cross_bitarrs, state->Wx, state->Wy, BOARD_LEN - 1)) ret.bitarr1 &= ~((__uint128_t)1 << (127 - (x + y * BIT_BOARD_LEN)));
+                set_row_wall_0(state, x, y);
+            }
 
-        virtual_column_wall = ((__uint128_t)1 << i) & must_be_checked_x;
-        if(virtual_column_wall > 0) {
-            if(!arrivable_by_uint128(state->row_wall_bitarr, state->column_wall_bitarr | virtual_column_wall, state->Bx, state->By, 0)
-            || !arrivable_by_uint128(state->row_wall_bitarr, state->column_wall_bitarr | virtual_column_wall, state->Wx, state->Wy, BOARD_LEN - 1)) ret.bitarr2 &= ~((__uint128_t)1 << i);
+            virtual_column_wall = ((__uint128_t)1 << (127 - (x + y * BIT_BOARD_LEN))) & must_be_checked_x;
+            if(virtual_column_wall > 0) {
+                set_column_wall_1(state, x, y);
+                if(!arrivable_by_cross(state->cross_bitarrs, state->Bx, state->By, 0)
+                || !arrivable_by_cross(state->cross_bitarrs, state->Wx, state->Wy, BOARD_LEN - 1)) ret.bitarr2 &= ~((__uint128_t)1 << (127 - (x + y * BIT_BOARD_LEN)));
+                set_column_wall_0(state, x, y);
+            }
         }
     }
 
