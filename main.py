@@ -4,7 +4,6 @@ from Agent import actionid2str
 from State import State, CHANNEL, State_init, eq_state
 from State import DRAW_TURN
 from Human import Human
-from LinearAI import LinearAI
 from CNNAI import CNNAI
 from BasicAI import state_copy
 import time
