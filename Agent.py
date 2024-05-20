@@ -1,5 +1,6 @@
 # coding:utf-8
 import State
+from State import color_p
 
 num2str = {-1: "j", 0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i", 9:"j"}
 
@@ -45,7 +46,7 @@ def str2actionid(state, s):
 
 
 def actionid2str(state, action_id):
-    x, y = state.color_p(state.turn % 2)
+    x, y = color_p(state, state.turn % 2)
     id1 = action_id // ((State.BOARD_LEN - 1) * (State.BOARD_LEN - 1))
     id2 = action_id % ((State.BOARD_LEN - 1) * (State.BOARD_LEN - 1))
     if id1 <= 1:
@@ -68,7 +69,7 @@ def actionid2str(state, action_id):
 
 
 def is_jump_move(state, action_id):
-    x, y = state.color_p(state.turn % 2)
+    x, y = color_p(state, state.turn % 2)
     id1 = action_id // ((State.BOARD_LEN - 1) * (State.BOARD_LEN - 1))
     id2 = action_id % ((State.BOARD_LEN - 1) * (State.BOARD_LEN - 1))
     if id1 == 2:

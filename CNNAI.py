@@ -3,7 +3,7 @@
 import time
 from BasicAI import BasicAI
 import State
-from State import CHANNEL
+from State import CHANNEL, color_p
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -421,12 +421,6 @@ class CNNAI(BasicAI):
         for i, s in enumerate(states):
             if s.pseudo_terminate:
                 y[i] = s.pseudo_reward
-            # _, y1 = s.color_p(0)
-            # _, y2 = s.color_p(1)
-            # if y1 == 0:
-            #     y[i] = 1.
-            # elif y2 == State.BOARD_LEN - 1:
-            #     y[i] = -1.
         if self.color == 0:
             return y
         else:
@@ -443,7 +437,7 @@ class CNNAI(BasicAI):
         if self.p_is_almost_flat:
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
                 r, c = s.placable_array(s.turn % 2)
-                x, y = s.color_p(s.turn % 2)
+                x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
@@ -454,7 +448,7 @@ class CNNAI(BasicAI):
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
                 r, c = s.placable_array(s.turn % 2)
-                x, y = s.color_p(s.turn % 2)
+                x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
@@ -470,7 +464,7 @@ class CNNAI(BasicAI):
 
         # 距離を縮める方向に事前確率を高める
         for i, s in enumerate(states):
-            x, y = s.color_p(s.turn % 2)
+            x, y = color_p(s, s.turn % 2)
             shortest_move = s.movable_array(x, y, shortest_only=True).flatten()
             p_move = p[i, 128:]
             if np.sum(shortest_move) > 0:  # 相手がゴールにいるせいで距離を縮められない場合などにsumが0になる
@@ -502,7 +496,7 @@ class CNNAI(BasicAI):
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
                 r, c = s.placable_array(s.turn % 2)
-                x, y = s.color_p(s.turn % 2)
+                x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
@@ -515,7 +509,7 @@ class CNNAI(BasicAI):
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
                 r, c = s.placable_array(s.turn % 2)
-                x, y = s.color_p(s.turn % 2)
+                x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
@@ -538,7 +532,7 @@ class CNNAI(BasicAI):
 
         # 距離を縮める方向に事前確率を高める
         for i, s in enumerate(states):
-            x, y = s.color_p(s.turn % 2)
+            x, y = color_p(s, s.turn % 2)
             shortest_move = s.movable_array(x, y, shortest_only=True).flatten()
             p_move = p[i, 128:]
             if np.sum(shortest_move) > 0:  # 相手がゴールにいるせいで距離を縮められない場合などにsumが0になる

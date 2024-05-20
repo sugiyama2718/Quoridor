@@ -184,10 +184,7 @@ cdef class State:
         return self.dist_array1[self.Bx, self.By], self.dist_array2[self.Wx, self.Wy]
 
     def color_p(self, color):
-        if color == 0:
-            return self.Bx, self.By
-        else:
-            return self.Wx, self.Wy
+        assert False
 
     def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
         # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
