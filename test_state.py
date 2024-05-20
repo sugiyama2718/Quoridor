@@ -59,7 +59,24 @@ for i in test_case_list:
         state.Wy = state.state_c.Wy = p[3]
     state.set_state_by_wall()
     print_state(state.state_c)
-    state.display_cui(check_algo=True)
+    state.display_cui()
+
+    placabler_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/placabler.csv"), delimiter=","), dtype=int)
+    placablec_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/placablec.csv"), delimiter=","), dtype=int)
+
+    placabler_pred, placablec_pred = state.calc_placable_array()
+
+    if not np.all(placabler_pred == placabler_ans) or not np.all(placablec_pred == placablec_ans):
+        print("placable array failed")
+        print("row answer")
+        print(placabler_ans)
+        print("row pred")
+        print(placabler_pred)
+        print("column answer")
+        print(placablec_ans)
+        print("column pred")
+        print(placablec_pred)
+        assert False
 
     # np.savetxt(os.path.join(TEST_DIR, f"{i}/dist_0.csv"), state.dist_array(0, state.cross_movable_array2(state.row_wall, state.column_wall)),delimiter=",")
     # np.savetxt(os.path.join(TEST_DIR, f"{i}/dist_8.csv"), state.dist_array(8, state.cross_movable_array2(state.row_wall, state.column_wall)),delimiter=",")
