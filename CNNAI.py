@@ -1,5 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
@@ -14,7 +16,6 @@ import h5py
 from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 from config import *
-import os
 from tqdm import tqdm
 import math
 import json

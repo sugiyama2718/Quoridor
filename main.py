@@ -28,8 +28,6 @@ from analyze_h5 import analyze_h5_main
 import shutil
 import random
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制？
-
 # agentsは初期化されてるとする
 def normal_play(agents, initial_state=None):
     if initial_state is None:
