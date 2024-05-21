@@ -31,9 +31,8 @@ LEFT = 3
 BITARRAY_SIZE = 128
 BIT_BOARD_LEN = 11
 
-bitarray_mask = bitarray(BITARRAY_SIZE)
-for i in range(BOARD_LEN):
-    bitarray_mask[i * BIT_BOARD_LEN:i * BIT_BOARD_LEN + BOARD_LEN] = 1
+# ------------------------------
+# c++の関数群の定義
 
 if os.name == "nt":
     lib = ctypes.CDLL('./State_util.dll')
@@ -48,13 +47,18 @@ class BitArrayPair(ctypes.Structure):
 class State_c(ctypes.Structure):
     _fields_ = [("row_wall_bitarr", ctypes.c_uint64 * 2),
                 ("column_wall_bitarr", ctypes.c_uint64 * 2),
+                ("cross_bitarrs", ctypes.c_uint64 * 8),
                 ("Bx", ctypes.c_int), ("By", ctypes.c_int), ("Wx", ctypes.c_int), ("Wy", ctypes.c_int),
                 ("turn", ctypes.c_int),
-                ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int)]
+                ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int),
+                ("dist_array1", ctypes.c_uint8 * 81), ("dist_array2", ctypes.c_uint8 * 81)]
+    
+class Point_c(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_int), ("y", ctypes.c_int)]
 
-State_init = lib.State_init
-State_init.argtypes = [ctypes.POINTER(State_c)]
-State_init.restype = None
+State_init_ = lib.State_init
+State_init_.argtypes = [ctypes.POINTER(State_c)]
+State_init_.restype = None
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
@@ -67,7 +71,7 @@ calc_placable_array_.restype = BitArrayPair
 
 calc_dist_array = lib.calc_dist_array
 calc_dist_array.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
-calc_dist_array.restype = ctypes.POINTER(ctypes.c_uint8)
+calc_dist_array.restype = None
 
 print_state = lib.print_state
 print_state.argtypes = [ctypes.POINTER(State_c)]
@@ -87,6 +91,34 @@ set_column_wall_0 = lib.set_column_wall_0
 set_column_wall_0.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
 set_column_wall_0.restype = None
 
+eq_state_c = lib.eq_state
+eq_state_c.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
+eq_state_c.restype = ctypes.c_bool
+
+color_p_c = lib.color_p
+color_p_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+color_p_c.restype = Point_c
+
+# -------------------------------------------
+# TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
+
+def State_init(state):
+    pass  # pythonではコンストラクタで初期化されるから何もしない
+
+def eq_state(state1, state2):
+    f = np.all(state1.row_wall == state2.row_wall) and np.all(state1.column_wall == state2.column_wall)
+    f = f and state1.Bx == state2.Bx and state1.By == state2.By and state1.Wx == state2.Wx and state1.Wy == state2.Wy
+    f = f and state1.black_walls == state2.black_walls and state1.white_walls == state2.white_walls
+    f = f and eq_state_c(state1.state_c, state2.state_c)
+    return f
+
+# c++で直接２つのintを返させてそのままpythonでも２つのintを返すのは難しそう。この関数はこのまま使う。
+def color_p(state, color):
+    ret = color_p_c(state.state_c, color)
+    return ret.x, ret.y
+
+# -----------------------------------------
+
 def print_bitarr(bitarr):
     print()
     for y in range(BOARD_LEN):
@@ -94,26 +126,12 @@ def print_bitarr(bitarr):
             print(bitarr[x + y * BIT_BOARD_LEN], end="")
         print()
 
-
-class Edge:
-    def __init__(self, n, p, type_):
-        self.n = n
-        self.p = p
-        self.type = type_
-
-    #def __eq__(self, edge):
-    #    return self.n == edge.n
-
-    def __repr__(self):
-        return "{} {} {}".format(self.n, self.p, self.type)
-
-
 cdef class State:
     draw_turn = DRAW_TURN
     cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
-    cdef public cross_bitarrs, state_c
+    cdef public state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -143,10 +161,8 @@ cdef class State:
         self.dist_array1 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
         self.dist_array2 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
 
-        self.cross_bitarrs = [bitarray(BITARRAY_SIZE) for i in range(4)]
-
         self.state_c = State_c()
-        State_init(self.state_c)
+        State_init_(self.state_c)
         # print_state(self.state_c)
 
         for y in range(BOARD_LEN):
@@ -164,19 +180,14 @@ cdef class State:
             self.cross_movable_arr[0, y, LEFT] = 0
 
     def __eq__(self, state):
-        f = np.all(self.row_wall == state.row_wall) and np.all(self.column_wall == state.column_wall)
-        f = f and self.Bx == state.Bx and self.By == state.By and self.Wx == state.Wx and self.Wy == state.Wy
-        f = f and self.black_walls == state.black_walls and self.white_walls == state.white_walls
-        return f
+        assert False
+        return False
 
     def get_player_dist_from_goal(self):
         return self.dist_array1[self.Bx, self.By], self.dist_array2[self.Wx, self.Wy]
 
     def color_p(self, color):
-        if color == 0:
-            return self.Bx, self.By
-        else:
-            return self.Wx, self.Wy
+        assert False
 
     def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
         # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
@@ -245,8 +256,10 @@ cdef class State:
                         set_row_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
+                            self.state_c.black_walls -= 1
                         else:
                             self.white_walls -= 1
+                            self.state_c.white_walls -= 1
                     else:
                         return False
                 elif s[2] == "v":
@@ -255,8 +268,10 @@ cdef class State:
                         set_column_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
+                            self.state_c.black_walls -= 1
                         else:
                             self.white_walls -= 1
+                            self.state_c.white_walls -= 1
                     else:
                         return False
                 else:
@@ -268,8 +283,10 @@ cdef class State:
                         set_row_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
+                            self.state_c.black_walls -= 1
                         else:
                             self.white_walls -= 1
+                            self.state_c.white_walls -= 1
                     else:
                         return False
                 elif s[2] == "v":
@@ -278,8 +295,10 @@ cdef class State:
                         set_column_wall_1(self.state_c, x, y)
                         if self.turn % 2 == 0:
                             self.black_walls -= 1
+                            self.state_c.black_walls -= 1
                         else:
                             self.white_walls -= 1
+                            self.state_c.white_walls -= 1
                     else:
                         return False
                 else:
@@ -299,6 +318,7 @@ cdef class State:
                 self.dist_array1 = self.calc_dist_array(0)
                 self.dist_array2 = self.calc_dist_array(BOARD_LEN - 1)
         self.turn += 1
+        self.state_c.turn += 1
 
         if self.By == 0:
             self.terminate = True
@@ -519,140 +539,6 @@ cdef class State:
         else:
             return self.placable_rw, self.placable_cw
 
-    def old_calc_placable_array(self):
-        ret1 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        ret2 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        must_be_checked_x1 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        must_be_checked_x2 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        must_be_checked_y1 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        must_be_checked_y2 = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        routes = [self.getroute(self.Bx, self.By, 0, True), self.getroute(self.Bx, self.By, 0, False)]
-
-        pointss0r = []
-        pointss0l = []
-        pointss1d = []
-        pointss1u = []
-        for route in routes:
-            points0r = []
-            points0l = []
-            points1d = []
-            points1u = []
-            for i, p in enumerate(route):
-                if i == len(route) - 1:
-                    break
-                dx = route[i + 1][0] - route[i][0]
-                dy = route[i + 1][1] - route[i][1]
-                dx = (dx + 2) // 2 - 1
-                dy = (dy + 2) // 2 - 1
-                x_move = abs(route[i + 1][0] - route[i][0]) >= 1
-                y_move = abs(route[i + 1][1] - route[i][1]) >= 1
-                if self.inboard(p[0] + dx, p[1] + dy, BOARD_LEN - 1):
-                    if x_move and dx == 0:
-                        points0r.append((p[0] + dx, p[1] + dy))
-                    elif x_move and dx == -1:
-                        points0l.append((p[0] + dx, p[1] + dy))
-                    elif y_move and dy == 0:
-                        points1d.append((p[0] + dx, p[1] + dy))
-                    elif y_move and dy == -1:
-                        points1u.append((p[0] + dx, p[1] + dy))
-                if x_move and dx == 0 and self.inboard(p[0] + dx, p[1] + dy - 1, BOARD_LEN - 1):
-                    points0r.append((p[0] + dx, p[1] + dy - 1))
-                elif x_move and dx == -1 and self.inboard(p[0] + dx, p[1] + dy - 1, BOARD_LEN - 1):
-                    points0l.append((p[0] + dx, p[1] + dy - 1))
-                elif y_move and dy == 0 and self.inboard(p[0] + dx - 1, p[1] + dy, BOARD_LEN - 1):
-                    points1d.append((p[0] + dx - 1, p[1] + dy))
-                elif y_move and dy == -1 and self.inboard(p[0] + dx - 1, p[1] + dy, BOARD_LEN - 1):
-                    points1u.append((p[0] + dx - 1, p[1] + dy))
-            pointss0r.append(points0r)
-            pointss0l.append(points0l)
-            pointss1d.append(points1d)
-            pointss1u.append(points1u)
-        and_points0r = pointss0r[0]
-        and_points0l = pointss0l[0]
-        and_points1d = pointss1d[0]
-        and_points1u = pointss1u[0]
-        for points in pointss0r[1:]:
-            and_points0r = list(set(and_points0r) & set(points))
-        for points in pointss0l[1:]:
-            and_points0l = list(set(and_points0l) & set(points))
-        for points in pointss1d[1:]:
-            and_points1d = list(set(and_points1d) & set(points))
-        for points in pointss1u[1:]:
-            and_points1u = list(set(and_points1u) & set(points))
-        for x, y in and_points0r + and_points0l:
-            must_be_checked_x1[x, y] = True
-        for x, y in and_points1d + and_points1u:
-            must_be_checked_y1[x, y] = True
-
-        routes = [self.getroute(self.Wx, self.Wy, BOARD_LEN - 1, True), self.getroute(self.Wx, self.Wy, BOARD_LEN - 1, False)]
-
-        pointss0r = []
-        pointss0l = []
-        pointss1d = []
-        pointss1u = []
-        for route in routes:
-            points0r = []
-            points0l = []
-            points1d = []
-            points1u = []
-            for i, p in enumerate(route):
-                if i == len(route) - 1:
-                    break
-                dx = route[i + 1][0] - route[i][0]
-                dy = route[i + 1][1] - route[i][1]
-                dx = (dx + 2) // 2 - 1
-                dy = (dy + 2) // 2 - 1
-                x_move = abs(route[i + 1][0] - route[i][0]) >= 1
-                y_move = abs(route[i + 1][1] - route[i][1]) >= 1
-                if self.inboard(p[0] + dx, p[1] + dy, BOARD_LEN - 1):
-                    if x_move and dx == 0:
-                        points0r.append((p[0] + dx, p[1] + dy))
-                    elif x_move and dx == -1:
-                        points0l.append((p[0] + dx, p[1] + dy))
-                    elif y_move and dy == 0:
-                        points1d.append((p[0] + dx, p[1] + dy))
-                    elif y_move and dy == -1:
-                        points1u.append((p[0] + dx, p[1] + dy))
-                if x_move and dx == 0 and self.inboard(p[0] + dx, p[1] + dy - 1, BOARD_LEN - 1):
-                    points0r.append((p[0] + dx, p[1] + dy - 1))
-                elif x_move and dx == -1 and self.inboard(p[0] + dx, p[1] + dy - 1, BOARD_LEN - 1):
-                    points0l.append((p[0] + dx, p[1] + dy - 1))
-                elif y_move and dy == 0 and self.inboard(p[0] + dx - 1, p[1] + dy, BOARD_LEN - 1):
-                    points1d.append((p[0] + dx - 1, p[1] + dy))
-                elif y_move and dy == -1 and self.inboard(p[0] + dx - 1, p[1] + dy, BOARD_LEN - 1):
-                    points1u.append((p[0] + dx - 1, p[1] + dy))
-            pointss0r.append(points0r)
-            pointss0l.append(points0l)
-            pointss1d.append(points1d)
-            pointss1u.append(points1u)
-        and_points0r = pointss0r[0]
-        and_points0l = pointss0l[0]
-        and_points1d = pointss1d[0]
-        and_points1u = pointss1u[0]
-        for points in pointss0r[1:]:
-            and_points0r = list(set(and_points0r) & set(points))
-        for points in pointss0l[1:]:
-            and_points0l = list(set(and_points0l) & set(points))
-        for points in pointss1d[1:]:
-            and_points1d = list(set(and_points1d) & set(points))
-        for points in pointss1u[1:]:
-            and_points1u = list(set(and_points1u) & set(points))
-        for x, y in and_points0r + and_points0l:
-            must_be_checked_x2[x, y] = True
-        for x, y in and_points1d + and_points1u:
-            must_be_checked_y2[x, y] = True
-
-        self.must_be_checked_x = must_be_checked_x1 | must_be_checked_x2
-        self.must_be_checked_y = must_be_checked_y1 | must_be_checked_y2
-
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                f1, f2 = self.placable(x, y)
-                ret1[x, y] = f1
-                ret2[x, y] = f2
-
-        return ret1, ret2
-
     cdef (int, int) placable_with_color(self, x, y, color):
         # すべてarrivableで確かめる。
         if self.row_wall[x, y] or self.column_wall[x, y]:
@@ -712,33 +598,6 @@ cdef class State:
             column_f = column_f and f
         return row_f, column_f
 
-    def shortest(self, x, y, goal_y):
-        dist = np.ones((BOARD_LEN, BOARD_LEN)) * BOARD_LEN * BOARD_LEN * 2
-        prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int8")
-        seen = np.zeros((BOARD_LEN, BOARD_LEN))
-        dist[x, y] = 0
-        while np.sum(seen) < BOARD_LEN * BOARD_LEN:
-            x2, y2 = np.unravel_index(np.argmin(dist + seen * BOARD_LEN * BOARD_LEN * 3, axis=None), dist.shape)
-            seen[x2, y2] = 1
-            cross = self.cross_movable(x2, y2)
-            for i, p in enumerate([(0, -1), (1, 0), (0, 1), (-1, 0)]):
-                x3 = x2 + p[0]
-                y3 = y2 + p[1]
-                if cross[i]:
-                    if dist[x3, y3] > dist[x2, y2] + 1:
-                        dist[x3, y3] = dist[x2, y2] + 1
-                        prev[x3, y3, 0] = x2
-                        prev[x3, y3, 1] = y2
-        x4 = np.argmin(dist[:, goal_y])
-        y4 = goal_y
-        route = []
-        while not (x4 == x and y4 == y):
-            route.append((x4, y4))
-            x4, y4 = prev[x4, y4]
-        route.append((x, y))
-        route = route[::-1]
-        return route
-
     def shortest_path_len(self, x, y, goal_y, cross_arr):
         dist = np.ones((BOARD_LEN, BOARD_LEN)) * BOARD_LEN * BOARD_LEN * 2
         prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int8")
@@ -778,22 +637,12 @@ cdef class State:
         return dist
 
     cdef np.ndarray[DTYPE_t, ndim = 2] calc_dist_array(self, int goal_y):
-        array_ptr = calc_dist_array(self.state_c, goal_y)
+        calc_dist_array(self.state_c, goal_y)
+        if goal_y == 0:
+            array_ptr = self.state_c.dist_array1
+        else:
+            array_ptr = self.state_c.dist_array2
         return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-
-    def getroute(self, x, y, goal_y, isleft):
-        self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
-        self.prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
-        self.arrivable_with_prev(x, y, goal_y, isleft)
-        x2 = np.argmax(self.seen[:, goal_y])
-        y2 = goal_y
-        route = []
-        while not (x2 == x and y2 == y):
-            route.append((x2, y2))
-            x2, y2 = self.prev[x2, y2]
-        route.append((x, y))
-        route = route[::-1]
-        return route
     
     def calc_oneside_placable_cand_from_color(self, color):
         # どちらかのプレイヤー（colorで指定）の路だけで壁置きの可能性を判定する。勝利の確定判定などに用いる。各種内部変数は計算済みと仮定する。
@@ -830,128 +679,8 @@ cdef class State:
 
         return row_array, column_array
 
-    def arrivable_with_prev(self, int x, int y, int goal_y, int isleft):
-        #cdef np.ndarray[DTYPE_t, ndim = 3] cross_arr
-        cdef DTYPE_t[:, :, :] prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int32")
-        cdef DTYPE_t[:] cross = np.zeros((4,), dtype="int32")
-        #cross_arr = self.cross_movable_array2(self.row_wall, self.column_wall)  # 一時的にself.row_wallとかを書き換えてこの関数が呼ばれることがあるために毎回計算する必要あり
-        x_stack = [x]
-        y_stack = [y]
-        while len(x_stack) > 0:
-            x = x_stack.pop()
-            y = y_stack.pop()
-            self.seen[x, y] = 1
-            if y == goal_y:
-                #self.seen = seen
-                self.prev = prev
-                return True
-            #cross = self.cross_movable(x, y)
-            cross[0] = (not (y == 0 or self.row_wall[min(x, BOARD_LEN - 2), y - 1] or self.row_wall[max(x - 1, 0), y - 1]))
-            cross[1] = (not (x == BOARD_LEN - 1 or self.column_wall[x, min(y, BOARD_LEN - 2)] or self.column_wall[x, max(y - 1, 0)]))
-            cross[2] = (not (y == BOARD_LEN - 1 or self.row_wall[min(x, BOARD_LEN - 2), y] or self.row_wall[max(x - 1, 0), y]))
-            cross[3] = (not (x == 0 or self.column_wall[x - 1, min(y, BOARD_LEN - 2)] or self.column_wall[x - 1, max(y - 1, 0)]))
-            if isleft and goal_y == 0:
-                p_list = [(3, -1, 0), (0, 0, -1), (1, 1, 0), (2, 0, 1)]
-            elif not isleft and goal_y == 0:
-                p_list = [(2, 0, 1), (1, 1, 0), (0, 0, -1), (3, -1, 0)]
-            elif isleft and goal_y == BOARD_LEN - 1:
-                p_list = [(1, 1, 0), (2, 0, 1), (3, -1, 0), (0, 0, -1)]
-            else:
-                p_list = [(0, 0, -1), (3, -1, 0), (2, 0, 1), (1, 1, 0)]
-            for i, dx, dy in p_list:
-                x2 = x + dx
-                y2 = y + dy
-                if cross[i] and not self.seen[x2, y2]:
-                    prev[x2, y2, 0] = x
-                    prev[x2, y2, 1] = y
-                    x_stack.append(x2)
-                    y_stack.append(y2)
-        #self.seen = seen
-        self.prev = prev
-        return False
-
     def arrivable(self, int x, int y, int goal_y):
         return arrivable_(self.state_c, x, y, goal_y)
-
-    def old_display_cui(self, check_algo=True, official=True, p1_atmark=False):
-        sys.stdout.write(" ")
-        for c in ["a", "b", "c", "d", "e", "f", "g", "h", "i"]:
-            sys.stdout.write(" " + c)
-        print("")
-        sys.stdout.write(" +")
-        for x in range(BOARD_LEN):
-            sys.stdout.write("-+")
-        print("")
-
-        for y in range(BOARD_LEN):
-            if official:
-                sys.stdout.write(str(BOARD_LEN - y) + "|")
-            else:
-                sys.stdout.write(str(y + 1) + "|")
-            for x in range(BOARD_LEN):
-                if x == self.Bx and y == self.By:
-                    if p1_atmark:
-                        sys.stdout.write("@")
-                    else:
-                        sys.stdout.write("O")
-                elif x == self.Wx and y == self.Wy:
-                    if p1_atmark:
-                        sys.stdout.write("O")
-                    else:
-                        sys.stdout.write("@")
-                else:
-                    sys.stdout.write(" ")
-
-                if x == BOARD_LEN - 1:
-                    break
-
-                if self.column_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or self.column_wall[min(x, BOARD_LEN - 2), max(y - 1, 0)]:
-                    sys.stdout.write("#")
-                else:
-                    sys.stdout.write("|")
-            print("|")
-
-            if y == BOARD_LEN - 1:
-                break
-
-            sys.stdout.write(" +")
-            for x in range(BOARD_LEN):
-                if self.row_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or self.row_wall[max(x - 1, 0), min(y, BOARD_LEN - 2)]:
-                    sys.stdout.write("=")
-                else:
-                    sys.stdout.write("-")
-
-                if x == BOARD_LEN - 1:
-                    break
-
-                if self.row_wall[x, y] or self.column_wall[x, y]:
-                    sys.stdout.write("+")
-                else:
-                    sys.stdout.write(" ")
-            print("+")
-
-        sys.stdout.write(" +")
-        for x in range(BOARD_LEN):
-            sys.stdout.write("-+")
-        print("")
-
-        print("1p walls:" + str(self.black_walls))
-        print("2p walls:" + str(self.white_walls))
-
-        if self.turn % 2 == 0:
-            print("{}:1p turn".format(self.turn))
-        else:
-            print("{}:2p turn".format(self.turn))
-        print(total_time1, total_time2)
-        # for i in range(4):
-        #     print("-"*30)
-        #     print(i)
-        #     for y in range(BOARD_LEN):
-        #         for x in range(BOARD_LEN):
-        #             print(self.cross_movable_arr[x, y, i], end=" ")
-        #         print("")
-        if check_algo:
-            self.check_placable_array_algo()
 
     def display_cui(self, check_algo=True, official=True, p1_atmark=False, ret_str=False):
         ret = " "
@@ -1035,54 +764,6 @@ cdef class State:
         else:
             sys.stdout.write(ret)
 
-        if check_algo:
-            self.check_placable_array_algo()
-
-    def check_placable_array_algo(self):
-        placabler1, placablec1 = self.old_calc_placable_array()
-        placabler2, placablec2 = self.calc_placable_array()
-        #print(np.all(placabler1 == placabler2) and np.all(placablec1 == placablec2))
-        if not (np.all(placabler1 == placabler2) and np.all(placablec1 == placablec2)):
-            print("")
-            print("="*50)
-            print("{},{},{},{}".format(self.Bx, self.By, self.Wx, self.Wy))
-            for y in range(8):
-                for x in range(8):
-                    print(int(self.row_wall[x, y]), end="")
-                    if x != 7:
-                        print(",", end="")
-                print("")
-            print("")
-            for y in range(8):
-                for x in range(8):
-                    print(int(self.column_wall[x, y]), end="")
-                    if x != 7:
-                        print(",", end="")
-                print("")
-
-            placabler1 = np.array(placabler1, dtype=int)
-            placablec1 = np.array(placablec1, dtype=int)
-            placabler2 = np.array(placabler2, dtype=int)
-            placablec2 = np.array(placablec2, dtype=int)
-
-            print()
-            print("row correctness")
-            print(placabler1.T == placabler2.T)
-            print("row answer")
-            print(placabler1.T)
-            print("row pred")
-            print(placabler2.T)
-
-            print()
-            print("column correctness")
-            print(placablec1.T == placablec2.T)
-            print("column answer")
-            print(placablec1.T)
-            print("column pred")
-            print(placablec2.T)
-            print("check_placable_array_algo failed")
-            exit()
-
     def feature_int(self):
         feature = np.zeros((135,), dtype=int)
         feature[0] = self.Bx
@@ -1094,32 +775,6 @@ cdef class State:
         feature[6] = self.turn % 2
         feature[7:7 + 64] = self.row_wall.flatten()
         feature[7 + 64:] = self.column_wall.flatten()
-        return feature
-
-    def feature(self):
-        feature = np.zeros((135,))
-        feature[0] = self.Bx / 8
-        feature[1] = self.By / 8
-        feature[2] = self.Wx / 8
-        feature[3] = self.Wy / 8
-        feature[4] = self.black_walls / 10
-        feature[5] = self.white_walls / 10
-        feature[6] = self.turn % 2
-        feature[7:7 + 64] = self.row_wall.flatten()
-        feature[7 + 64:] = self.column_wall.flatten()
-        return feature
-
-    def feature_rev(self):
-        feature = np.zeros((135,))
-        feature[0] = (7 - self.Bx) / 8
-        feature[1] = self.By / 8
-        feature[2] = (7 - self.Wx) / 8
-        feature[3] = self.Wy / 8
-        feature[4] = self.black_walls / 10
-        feature[5] = self.white_walls / 10
-        feature[6] = self.turn % 2
-        feature[7:7 + 64] = np.flip(self.row_wall, 0).flatten()
-        feature[7 + 64:] = np.flip(self.column_wall, 0).flatten()
         return feature
 
     def feature_CNN(self, xflip=False, yflip=False):
@@ -1188,50 +843,5 @@ cdef class State:
         feature[:-1, :-1, 13] = placable_r  # 盤面外にはおけないことを考えると、反転しないほうが0paddingと相性は良いと思われる
         feature[:-1, :-1, 14] = placable_c
 
-        return feature
-
-    def feature_CNN_old(self, xflip=False, yflip=False):
-        feature = np.zeros((8, 8, 7))
-        Bx = self.Bx
-        By = self.By
-        Wx = self.Wx
-        Wy = self.Wy
-        black_walls = self.black_walls
-        white_walls = self.white_walls
-        turn = self.turn
-        row_wall = self.row_wall
-        column_wall = self.column_wall
-        if xflip:
-            Bx = 8 - Bx
-            Wx = 8 - Wx
-            row_wall = np.flip(row_wall, 0)
-            column_wall = np.flip(column_wall, 0)
-        if yflip:
-            # goalが異なるから色を取り替える
-            temp = Bx
-            Bx = Wx
-            Wx = temp
-            By = 8 - self.Wy
-            Wy = 8 - self.By
-            black_walls = self.white_walls
-            white_walls = self.black_walls
-            turn += 1
-            row_wall = np.flip(row_wall, 1)
-            column_wall = np.flip(column_wall, 1)
-
-        for x, y in [(Bx, By), (Bx - 1, By), (Bx, By - 1), (Bx - 1, By - 1)]:
-            if x < 0 or x >= 8 or y < 0 or y >= 8:
-                continue
-            feature[x, y, 0] = 1.
-        for x, y in [(Wx, Wy), (Wx - 1, Wy), (Wx, Wy - 1), (Wx - 1, Wy - 1)]:
-            if x < 0 or x >= 8 or y < 0 or y >= 8:
-                continue
-            feature[x, y, 1] = 1.
-
-        feature[:, :, 2] = black_walls / 10
-        feature[:, :, 3] = white_walls / 10
-        feature[:, :, 4] = turn % 2
-        feature[:, :, 5] = row_wall
-        feature[:, :, 6] = column_wall
         return feature
 

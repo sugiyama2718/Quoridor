@@ -23,7 +23,7 @@ from kivy.uix.popup import Popup
 from kivy.uix.filechooser import FileChooserListView
 
 from Agent import actionid2str
-from State import State, CHANNEL
+from State import State, CHANNEL, State_init
 from State import DRAW_TURN
 from CNNAI import CNNAI
 from BasicAI import state_copy, get_state_vec
@@ -214,6 +214,7 @@ class Quoridor(Widget):
     def __init__(self, **kwargs):
         super(Quoridor, self).__init__(**kwargs)
         self.state = State()
+        State_init(self.state)
         self.agents = [GUIHuman(0), CNNAI(1, search_nodes=self.search_nodes, tau=0.5)]
         self.analyze_AIs = None
 
@@ -409,6 +410,7 @@ class Quoridor(Widget):
 
                 #ptag_string = "display" + os.linesep
                 state = State()
+                State_init(state)
                 for a in all_actions:
                     state.accept_action_str(Official2Glendenning(a))
                 ptag_string = state.display_cui(ret_str=True) + os.linesep
@@ -539,7 +541,9 @@ class Quoridor(Widget):
         print("register")
         
         if self.opening_tree is None:
-            self.opening_tree = get_opening_node_from_state(State(), self.statevec2node)
+            add_state = State()
+            State_init(add_state)
+            self.opening_tree = get_opening_node_from_state(add_state, self.statevec2node)
             self.opening_tree.is_display = True  # rootは常に表示対象とする
 
         node = self.opening_tree
@@ -622,6 +626,7 @@ class Quoridor(Widget):
         self.turn0()
         self.state_history = None
         s = State()
+        State_init(s)
         self.add_history(s, None)
         for a in actions:
             if isOfficial:
@@ -897,6 +902,7 @@ class Quoridor(Widget):
         self.set_analyze_AIs()
 
         self.state = State()
+        State_init(self.state)
         self.turn = 0
         self.state_history = None
         self.add_history(self.state, None)

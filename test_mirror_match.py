@@ -1,4 +1,4 @@
-from State import State
+from State import State, State_init
 import numpy as np
 import os
 from config import *
@@ -20,18 +20,19 @@ for dir in dirs:
     pos_arr = np.loadtxt(os.path.join(path, f"{turn}_pos.txt"))
     row_wall = np.loadtxt(os.path.join(path, f"{turn}_r.txt"), dtype=bool)
     column_wall = np.loadtxt(os.path.join(path, f"{turn}_c.txt"), dtype=bool)
-    p1_walls, p2_walls = np.loadtxt(os.path.join(path, f"{turn}_w.txt"))
+    p1_walls, p2_walls = np.loadtxt(os.path.join(path, f"{turn}_w.txt"), dtype=int)
 
     state = State()
-    state.turn = turn
-    state.Bx = int(pos_arr[0])
-    state.By = int(pos_arr[1])
-    state.Wx = int(pos_arr[2])
-    state.Wy = int(pos_arr[3])
+    State_init(state)
+    state.turn = state.state_c.turn = turn
+    state.Bx = state.state_c.Bx = int(pos_arr[0])
+    state.By = state.state_c.By = int(pos_arr[1])
+    state.Wx = state.state_c.Wx = int(pos_arr[2])
+    state.Wy = state.state_c.Wy = int(pos_arr[3])
     state.row_wall = row_wall
     state.column_wall = column_wall
-    state.black_walls = p1_walls
-    state.white_walls = p2_walls
+    state.black_walls = state.state_c.black_walls = p1_walls
+    state.white_walls = state.state_c.white_walls = p2_walls
     state.set_state_by_wall()
 
     state.display_cui()

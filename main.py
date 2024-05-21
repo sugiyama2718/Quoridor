@@ -1,10 +1,9 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL
+from State import State, CHANNEL, State_init, eq_state
 from State import DRAW_TURN
 from Human import Human
-from LinearAI import LinearAI
 from CNNAI import CNNAI
 from BasicAI import state_copy
 import time
@@ -35,6 +34,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制？
 def normal_play(agents, initial_state=None):
     if initial_state is None:
         state = State()
+        State_init(state)
     else:
         state = initial_state
         
@@ -97,6 +97,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
     hash_ = 0
     for j in range(play_num):
         state = State()
+        State_init(state)
         AIs[0].init_prev()
         AIs[1].init_prev()
         featuress = [[], [], [], []]
@@ -144,7 +145,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             state.check_placable_array_algo()
             end = False
             for state2 in states:
-                if equal_draw and state == state2:
+                if equal_draw and eq_state(state, state2):
                     end = True
                     break
             if end:
@@ -179,7 +180,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             state.check_placable_array_algo()
             end = False
             for state2 in states:
-                if equal_draw and state == state2:
+                if equal_draw and eq_state(state, state2):
                     end = True
                     break
             if end:
@@ -288,6 +289,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         game_start_time = time.time()
         is_endgame = False
         state = State()
+        State_init(state)
         AIs[0].init_prev()
         AIs[1].init_prev()
         AIs[i % 2].color = 0

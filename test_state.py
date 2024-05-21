@@ -1,7 +1,7 @@
 # coding:utf-8
-from State import State, BIT_BOARD_LEN, State_c
+from State import State, BIT_BOARD_LEN, State_c, State_init
 import numpy as np
-import os
+import os, sys
 import ctypes
 from BasicAI import state_copy
 
@@ -32,32 +32,51 @@ print_state = lib.print_state
 print_state.argtypes = [ctypes.POINTER(State_c)]
 print_state.restype = None
 
-# state = State()
-# set_row_wall_1(state.state_c, 3, 1)
-# set_row_wall_1(state.state_c, 4, 1)
-# set_column_wall_1(state.state_c, 2, 2)
-# set_column_wall_1(state.state_c, 2, 3)
-# print_state(state.state_c)
-# set_row_wall_0(state.state_c, 3, 1)
-# set_column_wall_0(state.state_c, 2, 3)
-# print_state(state.state_c)
+eq_state = lib.eq_state
+eq_state.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
+eq_state.restype = ctypes.c_bool
+
+# s1 = State_c()
+# s2 = State_c()
+# print(eq_state(s1, s2))
+# s2.Bx = 2
+# print(eq_state(s1, s2))
 # exit()
 
 results = []
 for i in test_case_list:
     state = State()
+    State_init(state)
     state.row_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/r.txt".format(i)), delimiter=",").T
     state.column_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/c.txt".format(i)), delimiter=",").T
-    state.set_state_by_wall()
+    
     if os.path.exists(os.path.join(TEST_DIR, "{}/p.txt".format(i))):
         p = np.loadtxt(os.path.join(TEST_DIR, "{}/p.txt".format(i)), delimiter=",")
-        p = np.asarray(p, dtype="int8")
+        p = np.asarray(p, dtype=int)
         state.Bx = state.state_c.Bx = p[0]
         state.By = state.state_c.By = p[1]
         state.Wx = state.state_c.Wx = p[2]
         state.Wy = state.state_c.Wy = p[3]
+    state.set_state_by_wall()
     print_state(state.state_c)
-    state.display_cui(check_algo=True)
+    state.display_cui()
+
+    placabler_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/placabler.csv"), delimiter=","), dtype=int)
+    placablec_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/placablec.csv"), delimiter=","), dtype=int)
+
+    placabler_pred, placablec_pred = state.calc_placable_array()
+
+    if not np.all(placabler_pred == placabler_ans) or not np.all(placablec_pred == placablec_ans):
+        print("placable array failed")
+        print("row answer")
+        print(placabler_ans)
+        print("row pred")
+        print(placabler_pred)
+        print("column answer")
+        print(placablec_ans)
+        print("column pred")
+        print(placablec_pred)
+        assert False
 
     # np.savetxt(os.path.join(TEST_DIR, f"{i}/dist_0.csv"), state.dist_array(0, state.cross_movable_array2(state.row_wall, state.column_wall)),delimiter=",")
     # np.savetxt(os.path.join(TEST_DIR, f"{i}/dist_8.csv"), state.dist_array(8, state.cross_movable_array2(state.row_wall, state.column_wall)),delimiter=",")
@@ -76,10 +95,4 @@ for i in test_case_list:
             print(dist_8)
             print(dist_8_pred)
             assert False
-
-state = State()
-state2 = State()
-state.state_c.turn = 5
-
-state3 = state_copy(state)
-print(state.state_c.turn, state2.state_c.turn, state3.state_c.turn)
+    sys.stdout.flush()

@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c
+from State import State_c, State_init, color_p
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -225,11 +225,11 @@ def calc_optimal_move_by_DP(s):
             if is_black:
                 x = Bx
                 y = By
-                s.turn = 0
+                s.turn = s.state_c.turn = 0
             else:
                 x = Wx
                 y = Wy
-                s.turn = 1
+                s.turn = s.state_c.turn = 1
             movable_array = s.movable_array(x, y, shortest_only=False)
             if not np.any(movable_array):
                 return False
@@ -261,12 +261,12 @@ def calc_optimal_move_by_DP(s):
             x = Bx
             y = By
             d = Bd
-            s.turn = 0
+            s.turn = s.state_c.turn = 0
         else:
             x = Wx
             y = Wy
             d = Wd
-            s.turn = 1
+            s.turn = s.state_c.turn = 1
         s.Bx = s.state_c.Bx = Bx
         s.By = s.state_c.By = By
         s.Wx = s.state_c.Wx = Wx
@@ -387,6 +387,7 @@ class BasicAI(Agent):
         # 試合前に毎回実行
         if state is None:
             state = State.State()
+            State_init(state)
         # p = np.ones((137,)) / 137.
         # p = np.asarray(p, dtype=np.float32)
         self.prev_tree = None
@@ -426,7 +427,7 @@ class BasicAI(Agent):
         # 探索済みマスをTrueにする配列、0にB, 1にWを割当て
         self.discovery_arr = np.zeros((2, 9, 9), dtype=bool)
         for color in range(2):
-            x, y = state.color_p(color)
+            x, y = color_p(state, color)
             self.discovery_arr[color, x, y] = True
 
     def act(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
@@ -449,7 +450,7 @@ class BasicAI(Agent):
         if s.terminate:
             return np.zeros((2 * (State.BOARD_LEN - 1) * (State.BOARD_LEN - 1) + 9,), dtype="bool")
         r, c = s.placable_array(s.turn % 2)
-        x, y = s.color_p(s.turn % 2)
+        x, y = color_p(s, s.turn % 2)
         v = np.concatenate([r.flatten(), c.flatten(), s.movable_array(x, y).flatten()])
         return np.asarray(v, dtype="bool")
 
@@ -523,7 +524,7 @@ class BasicAI(Agent):
             leaf_discovery_arr[0, state.Bx, state.By] = True
             leaf_discovery_arr[1, state.Wx, state.Wy] = True
 
-        x, y = state.color_p(state.turn % 2)
+        x, y = color_p(state, state.turn % 2)
         ret = state.movable_array(x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
         if self.shortest_only or (state.black_walls == 0 and state.white_walls == 0):
             return ret.flatten()
@@ -544,13 +545,6 @@ class BasicAI(Agent):
         return ret
 
     def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False, use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
-        # 壁がお互いになく、分岐のない場合読みを入れない。ただし、それでもprev_treeとかの関係上振る舞いが変わるので保留中。
-        #search_node_num = max_node
-        #if state.black_walls == 0 and state.white_walls == 0:
-        #    x, y = state.color_p(state.turn % 2)
-        #    if int(np.sum(state.movable_array(x, y, shortest_only=True))) == 1:
-        #        search_node_num = 1
-
         if self.random_playouts:
             max_node = SELFPLAY_SEARCHNODES_MIN
             if random.random() < DEEP_SEARCH_P:
@@ -570,7 +564,7 @@ class BasicAI(Agent):
         # 自分の道が確定していて相手よりも早く着くなら最短路を進むだけ
         if state.is_certain_path_terminate():
             self.tree_for_visualize = self.prev_tree = None  # 読みが入らなくなるので、prev_treeが参照されないようにNoneを入れておく
-            x, y = state.color_p(state.turn % 2)
+            x, y = color_p(state, state.turn % 2)
             movable_arr = state.movable_array(x, y, shortest_only=True)
             if not np.any(movable_arr):
                 movable_arr = state.movable_array(x, y, shortest_only=False)
@@ -625,10 +619,10 @@ class BasicAI(Agent):
         if wall_num != self.prev_wall_num:
             self.init_discovery(state)
         for color in range(2):
-            x, y = state.color_p(color)
+            x, y = color_p(state, color)
             self.discovery_arr[color, x, y] = True
 
-        x, y = state.color_p(state.turn % 2)
+        x, y = color_p(state, state.turn % 2)
         p = self.p(state, leaf_movable_arrs=[self.movable_array(x, y, state)])
         illegal = (p == 0.)
         p = (1. - noise) * p + noise * np.random.dirichlet([0.3] * len(p))  # ディリクレ分布はチェスと同じ設定
@@ -905,7 +899,7 @@ class BasicAI(Agent):
             pi = np.zeros((137))
             pi[action] = 1.0
         else:
-            x, y = state.color_p(state.turn % 2)
+            x, y = color_p(state, state.turn % 2)
             shortest_move = state.movable_array(x, y, shortest_only=True).flatten()
             move_N = root_tree.N[128:]
             move_Q = root_tree.Q[128:]
