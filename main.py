@@ -142,7 +142,6 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             if display:
                 print("generate id=", id_)
                 state.display_cui()
-            state.check_placable_array_algo()
             end = False
             for state2 in states:
                 if equal_draw and eq_state(state, state2):
@@ -177,7 +176,6 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             if display:
                 print("generate id=", id_)
                 state.display_cui()
-            state.check_placable_array_algo()
             end = False
             for state2 in states:
                 if equal_draw and eq_state(state, state2):
