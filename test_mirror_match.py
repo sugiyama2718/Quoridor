@@ -20,7 +20,7 @@ for dir in dirs:
     pos_arr = np.loadtxt(os.path.join(path, f"{turn}_pos.txt"))
     row_wall = np.loadtxt(os.path.join(path, f"{turn}_r.txt"), dtype=bool)
     column_wall = np.loadtxt(os.path.join(path, f"{turn}_c.txt"), dtype=bool)
-    p1_walls, p2_walls = np.loadtxt(os.path.join(path, f"{turn}_w.txt"))
+    p1_walls, p2_walls = np.loadtxt(os.path.join(path, f"{turn}_w.txt"), dtype=int)
 
     state = State()
     State_init(state)
