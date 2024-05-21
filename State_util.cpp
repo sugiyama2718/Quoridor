@@ -14,7 +14,7 @@ struct State {
     int Bx, By, Wx, Wy;  // Bが先手、Wが後手。BGAと逆になっているが、昔実装したときに混同した名残。
     int turn;
     int black_walls, white_walls;
-    uint8_t dist_array1[81];  // x + y * BOARD_LENでアクセスするものとする
+    uint8_t dist_array1[81];  // x + y * BOARD_LENでアクセスするものとする。1が先手、2は後手
     uint8_t dist_array2[81];
 };
 
@@ -44,6 +44,9 @@ inline __uint128_t left_shift(__uint128_t bitarr);
 inline __uint128_t right_down_shift(__uint128_t bitarr);
 int arrivable_(State* state, int pawn_x, int pawn_y, int goal_y);
 void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column_bitarr);
+int arrivable_by_cross(__uint128_t cross_bitarrs[4], int pawn_x, int pawn_y, int goal_y);
+void calc_dist_array(State* state, int goal_y);
+int arrivable_(State* state, int pawn_x, int pawn_y, int goal_y);
 
 struct BitArrayPair {
     __uint128_t bitarr1;
@@ -221,6 +224,10 @@ float C_puct, float estimated_V, int color, int turn) {
     }
     
     return a;
+}
+
+bool is_mirror_match(State* state) {
+    return false;
 }
 
 void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column_bitarr) {
