@@ -113,6 +113,24 @@ class CNNAI(BasicAI):
             # for i in range(6):
             #     print(position_arr[:, :, i])
 
+        # Headの分割
+        def split_heads(x, num_heads):
+            batch_size = tf.shape(x)[0]
+            length = tf.shape(x)[1]
+            depth = tf.shape(x)[2] // num_heads
+            x = tf.reshape(x, [batch_size, length, num_heads, depth])
+            return tf.transpose(x, [0, 2, 1, 3])  # [batch_size, num_heads, length, depth]
+
+        # 元の形に戻す
+        def combine_heads(x):
+            batch_size = tf.shape(x)[0]
+            num_heads = tf.shape(x)[1]
+            length = tf.shape(x)[2]
+            depth = tf.shape(x)[3]
+            x = tf.transpose(x, [0, 2, 1, 3])  # [batch_size, length, num_heads, depth]
+            x = tf.reshape(x, [batch_size, length, num_heads * depth])
+            return x
+
         old_h_conv = h_conv
 
         for i in range(1, self.layer_num):
@@ -142,21 +160,24 @@ class CNNAI(BasicAI):
                     position_num = h_shape1 * h_shape2
                     h_conv = tf.reshape(h_conv, [-1, position_num, self.filters])
 
-                    h_query = tf.reshape(tf.matmul(h_conv, self.WQs[i]), [-1, position_num, head_num, ATTENTION_VEC_LEN])
-                    h_key = tf.reshape(tf.matmul(h_conv, self.WKs[i]), [-1, position_num, head_num, ATTENTION_VEC_LEN])
-                    h_value = tf.reshape(tf.matmul(h_conv, self.WVs[i]), [-1, position_num, head_num, ATTENTION_VEC_LEN])
-                    
-                    # 得られるh_convのshape=[-1, head_num, 81, 81]
-                    h_conv = tf.nn.softmax(1 / math.sqrt(ATTENTION_VEC_LEN) * tf.matmul(tf.transpose(h_query, perm=[0, 2, 1, 3]), tf.transpose(h_key, perm=[0, 2, 3, 1])), axis=3)
+                    h_query = tf.matmul(h_conv, self.WQs[i])
+                    h_key = tf.matmul(h_conv, self.WKs[i])
+                    h_value = tf.matmul(h_conv, self.WVs[i])
 
-                    # 得られるh_convのshape=[-1, head_num, 81, ATTENTION_VEC_LEN]
-                    h_conv = tf.matmul(h_conv, tf.transpose(h_value, perm=[0, 2, 1, 3]))
+                    h_query = split_heads(h_query, head_num)
+                    h_key = split_heads(h_key, head_num)
+                    h_value = split_heads(h_value, head_num)
 
-                    h_conv = tf.transpose(h_conv, perm=[0, 2, 1, 3])
+                    # Attention Scoresの計算
+                    scores = tf.matmul(h_query, h_key, transpose_b=True)
+                    scores = scores / tf.sqrt(float(ATTENTION_VEC_LEN))
+                    attention_weights = tf.nn.softmax(scores, axis=-1)
+
+                    # Weighted sum of values
+                    h_conv = tf.matmul(attention_weights, h_value)  # [batch_size, num_heads, length, depth]
+
+                    h_conv = combine_heads(h_conv)
                     h_conv = tf.reshape(h_conv, [-1, h_shape1, h_shape2, self.filters])
-
-                # 連続するconvの中ではskip connectionしない
-                # if i % 3 == 0 or i % 3 == 2:
 
                 h_conv += old_h_conv
                 old_h_conv = h_conv
