@@ -99,6 +99,10 @@ color_p_c = lib.color_p
 color_p_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
 color_p_c.restype = Point_c
 
+is_mirror_match_c = lib.is_mirror_match
+is_mirror_match_c.argtypes = [ctypes.POINTER(State_c)]
+is_mirror_match_c.restype = ctypes.c_bool
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
@@ -355,6 +359,8 @@ cdef class State:
         return True
 
     def is_mirror_match(self):
+        print(is_mirror_match_c(self.state_c))
+
         # 盤面上の壁が5枚以下ではmirror matchは成立し得ない
         if 20 - (self.black_walls + self.white_walls) <= 5:
             return False

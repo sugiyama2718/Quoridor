@@ -227,6 +227,7 @@ float C_puct, float estimated_V, int color, int turn) {
 }
 
 bool is_mirror_match(State* state) {
+    printf("is_mirror_match\n");
     return false;
 }
 
