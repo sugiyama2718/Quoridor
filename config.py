@@ -113,7 +113,7 @@ VALID_EMA_DECAY = EMA_DECAY
 BATCH_SIZE = 256
 PER_PROCESS_GPU_MEMORY_FRACTION = 0.07
 WARMUP_STEPS = 0.1
-N_PARALLEL = 32
+N_PARALLEL = 16
 NOISE = 0.25
 
 # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる。そのときの十分探索のNの比率と、勝ちに近いとする閾値
