@@ -1,7 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
@@ -45,7 +45,7 @@ class CNNAI(BasicAI):
     def __init__(self, color, search_nodes=1, C_puct=2, tau=1, all_parameter_zero=False, v_is_dist=False, p_is_almost_flat=False, 
     seed=0, use_estimated_V=True, V_ema_w=0.01, shortest_only=False, per_process_gpu_memory_fraction=PER_PROCESS_GPU_MEMORY_FRACTION, use_average_Q=False, random_playouts=False,
     filters=DEFAULT_FILTERS, layer_num=DEFAULT_LAYER_NUM, use_global_pooling=USE_GLOBAL_POOLING, use_self_attention=USE_SELF_ATTENTION, use_slim_head=USE_SLIM_HEAD, opponent_AI=None,
-    is_mimic_AI=False, force_opening=None):
+    is_mimic_AI=False, force_opening=None, use_mix_precision=True):
         super(CNNAI, self).__init__(color, search_nodes, C_puct, tau, use_estimated_V=use_estimated_V, V_ema_w=V_ema_w, shortest_only=shortest_only, use_average_Q=use_average_Q, random_playouts=random_playouts, is_mimic_AI=is_mimic_AI, force_opening=force_opening)
 
         np.random.seed(seed)
@@ -65,6 +65,7 @@ class CNNAI(BasicAI):
         self.use_self_attention = use_self_attention
         self.use_slim_head = use_slim_head
         self.opponent_AI = opponent_AI  # tensorflowを自己対戦の２AIで共有するための変数。TODO: 非合法手がまだ出るので修正は必要。ただしGPUメモリが節約できなかったので着手していない。
+        self.use_mix_precision = use_mix_precision
 
         if self.opponent_AI is None:
             self.init_tensorflow()
@@ -393,7 +394,12 @@ class CNNAI(BasicAI):
             self.loss += WEIGHT_DECAY * tf.nn.l2_loss(parameter)
         self.loss = self.warmup_coef * self.loss
 
-        self.train_step = tf.train.AdagradOptimizer(LEARNING_RATE).minimize(self.loss)  # 学習の関数で定義しようとするとエラー出る
+        if self.use_mix_precision:
+            self.train_step = tf.train.AdagradOptimizer(LEARNING_RATE)  # 学習の関数で定義しようとするとエラー出る
+            self.train_step = tf.train.experimental.enable_mixed_precision_graph_rewrite(self.train_step)
+            self.train_step = self.train_step.minimize(self.loss)
+        else:
+            self.train_step = tf.train.AdagradOptimizer(LEARNING_RATE).minimize(self.loss)
 
         init = tf.initialize_all_variables()
         config = tf.ConfigProto(
@@ -747,7 +753,8 @@ class CNNAI(BasicAI):
             "layer_num": self.layer_num, 
             "use_global_pooling": self.use_global_pooling,
             "use_self_attention": self.use_self_attention,
-            "use_slim_head": self.use_slim_head
+            "use_slim_head": self.use_slim_head,
+            "use_mix_precision": self.use_mix_precision
         }
         with open(os.path.join(dir, f"{name}.json"), "w") as fout:
             fout.write(json.dumps(params))
@@ -780,6 +787,11 @@ class CNNAI(BasicAI):
             self.use_slim_head = params["use_slim_head"]
         else:
             self.use_slim_head = False
+
+        if "use_mix_precision" in params.keys():
+            self.use_mix_precision = params["use_mix_precision"]
+        else:
+            self.use_mix_precision = False
 
         self.init_tensorflow()
         saver = tf.train.Saver()
