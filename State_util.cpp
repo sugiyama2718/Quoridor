@@ -228,7 +228,13 @@ float C_puct, float estimated_V, int color, int turn) {
 
 bool is_mirror_match(State* state) {
     printf("is_mirror_match\n");
-    return false;
+
+    // 盤面上の壁が5枚以下ではmirror matchは成立し得ない
+    if(20 - (state->black_walls + state->white_walls) <= 5) return false;
+
+    if(state->black_walls != state->white_walls) return false;
+
+    return true;
 }
 
 void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column_bitarr) {
