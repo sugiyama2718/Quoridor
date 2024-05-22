@@ -5,7 +5,7 @@ import json
 # 学習設定 large 学習本番
 POOL_SIZE = 60000  # 学習のときにサンプルする対象となる試合数
 TRAIN_CYCLE = 1000  # 何試合おきに学習を行うか
-EVALUATION_CYCLE = 20000  # 何試合おきに評価を行うか
+EVALUATION_CYCLE = 60000  # 何試合おきに評価を行うか
 GAME_NUM_IN_H5 = 10  # 一つのh5ファイルに何試合含めるか。AI初期化のオーバーヘッド対策。
 SEE_DATA_NUM = 2  # 一つのデータを何度学習に使うか（見込み）
 TRAIN_ARRAY_SIZE = 1000  # 学習時にメモリに乗せる試合数。増やすとメモリを圧迫する
@@ -61,8 +61,7 @@ DEEP_SEARCH_P = 0.15  # 深い探索を実施する確率
 DEEP_TH = 0.5  # prev_v, post_vにどれだけ差があれば深い探索にするか
 EVALUATION_SEARCHNODES = 1000
 
-PROCESS_NUM = 10
-#THREAD_NUM = 2
+PROCESS_NUM = 20
 
 RATE_TH = 0.1  # レートがいくつ以上あがったら新AIとして採用するか
 RATE_TH2 = 0.5  # レートがいくつ以上あがったらAI listを更新するか
