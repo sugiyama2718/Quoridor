@@ -10,14 +10,18 @@ import copy
 import pandas as pd
 from multiprocessing import Pool
 from tqdm import tqdm
+import argparse
 
-SIGMA = 1.2
+SIGMA = 1.5
 RANDOM_EPSILON = 1e-5  # 同スコアのものにランダム性を加える目的
 EPSILON = 1e-10
-FIX_EPOCH_LIST = [60, 62, 71, 91, 96, 155, 220, 465, 620, 1050, 1284, 
-                  2020, 2520, 2780, 2910, 3090, 3350, 3360, 3400, 3460, 3545, 3560, 3700, 3850, 3985, 4175, 4225]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
+FIX_EPOCH_LIST = [60]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
 
-USE_PAST_RESULT = True
+parser = argparse.ArgumentParser(description="")
+parser.add_argument('--use_past_result', action='store_true', help='Use past result if specified')
+args = parser.parse_args()
+
+use_past_result = args.use_past_result
 
 # EVALUATE_GAME_NUM = 14000
 # SEARCHNODES_FOR_EXTRACT = 500
@@ -127,7 +131,7 @@ if __name__ == "__main__":
     param_files = list(set([s.split(".")[0] for s in param_files]))
     param_files = [int(s[5:]) for s in param_files if s.startswith("epoch")]
     
-    if USE_PAST_RESULT:
+    if use_past_result:
         rate_df = pd.read_csv(os.path.join(TRAIN_LOG_DIR, "detail", "estimated_rate.csv"))
         past_AI_id_arr = rate_df["AI_id"].values
         past_search_nodes_arr = rate_df["search nodes"].values
@@ -173,8 +177,10 @@ if __name__ == "__main__":
         print(list(zip(AI_id_list, search_nodes_list)))
     else:
         AI_id_list = [-1] + list(sorted(param_files))
-        both_ends_num = 100  # AI_id_listの両端をいくつそのまま残すか
-        AI_id_list = AI_id_list[:both_ends_num] + [AI_id for AI_id in AI_id_list[both_ends_num:-both_ends_num] if AI_id % 5 == 0] + AI_id_list[-both_ends_num:]
+        # both_ends_num = 100  # AI_id_listの両端をいくつそのまま残すか
+        # AI_id_list = AI_id_list[:both_ends_num] + [AI_id for AI_id in AI_id_list[both_ends_num:-both_ends_num] if AI_id % 5 == 0] + AI_id_list[-both_ends_num:]
+        first_num = 50  # AI_id_listの最初をいくつそのまま残すか
+        AI_id_list = AI_id_list[:first_num] + [AI_id for AI_id in AI_id_list[both_ends_num:] if AI_id % 5 == 0]
         search_nodes_list = [EVALUATION_SEARCHNODES] * len(AI_id_list)
         print(AI_id_list)
 
