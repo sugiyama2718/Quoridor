@@ -269,8 +269,6 @@ bool is_mirror_match(State* state) {
     // 中央マスから横に移動できる場合、先手は横に移動することで優位に立てる可能性がある
     if(((state->row_wall_bitarr & CENTER_21_BOX) | (state->column_wall_bitarr & CENTER_21_BOX)) == 0) return false;
 
-    printf("AAAAA\n");
-
     // ゴールへの道が中央マスを必ず通る場合のみ後手勝利。
     __uint128_t blocked_cross_bitarr[4];
     bool B_arrivable, W_arrivable;
