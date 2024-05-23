@@ -226,14 +226,36 @@ float C_puct, float estimated_V, int color, int turn) {
     return a;
 }
 
+__uint128_t flip_bitarr(__uint128_t bitarr) {
+    // 9*9を縦軸・横軸両方でflipする
+
+    __uint128_t mask, flip1 = 0, flip2 = 0;
+    printf("-----\n");
+    print_bitarray(bitarr);
+    for(int x = 0;x < BOARD_LEN;x++) {
+        mask = LEFT_EDGE >> x;
+        if((BOARD_LEN - 2 * x - 1) >= 0) flip1 |= (bitarr & mask) >> (BOARD_LEN - 2 * x - 1);
+        if((BOARD_LEN - 2 * x - 1) < 0) flip1 |= (bitarr & mask) << -(BOARD_LEN - 2 * x - 1);
+    }
+    for(int y = 0;y < BOARD_LEN;y++) {
+        mask = UP_EDGE >> y * BIT_BOARD_LEN;
+        if((BOARD_LEN - 2 * y - 1) >= 0) flip2 |= (flip1 & mask) >> (BOARD_LEN - 2 * y - 1) * BIT_BOARD_LEN;
+        if((BOARD_LEN - 2 * y - 1) < 0) flip2 |= (flip1 & mask) << -(BOARD_LEN - 2 * y - 1) * BIT_BOARD_LEN;
+    }
+    printf("\n");
+    print_bitarray(flip2);
+    return flip2;
+}
+
 bool is_mirror_match(State* state) {
-    printf("is_mirror_match\n");
+    //printf("is_mirror_match\n");
 
     // 盤面上の壁が5枚以下ではmirror matchは成立し得ない
     if(20 - (state->black_walls + state->white_walls) <= 5) return false;
 
     if(state->black_walls != state->white_walls) return false;
 
+    flip_bitarr(state->row_wall_bitarr);
     return true;
 }
 
