@@ -25,7 +25,7 @@ def estimate_multi_rate(n_arr, N_arr, AI_num, r_init=None):
         loss = tf.reduce_sum(r**2) / (2 * SIGMA ** 2) - tf.reduce_sum(n_arr * tf.math.log(p + EPSILON) + (N_arr - n_arr) * tf.math.log(1 - p + EPSILON))
         return loss
 
-    opt = tf.keras.optimizers.experimental.SGD(learning_rate=LR, momentum=0.9)
+    opt = tf.keras.optimizers.SGD(learning_rate=LR, momentum=0.9)
     #opt = tf.keras.optimizers.Adam(learning_rate=LR)
 
     if r_init is None:
