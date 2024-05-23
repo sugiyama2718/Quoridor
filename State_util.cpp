@@ -260,9 +260,13 @@ bool is_mirror_match(State* state) {
 
     if(state->black_walls != state->white_walls) return false;
 
+    // コマが回転対称でなければmirror matchでない
+    if(state->Bx != 8 - state->Wx && state->By == 8 - state->Wy) return false;
+
     // 壁が回転対称でなければmirror matchでない
     if(!(state->row_wall_bitarr == flip_bitarr(state->row_wall_bitarr) && state->column_wall_bitarr == flip_bitarr(state->column_wall_bitarr))) return false;
 
+    // 中央マスから横に移動できる場合、先手は横に移動することで優位に立てる可能性がある
     if(((state->row_wall_bitarr & CENTER_21_BOX) | (state->column_wall_bitarr & CENTER_21_BOX)) == 0) return false;
 
     return true;
