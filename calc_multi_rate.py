@@ -1,9 +1,12 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # warning抑制
 import tensorflow as tf
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-import os
 from config import *
+import logging
+tf.get_logger().setLevel(logging.ERROR)
 
 AI_num = 50
 SIGMA = 1.0

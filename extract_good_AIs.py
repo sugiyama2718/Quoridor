@@ -1,7 +1,7 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # warning抑制
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+import tensorflow as tf
+# tf.disable_v2_behavior()
 import numpy as np
 import random
 import matplotlib.pyplot as plt
@@ -13,17 +13,13 @@ import pandas as pd
 from multiprocessing import Pool
 from tqdm import tqdm
 import argparse
+import logging
+tf.get_logger().setLevel(logging.ERROR)
 
 SIGMA = 1.5
 RANDOM_EPSILON = 1e-5  # 同スコアのものにランダム性を加える目的
 EPSILON = 1e-10
 FIX_EPOCH_LIST = [60]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
-
-parser = argparse.ArgumentParser(description="")
-parser.add_argument('--use_past_result', action='store_true', help='Use past result if specified')
-args = parser.parse_args()
-
-use_past_result = args.use_past_result
 
 # EVALUATE_GAME_NUM = 14000
 # SEARCHNODES_FOR_EXTRACT = 500
@@ -128,6 +124,12 @@ def evaluate_2game_process_2id(arg_tuple):
 if __name__ == "__main__":
     random.seed(0)
     np.random.seed(0)
+
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument('--use_past_result', action='store_true', help='Use past result if specified')
+    args = parser.parse_args()
+
+    use_past_result = args.use_past_result
 
     param_files = os.listdir(PARAMETER_DIR)
     param_files = list(set([s.split(".")[0] for s in param_files]))
