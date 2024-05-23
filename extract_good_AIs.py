@@ -1,9 +1,9 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # warning抑制
 import tensorflow as tf
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # warning抑制
 from config import *
 from calc_multi_rate import estimate_multi_rate
 from collections import Counter
