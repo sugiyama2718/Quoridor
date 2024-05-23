@@ -1,9 +1,10 @@
-from State import State, State_init
+from State import State, State_init, State_c
 import numpy as np
 import os
 from config import *
 import pandas as pd
 import time
+import ctypes
 
 TEST_DIR = "testcases/mirror_match"  # 勝敗を
 
@@ -12,6 +13,14 @@ dirs = [dir for dir in dirs if dir.isdigit()]
 dirs = sorted(dirs, key=int)
 
 start_time = time.time()
+
+if os.name == "nt":
+    lib = ctypes.CDLL('./State_util.dll')
+else:
+    lib = ctypes.CDLL('./State_util.so')
+is_mirror_match = lib.is_mirror_match
+is_mirror_match.argtypes = [ctypes.POINTER(State_c)]
+is_mirror_match.restype = ctypes.c_bool
 
 results = []
 for dir in dirs:
@@ -36,9 +45,9 @@ for dir in dirs:
     state.set_state_by_wall()
 
     state.display_cui()
-    print(state.is_mirror_match())
+    print(is_mirror_match(state.state_c))
     
-    results.append(state.is_mirror_match())
+    results.append(is_mirror_match(state.state_c))
 
 answer_df = pd.read_csv(os.path.join(TEST_DIR, "answer.csv"))
 print(answer_df)

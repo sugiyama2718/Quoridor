@@ -99,9 +99,9 @@ color_p_c = lib.color_p
 color_p_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
 color_p_c.restype = Point_c
 
-is_mirror_match_c = lib.is_mirror_match
-is_mirror_match_c.argtypes = [ctypes.POINTER(State_c)]
-is_mirror_match_c.restype = ctypes.c_bool
+is_mirror_match = lib.is_mirror_match
+is_mirror_match.argtypes = [ctypes.POINTER(State_c)]
+is_mirror_match.restype = ctypes.c_bool
 
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
@@ -349,60 +349,12 @@ cdef class State:
             elif self.white_walls == 0 and (B_dist + self.turn % 2 <= W_dist - 1):
                 self.pseudo_terminate = True
                 self.pseudo_reward = 1
-            elif self.is_mirror_match():
+            elif is_mirror_match(self.state_c):
                 self.pseudo_terminate = True
                 self.pseudo_reward = -1
             else:
                 self.pseudo_terminate = False
                 self.pseudo_reward = 0
-
-        return True
-
-    def is_mirror_match(self):
-        print(is_mirror_match_c(self.state_c))
-
-        # 盤面上の壁が5枚以下ではmirror matchは成立し得ない
-        if 20 - (self.black_walls + self.white_walls) <= 5:
-            return False
-        
-        if self.black_walls != self.white_walls:
-            return False
-
-        # 壁が回転対称でなければ
-        if not (np.all(self.row_wall == np.flip(self.row_wall)) and np.all(self.column_wall == np.flip(self.column_wall))):
-            return False
-        
-        # 中央マスから横に移動できる場合、先手は横に移動することで優位に立てる可能性がある
-        if not (self.column_wall[3, 3] or self.column_wall[4, 3] or self.row_wall[3, 3] or self.row_wall[4, 3]):
-            return False
-        
-        # コマが回転対称で飛び越し前かつ先手番なら後手勝ち
-        f1 = (self.Bx == 8 - self.Wx and self.By == 8 - self.Wy and self.turn % 2 == 0 and self.dist_array1[self.Bx, self.By] > self.dist_array1[4, 4])
-
-        # 飛び越し後は逆
-        f2 = (self.Bx == 8 - self.Wx and self.By == 8 - self.Wy and self.turn % 2 == 1 and self.dist_array1[self.Bx, self.By] < self.dist_array1[4, 4])
-        
-        if not (f1 or f2):
-            return False
-        
-        # ゴールへの道が中央マスを必ず通る場合のみ後手勝利。中央マスの上側を塞いだとき、ゴールにたどり着けなくなるかどうかで判定。
-        blocked_cross_movable_array = np.copy(self.cross_movable_arr)
-        if self.column_wall[3, 3] or self.column_wall[4, 3]:
-            blocked_cross_movable_array[4, 3, DOWN] = 0
-            blocked_cross_movable_array[4, 4, UP] = 0
-            blocked_cross_movable_array[4, 4, DOWN] = 0
-            blocked_cross_movable_array[4, 5, UP] = 0
-            blocked_dist_array = self.dist_array(0, blocked_cross_movable_array)
-            if blocked_dist_array[4, 3] != np.max(blocked_dist_array) and blocked_dist_array[4, 5] != np.max(blocked_dist_array):
-                return False
-        else:
-            blocked_cross_movable_array[3, 4, RIGHT] = 0
-            blocked_cross_movable_array[4, 4, LEFT] = 0
-            blocked_cross_movable_array[4, 4, RIGHT] = 0
-            blocked_cross_movable_array[5, 4, LEFT] = 0
-            blocked_dist_array = self.dist_array(0, blocked_cross_movable_array)
-            if blocked_dist_array[3, 4] != np.max(blocked_dist_array) and blocked_dist_array[5, 4] != np.max(blocked_dist_array):
-                return False
 
         return True
 

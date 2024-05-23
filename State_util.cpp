@@ -261,13 +261,37 @@ bool is_mirror_match(State* state) {
     if(state->black_walls != state->white_walls) return false;
 
     // コマが回転対称でなければmirror matchでない
-    if(state->Bx != 8 - state->Wx && state->By == 8 - state->Wy) return false;
+    if(!(state->Bx == 8 - state->Wx && state->By == 8 - state->Wy)) return false;
 
     // 壁が回転対称でなければmirror matchでない
     if(!(state->row_wall_bitarr == flip_bitarr(state->row_wall_bitarr) && state->column_wall_bitarr == flip_bitarr(state->column_wall_bitarr))) return false;
 
     // 中央マスから横に移動できる場合、先手は横に移動することで優位に立てる可能性がある
     if(((state->row_wall_bitarr & CENTER_21_BOX) | (state->column_wall_bitarr & CENTER_21_BOX)) == 0) return false;
+
+    printf("AAAAA\n");
+
+    // ゴールへの道が中央マスを必ず通る場合のみ後手勝利。
+    __uint128_t blocked_cross_bitarr[4];
+    bool B_arrivable, W_arrivable;
+    for(int i = 0;i < 4;i++) blocked_cross_bitarr[i] = state->cross_bitarrs[i];
+    if((state->column_wall_bitarr & CENTER_21_BOX) > 0) {
+        set_0(&blocked_cross_bitarr[DOWN], 4, 3);
+        set_0(&blocked_cross_bitarr[UP], 4, 4);
+        set_0(&blocked_cross_bitarr[DOWN], 4, 4);
+        set_0(&blocked_cross_bitarr[UP], 4, 5);
+    } else {
+        set_0(&blocked_cross_bitarr[RIGHT], 3, 4);
+        set_0(&blocked_cross_bitarr[LEFT], 4, 4);
+        set_0(&blocked_cross_bitarr[RIGHT], 4, 4);
+        set_0(&blocked_cross_bitarr[LEFT], 5, 4);
+    }
+    B_arrivable = arrivable_by_cross(blocked_cross_bitarr, state->Bx, state->By, 0);
+    W_arrivable = arrivable_by_cross(blocked_cross_bitarr, state->Wx, state->Wy, 0);
+
+    if(B_arrivable && W_arrivable) return false;
+    if(state->turn % 2 == 0 && B_arrivable) return false;
+    if(state->turn % 2 == 1 && W_arrivable) return false;
 
     return true;
 }
