@@ -1,6 +1,6 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # warning抑制
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 import numpy as np
 import random
