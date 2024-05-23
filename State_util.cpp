@@ -42,8 +42,9 @@ const __uint128_t SMALL_RIGHT_EDGE = ((__uint128_t)0x100200400801002ULL << 64) |
 const __uint128_t SMALL_DOWN_EDGE = 0x7F80000000000ULL;
 const __uint128_t SMALL_LEFT_EDGE = ((__uint128_t)0x8010020040080100ULL << 64) | 0x2004000000000000ULL;
 
-const __uint128_t BOX_10 = ((__uint128_t)0XFFD00A0140280500ULL << 64) | 0xA01402805FF80000ULL;
+const __uint128_t BOX_10 = ((__uint128_t)0xFFD00A0140280500ULL << 64) | 0xA01402805FF80000ULL;
 
+const __uint128_t CENTER_21_BOX = ((__uint128_t)0xC000000ULL << 64) | 0x0000000000000000ULL;  // (3, 3), (4, 3)の2マス
 
 void print_bitarray(__uint128_t bitarr);
 void print_full_bitarray(__uint128_t bitarr);
@@ -254,14 +255,15 @@ __uint128_t flip_bitarr(__uint128_t bitarr) {
 }
 
 bool is_mirror_match(State* state) {
-    //printf("is_mirror_match\n");
-
     // 盤面上の壁が5枚以下ではmirror matchは成立し得ない
     if(20 - (state->black_walls + state->white_walls) <= 5) return false;
 
     if(state->black_walls != state->white_walls) return false;
 
-    flip_bitarr(state->row_wall_bitarr);
+    // 壁が回転対称でなければmirror matchでない
+    if(!(state->row_wall_bitarr == flip_bitarr(state->row_wall_bitarr) && state->column_wall_bitarr == flip_bitarr(state->column_wall_bitarr))) return false;
+
+    if(((state->row_wall_bitarr & CENTER_21_BOX) | (state->column_wall_bitarr & CENTER_21_BOX)) == 0) return false;
 
     return true;
 }
