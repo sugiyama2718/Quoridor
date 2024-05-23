@@ -29,11 +29,21 @@ enum DIRECTION {
 };
 const __uint128_t BIT_BOARD_MASK = ((__uint128_t)0xFF9FF3FE7FCFF9FFULL << 64) | 0x3FE7FCFF80000000ULL;  // 9*9
 const __uint128_t BIT_SMALL_BOARD_MASK = ((__uint128_t)0xFF1FE3FC7F8FF1FEULL << 64) | 0x3FC7F80000000000ULL;  // 8*8
+
+// len 9
 const __uint128_t UP_EDGE = ((__uint128_t)0xFF80000000000000ULL << 64) | 0x0000000000000000ULL;
 const __uint128_t RIGHT_EDGE = ((__uint128_t)0x80100200400801ULL << 64) | 0x0020040080000000ULL;
 const __uint128_t DOWN_EDGE = 0xFF80000000ULL;
 const __uint128_t LEFT_EDGE = ((__uint128_t)0x8010020040080100ULL << 64) | 0x2004008000000000ULL;
+
+// len 8
+const __uint128_t SMALL_UP_EDGE = ((__uint128_t)0xFF00000000000000ULL << 64) | 0x0000000000000000ULL;
+const __uint128_t SMALL_RIGHT_EDGE = ((__uint128_t)0x100200400801002ULL << 64) | 0x0040080000000000ULL;
+const __uint128_t SMALL_DOWN_EDGE = 0x7F80000000000ULL;
+const __uint128_t SMALL_LEFT_EDGE = ((__uint128_t)0x8010020040080100ULL << 64) | 0x2004000000000000ULL;
+
 const __uint128_t BOX_10 = ((__uint128_t)0XFFD00A0140280500ULL << 64) | 0xA01402805FF80000ULL;
+
 
 void print_bitarray(__uint128_t bitarr);
 void print_full_bitarray(__uint128_t bitarr);
@@ -227,23 +237,19 @@ float C_puct, float estimated_V, int color, int turn) {
 }
 
 __uint128_t flip_bitarr(__uint128_t bitarr) {
-    // 9*9を縦軸・横軸両方でflipする
+    // 8*8を縦軸・横軸両方でflipする
 
     __uint128_t mask, flip1 = 0, flip2 = 0;
-    printf("-----\n");
-    print_bitarray(bitarr);
-    for(int x = 0;x < BOARD_LEN;x++) {
-        mask = LEFT_EDGE >> x;
-        if((BOARD_LEN - 2 * x - 1) >= 0) flip1 |= (bitarr & mask) >> (BOARD_LEN - 2 * x - 1);
-        if((BOARD_LEN - 2 * x - 1) < 0) flip1 |= (bitarr & mask) << -(BOARD_LEN - 2 * x - 1);
+    for(int x = 0;x < BOARD_LEN - 1;x++) {
+        mask = SMALL_LEFT_EDGE >> x;
+        if((BOARD_LEN - 2 * x - 2) >= 0) flip1 |= (bitarr & mask) >> (BOARD_LEN - 2 * x - 2);
+        if((BOARD_LEN - 2 * x - 2) < 0) flip1 |= (bitarr & mask) << -(BOARD_LEN - 2 * x - 2);
     }
-    for(int y = 0;y < BOARD_LEN;y++) {
-        mask = UP_EDGE >> y * BIT_BOARD_LEN;
-        if((BOARD_LEN - 2 * y - 1) >= 0) flip2 |= (flip1 & mask) >> (BOARD_LEN - 2 * y - 1) * BIT_BOARD_LEN;
-        if((BOARD_LEN - 2 * y - 1) < 0) flip2 |= (flip1 & mask) << -(BOARD_LEN - 2 * y - 1) * BIT_BOARD_LEN;
+    for(int y = 0;y < BOARD_LEN - 1;y++) {
+        mask = SMALL_UP_EDGE >> y * BIT_BOARD_LEN;
+        if((BOARD_LEN - 2 * y - 2) >= 0) flip2 |= (flip1 & mask) >> (BOARD_LEN - 2 * y - 2) * BIT_BOARD_LEN;
+        if((BOARD_LEN - 2 * y - 2) < 0) flip2 |= (flip1 & mask) << -(BOARD_LEN - 2 * y - 2) * BIT_BOARD_LEN;
     }
-    printf("\n");
-    print_bitarray(flip2);
     return flip2;
 }
 
@@ -256,6 +262,7 @@ bool is_mirror_match(State* state) {
     if(state->black_walls != state->white_walls) return false;
 
     flip_bitarr(state->row_wall_bitarr);
+
     return true;
 }
 
