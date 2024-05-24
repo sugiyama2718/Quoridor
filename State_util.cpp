@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cinttypes>
 #include <cmath>
+#include <cstring>
 //#include <iostream>  //Could not find moduleが出る
 
 extern "C" {
@@ -237,8 +238,34 @@ float C_puct, float estimated_V, int color, int turn) {
     return a;
 }
 
-bool accept_action_str(State* state, const char* str, bool check_placable, bool calc_placable_array, bool check_movable) {
-    printf("accept_action_str\n");
+bool accept_action_str(State* state, const char* s, bool check_placable, bool calc_placable_array, bool check_movable) {
+    // その行動が合法手で実行できればtrue, そうでなければfalseを返す
+    if(strlen(s) <= 1 || strlen(s) >= 4) return false;
+    if(s[0] < 'a' && s[0] > 'i') return false;
+    if(s[1] < '1' && s[1] > '9') return false;
+
+    int x = s[0] - 'a', y = s[1] - '1';
+
+    if(strlen(s) == 2) {
+        //移動
+        int x2, y2, dx, dy;
+        if(state->turn % 2 == 0) {
+            x2 = state->Bx;
+            y2 = state->By;
+        } else {
+            x2 = state->Wx;
+            y2 = state->Wy;
+        }
+        dx = x - x2;
+        dy = y - y2;
+        if(std::abs(dx) + std::abs(dy) >= 3) return false;
+        if(std::abs(dx) == 2 || std::abs(dy) == 2) {
+            
+        }
+    } else {
+        //壁置き
+    }
+    //printf("%s, %d %d\n", s, x, y);
     return true;
 }
 
