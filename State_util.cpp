@@ -238,6 +238,25 @@ float C_puct, float estimated_V, int color, int turn) {
     return a;
 }
 
+const int dxs[4] = {0, 1, 0, -1};
+const int dys[4] = {-1, 0, 1, 0};
+
+void movable_array(State* state, bool* mv, int x, int y, bool shortest_only) {
+    // mvにmv[(dx + 1) + (dy + 1) * 3]の形で結果を格納
+    uint8_t* dist_arr;
+    int dx, dy, x2, y2;
+
+    if(state->turn % 2 == 0) dist_arr = state->dist_array1;
+    else dist_arr = state->dist_array2;
+
+    for(int i = 0;i < 4;i++) {
+        dx = dxs[i];
+        dy = dys[i];
+        x2 = x + dx;
+        y2 = y + dy;
+    }
+}
+
 bool accept_action_str(State* state, const char* s, bool check_placable, bool calc_placable_array, bool check_movable) {
     // その行動が合法手で実行できればtrue, そうでなければfalseを返す
     if(strlen(s) <= 1 || strlen(s) >= 4) return false;
@@ -260,7 +279,7 @@ bool accept_action_str(State* state, const char* s, bool check_placable, bool ca
         dy = y - y2;
         if(std::abs(dx) + std::abs(dy) >= 3) return false;
         if(std::abs(dx) == 2 || std::abs(dy) == 2) {
-            
+
         }
     } else {
         //壁置き
