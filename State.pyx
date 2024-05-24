@@ -99,6 +99,10 @@ color_p_c = lib.color_p
 color_p_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
 color_p_c.restype = Point_c
 
+accept_action_str_c = lib.accept_action_str
+accept_action_str_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_char_p, ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
+accept_action_str_c.restype = ctypes.c_bool
+
 is_mirror_match = lib.is_mirror_match
 is_mirror_match.argtypes = [ctypes.POINTER(State_c)]
 is_mirror_match.restype = ctypes.c_bool
@@ -195,7 +199,9 @@ cdef class State:
 
     def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
         # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
-        #cdef np.ndarray[DTYPE_t, ndim = 3] cross_arr
+        
+        accept_action_str_c(self.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
+
         if len(s) <= 1 or len(s) >= 4:
             return False
         if s[0] not in notation_dict.keys():

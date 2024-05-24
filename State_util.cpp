@@ -237,6 +237,11 @@ float C_puct, float estimated_V, int color, int turn) {
     return a;
 }
 
+bool accept_action_str(State* state, const char* str, bool check_placable, bool calc_placable_array, bool check_movable) {
+    printf("accept_action_str\n");
+    return true;
+}
+
 __uint128_t flip_bitarr(__uint128_t bitarr) {
     // 8*8を縦軸・横軸両方でflipする
 
