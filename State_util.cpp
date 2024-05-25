@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cinttypes>
 #include <cmath>
+#include <cstring>
 //#include <iostream>  //Could not find moduleが出る
 
 extern "C" {
@@ -235,6 +236,89 @@ float C_puct, float estimated_V, int color, int turn) {
     }
     
     return a;
+}
+
+const int dxs[4] = {0, 1, 0, -1};
+const int dys[4] = {-1, 0, 1, 0};
+
+void movable_array(State* state, bool* mv, int x, int y, bool shortest_only) {
+    // mvにmv[(dx + 1) + (dy + 1) * 3]の形で結果を格納
+    uint8_t* dist_arr;
+    int dx, dy, dx2, dy2, x2, y2, dx3, dy3;
+
+    if(state->turn % 2 == 0) dist_arr = state->dist_array1;
+    else dist_arr = state->dist_array2;
+
+    for(int i = 0;i < 4;i++) {
+        if(!get_bit(state->cross_bitarrs[i], x, y)) continue;
+        dx = dxs[i];
+        dy = dys[i];
+        x2 = x + dx;
+        y2 = y + dy;
+        if((state->Bx == x2 && state->By == y2) || (state->Wx == x2 && state->Wy == y2)) {
+            // 進む先にコマがある場合
+            
+            // 先に同じ方向に進むことができるかからチェック。進めるなら斜めには移動できない。
+            if(get_bit(state->cross_bitarrs[i], x2, y2)) {
+                if(shortest_only) {
+                    if(dist_arr[(x2 + dx) + (y2 + dy) * BOARD_LEN] < dist_arr[x + y * BOARD_LEN]) mv[(dx + 1) + (dy + 1) * 3] = 1;
+                } else {
+                    mv[(dx + 1) + (dy + 1) * 3] = 1;
+                }
+                continue;
+            }
+
+            for(int j = 0;j < 4;j++) {
+                dx2 = dxs[j];
+                dy2 = dys[j];
+                if(!get_bit(state->cross_bitarrs[j], x2, y2)) continue;
+                if(shortest_only && (dist_arr[(x2 + dx2) + (y2 + dy2) * BOARD_LEN] >= dist_arr[x + y * BOARD_LEN])) continue;
+                dx3 = __max(__min(dx + dx2, 1), -1);
+                dy3 = __max(__min(dy + dy2, 1), -1);
+                mv[(dx3 + 1) + (dy3 + 1) * 3] = 1;
+            }
+            mv[1 + 3] = 0;  // dx = dy = 0では0
+        } else {
+            // 進む先にコマがない場合
+            if(shortest_only) {
+                if(dist_arr[x2 + y2 * BOARD_LEN] < dist_arr[x + y * BOARD_LEN]) mv[(dx + 1) + (dy + 1) * 3] = 1;
+            } else {
+                mv[(dx + 1) + (dy + 1) * 3] = 1;
+            }
+            
+        }
+    }
+}
+
+bool accept_action_str(State* state, const char* s, bool check_placable, bool calc_placable_array, bool check_movable) {
+    // その行動が合法手で実行できればtrue, そうでなければfalseを返す
+    if(strlen(s) <= 1 || strlen(s) >= 4) return false;
+    if(s[0] < 'a' && s[0] > 'i') return false;
+    if(s[1] < '1' && s[1] > '9') return false;
+
+    int x = s[0] - 'a', y = s[1] - '1';
+
+    if(strlen(s) == 2) {
+        //移動
+        int x2, y2, dx, dy;
+        if(state->turn % 2 == 0) {
+            x2 = state->Bx;
+            y2 = state->By;
+        } else {
+            x2 = state->Wx;
+            y2 = state->Wy;
+        }
+        dx = x - x2;
+        dy = y - y2;
+        if(std::abs(dx) + std::abs(dy) >= 3) return false;
+        if(std::abs(dx) == 2 || std::abs(dy) == 2) {
+
+        }
+    } else {
+        //壁置き
+    }
+    //printf("%s, %d %d\n", s, x, y);
+    return true;
 }
 
 __uint128_t flip_bitarr(__uint128_t bitarr) {

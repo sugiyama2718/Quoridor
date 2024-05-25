@@ -43,6 +43,13 @@ eq_state.restype = ctypes.c_bool
 # print(eq_state(s1, s2))
 # exit()
 
+# action_list = ["e8", "e2", "a1h"]
+# state = State()
+# for action_str in action_list:
+#     state.accept_action_str(action_str)
+#     state.display_cui()
+# exit()
+
 results = []
 for i in test_case_list:
     state = State()
@@ -60,6 +67,15 @@ for i in test_case_list:
     state.set_state_by_wall()
     print_state(state.state_c)
     state.display_cui()
+
+    movable_array_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/movable_array.csv"), delimiter=","), dtype=bool)
+    movable_array_pred = state.movable_array(state.Bx, state.By)
+    if not np.all(movable_array_pred == movable_array_ans):
+        print("movable array failed")
+        print("ans")
+        print(movable_array_ans)
+        print("pred")
+        print(movable_array_pred)
 
     placabler_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/placabler.csv"), delimiter=","), dtype=int)
     placablec_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/placablec.csv"), delimiter=","), dtype=int)

@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p
+from State import State_c, State_init, color_p, movable_array
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -196,26 +196,14 @@ def state_copy(s):
     return ret
 
 def calc_optimal_move_by_DP(s):
-    s_ori = s
     s = state_copy(s)
-    start = time.time()
     boards = list(product(range(9), range(9), range(9), range(9), range(2)))  # 壁0なので、(Bx, By, Wx, Wy, 手番)で盤面が一意に定まる。のでそれで盤面を表現。
-    # print(boards[0])
-    # print(len(boards))
-    # print(s.dist_array1)
-    # print(s.dist_array2)
-    # unreachable1 = (s.dist_array1 == np.max(s.dist_array1))
-    # unreachable2 = (s.dist_array2 == np.max(s.dist_array2))
-    # print(unreachable1)
-    # print(unreachable2)
 
     # 合法手のみに絞る
     def is_legal(board):
         Bx, By, Wx, Wy, _ = board
         if Bx == Wx and By == Wy:
             return False
-        # if unreachable1[Bx, By] or unreachable2[Wx, Wy]:
-        #     return False
         Bd = s.dist_array1[Bx, By]
         Wd = s.dist_array2[Wx, Wy]
         if Bd == 0 and Wd == 0:
@@ -230,14 +218,12 @@ def calc_optimal_move_by_DP(s):
                 x = Wx
                 y = Wy
                 s.turn = s.state_c.turn = 1
-            movable_array = s.movable_array(x, y, shortest_only=False)
-            if not np.any(movable_array):
+            movable_arr = movable_array(s, x, y, shortest_only=False)
+            if not np.any(movable_arr):
                 return False
 
         return True
     boards = list(filter(is_legal, boards))
-    # print(len(boards))
-    # pprint(boards[:10])
 
     # ゴールからの距離を組にする
     boards_d = [(-1, -1, -1, -1, -1, -1, -1)] * len(boards)
@@ -249,7 +235,6 @@ def calc_optimal_move_by_DP(s):
 
     # ゴールからの距離の和でソート
     boards_d = sorted(boards_d, key=lambda x: x[5] + x[6])
-    #pprint(boards_d[:250])
 
     optimal_dict = {}
     for Bx, By, Wx, Wy, is_black, Bd, Wd in boards_d:
@@ -271,15 +256,15 @@ def calc_optimal_move_by_DP(s):
         s.By = s.state_c.By = By
         s.Wx = s.state_c.Wx = Wx
         s.Wy = s.state_c.Wy = Wy
-        movable_array = s.movable_array(x, y, shortest_only=True)
-        if not np.any(movable_array):
-            movable_array = s.movable_array(x, y, shortest_only=False)
+        movable_arr = movable_array(s, x, y, shortest_only=True)
+        if not np.any(movable_arr):
+            movable_arr = movable_array(s, x, y, shortest_only=False)
 
         # 距離を縮める方向に動けているなら探索済みでoptimal_dictに要素が存在するはず
         cands = []
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
-                if not movable_array[dx, dy]:
+                if not movable_arr[dx, dy]:
                     continue
                 if is_black:
                     new_Bx = Bx + dx
@@ -300,14 +285,7 @@ def calc_optimal_move_by_DP(s):
                         new_Wy = new_Wy + dy
                     new_d = s.dist_array2[new_Wx, new_Wy]
                 
-                #print(new_d, d)
                 if new_d < d and (new_Bx, new_By, new_Wx, new_Wy, not is_black) in optimal_dict.keys():
-                    # if new_By == 0 and new_Wy == 8:
-                    #     print(Bx, By, Wx, Wy, is_black, Bd, Wd)
-                    # if not (new_Bx, new_By, new_Wx, new_Wy, not is_black) in optimal_dict.keys():
-                    #     s.display_cui(check_algo=False)  # check_algo=Trueだと無限ループに入ってメモリ使い果たして壊れる！！
-                    #     print("DP failed")
-                    #     exit()
                     cands.append((new_Bx, new_By, new_Wx, new_Wy, not is_black, optimal_dict[(new_Bx, new_By, new_Wx, new_Wy, not is_black)][5], True))
                 else:
                     cands.append((new_Bx, new_By, new_Wx, new_Wy, not is_black, 0, False))  # 距離を縮められないのは有効でないとする
@@ -321,9 +299,6 @@ def calc_optimal_move_by_DP(s):
         else:
             cands = sorted(cands, key=lambda x: -x[5] - (not x[6]) * 100, reverse=True)  # Bd-Wd最小化
 
-        # if Bd + Wd <= 2:
-        #     print(cands)
-
         max_score = cands[0][5]
         for i, cand in enumerate(cands):
             if cand[5] < max_score:
@@ -331,26 +306,8 @@ def calc_optimal_move_by_DP(s):
                 break
             else:
                 max_score_index = i + 1
-        # if max_score_index != len(cands):
-        #     print(max_score_index, len(cands))
-
-        # if Bx == 7 and By == 4 and Wx == 5 and Wy == 4 and is_black:accept_action_str
-        #     print(cands)
-        #     print(max_score_index)
 
         optimal_dict[(Bx, By, Wx, Wy, is_black)] = cands[random.randrange(max_score_index)]  # 一番良い行動を記録
-
-    # 動作確認用
-    # s = s_ori
-    # Bx, By, Wx, Wy = s.Bx, s.By, s.Wx, s.Wy
-    # is_black = (s.turn % 2 == 0)
-    # print(Bx, By, Wx, Wy, is_black)
-    # for i in range(81):
-    #     Bx, By, Wx, Wy, is_black, d_diff, is_ok = optimal_dict[(Bx, By, Wx, Wy, is_black)]
-    #     print(Bx, By, Wx, Wy, is_black, d_diff, is_ok)
-    #     if Bx == -1:
-    #         break
-    # print(time.time() - start)
 
     return optimal_dict
 
@@ -451,20 +408,20 @@ class BasicAI(Agent):
             return np.zeros((2 * (State.BOARD_LEN - 1) * (State.BOARD_LEN - 1) + 9,), dtype="bool")
         r, c = s.placable_array(s.turn % 2)
         x, y = color_p(s, s.turn % 2)
-        v = np.concatenate([r.flatten(), c.flatten(), s.movable_array(x, y).flatten()])
+        v = np.concatenate([r.flatten(), c.flatten(), movable_array(s, x, y).flatten()])
         return np.asarray(v, dtype="bool")
 
     def movable_array(self, x, y, s):
         if self.shortest_only:
-            return s.movable_array(x, y, shortest_only=True).flatten()
+            return movable_array(s, x, y, shortest_only=True).flatten()
 
         # 壁が両方0なら最短路以外の手はない。教師の質向上を目的とする
         if s.black_walls == 0 and s.white_walls == 0:
-            return s.movable_array(x, y, shortest_only=True).flatten()
+            return movable_array(s, x, y, shortest_only=True).flatten()
 
-        ret = s.movable_array(x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
+        ret = movable_array(s, x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
 
-        all_movable_arr = s.movable_array(x, y, shortest_only=False)
+        all_movable_arr = movable_array(s, x, y, shortest_only=False)
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
                 x2 = x + dx
@@ -525,11 +482,11 @@ class BasicAI(Agent):
             leaf_discovery_arr[1, state.Wx, state.Wy] = True
 
         x, y = color_p(state, state.turn % 2)
-        ret = state.movable_array(x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
+        ret = movable_array(state, x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
         if self.shortest_only or (state.black_walls == 0 and state.white_walls == 0):
             return ret.flatten()
 
-        all_movable_arr = state.movable_array(x, y, shortest_only=False)
+        all_movable_arr = movable_array(state, x, y, shortest_only=False)
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
                 x2 = x + dx
@@ -565,9 +522,9 @@ class BasicAI(Agent):
         if state.is_certain_path_terminate():
             self.tree_for_visualize = self.prev_tree = None  # 読みが入らなくなるので、prev_treeが参照されないようにNoneを入れておく
             x, y = color_p(state, state.turn % 2)
-            movable_arr = state.movable_array(x, y, shortest_only=True)
+            movable_arr = movable_array(state, x, y, shortest_only=True)
             if not np.any(movable_arr):
-                movable_arr = state.movable_array(x, y, shortest_only=False)
+                movable_arr = movable_array(state, x, y, shortest_only=False)
             cands = []
             for dx in [-1, 0, 1]:
                 for dy in [-1, 0, 1]:
@@ -900,7 +857,7 @@ class BasicAI(Agent):
             pi[action] = 1.0
         else:
             x, y = color_p(state, state.turn % 2)
-            shortest_move = state.movable_array(x, y, shortest_only=True).flatten()
+            shortest_move = movable_array(state, x, y, shortest_only=True).flatten()
             move_N = root_tree.N[128:]
             move_Q = root_tree.Q[128:]
             use_shortest = (move_N >= int(np.sum(root_tree.N) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる
