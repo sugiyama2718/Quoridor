@@ -208,6 +208,9 @@ inline __uint128_t right_down_down_shift(__uint128_t bitarr) {
     return bitarr >> (BIT_BOARD_LEN * 2 + 1);
 }
 
+inline int min(int a, int b) {return (a < b) ? a : b;}
+inline int max(int a, int b) {return (a > b) ? a : b;}
+
 int select_action(float Q[ACTION_NUM], float N[ACTION_NUM], float P[ACTION_NUM],
 float C_puct, float estimated_V, int color, int turn) {
     int N_sum = 0;
@@ -273,8 +276,8 @@ void movable_array(State* state, bool* mv, int x, int y, bool shortest_only) {
                 dy2 = dys[j];
                 if(!get_bit(state->cross_bitarrs[j], x2, y2)) continue;
                 if(shortest_only && (dist_arr[(x2 + dx2) + (y2 + dy2) * BOARD_LEN] >= dist_arr[x + y * BOARD_LEN])) continue;
-                dx3 = __max(__min(dx + dx2, 1), -1);
-                dy3 = __max(__min(dy + dy2, 1), -1);
+                dx3 = max(min(dx + dx2, 1), -1);
+                dy3 = max(min(dy + dy2, 1), -1);
                 mv[(dx3 + 1) + (dy3 + 1) * 3] = 1;
             }
             mv[1 + 3] = 0;  // dx = dy = 0では0
