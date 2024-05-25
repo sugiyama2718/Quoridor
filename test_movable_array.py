@@ -1,4 +1,4 @@
-from State import State, State_init, State_c
+from State import State, State_init, State_c, movable_array
 import numpy as np
 import os
 from config import *
@@ -45,10 +45,10 @@ for dir in dirs:
     state.set_state_by_wall()
 
     state.display_cui()
-    pred_B = state.movable_array(state.Bx, state.By)
-    pred_W = state.movable_array(state.Wx, state.Wy)
-    pred_shortest_B = state.movable_array(state.Bx, state.By, shortest_only=True)
-    pred_shortest_W = state.movable_array(state.Wx, state.Wy, shortest_only=True)
+    pred_B = movable_array(state, state.Bx, state.By)
+    pred_W = movable_array(state, state.Wx, state.Wy)
+    pred_shortest_B = movable_array(state, state.Bx, state.By, shortest_only=True)
+    pred_shortest_W = movable_array(state, state.Wx, state.Wy, shortest_only=True)
     ans_B = np.array(np.loadtxt(os.path.join(path, f"ans_B.csv"), delimiter=","), dtype=bool)
     ans_W = np.array(np.loadtxt(os.path.join(path, f"ans_W.csv"), delimiter=","), dtype=bool)
     ans_shortest_B = np.array(np.loadtxt(os.path.join(path, f"ans_shortest_B.csv"), delimiter=","), dtype=bool)

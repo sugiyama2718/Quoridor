@@ -129,6 +129,16 @@ def color_p(state, color):
     ret = color_p_c(state.state_c, color)
     return ret.x, ret.y
 
+def movable_array(state, x, y, shortest_only=False):
+    mv_c = (ctypes.c_bool * 9)(*([False] * 9))
+    movable_array_c(state.state_c, mv_c, x, y, shortest_only)
+    mv = np.zeros((3, 3), dtype="bool")
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            mv[dx, dy] = mv_c[(dx + 1) + (dy + 1) * 3]
+
+    return mv
+
 # -----------------------------------------
 
 def print_bitarr(bitarr):
@@ -233,7 +243,7 @@ cdef class State:
                 dx //= 2
                 dy //= 2
             if check_movable:
-                mv = self.movable_array(x2, y2)
+                mv = movable_array(self, x2, y2)
                 if not mv[dx, dy]:
                     return False
             if self.turn % 2 == 0:
@@ -454,14 +464,7 @@ cdef class State:
 
     # shortest_onely=Trueの場合ゴールからの距離を縮める方向のみに1を立てる
     def movable_array(self, x, y, shortest_only=False):
-        mv_c = (ctypes.c_bool * 9)(*([False] * 9))
-        movable_array_c(self.state_c, mv_c, x, y, shortest_only)
-        mv = np.zeros((3, 3), dtype="bool")
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                mv[dx, dy] = mv_c[(dx + 1) + (dy + 1) * 3]
-
-        return mv
+        assert False
 
     def inboard(self, x, y, size):
         if x < 0 or y < 0 or x >= size or y >= size:
