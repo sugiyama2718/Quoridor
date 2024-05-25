@@ -185,7 +185,7 @@ if __name__ == "__main__":
         # AI_id_list = AI_id_list[:both_ends_num] + [AI_id for AI_id in AI_id_list[both_ends_num:-both_ends_num] if AI_id % 5 == 0] + AI_id_list[-both_ends_num:]
         first_num = 50  # AI_id_listの最初をいくつそのまま残すか
         AI_id_list = AI_id_list[:first_num] + [AI_id for AI_id in AI_id_list[first_num:] if AI_id % 5 == 0]
-        search_nodes_list = [EVALUATION_SEARCHNODES] * len(AI_id_list)
+        search_nodes_list = [SEARCHNODES_FOR_EXTRACT] * len(AI_id_list)
         print(AI_id_list)
 
     AI_num = len(AI_id_list)
