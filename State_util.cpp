@@ -244,12 +244,13 @@ const int dys[4] = {-1, 0, 1, 0};
 void movable_array(State* state, bool* mv, int x, int y, bool shortest_only) {
     // mvにmv[(dx + 1) + (dy + 1) * 3]の形で結果を格納
     uint8_t* dist_arr;
-    int dx, dy, x2, y2;
+    int dx, dy, dx2, dy2, x2, y2, dx3, dy3;
 
     if(state->turn % 2 == 0) dist_arr = state->dist_array1;
     else dist_arr = state->dist_array2;
 
     for(int i = 0;i < 4;i++) {
+        if(!get_bit(state->cross_bitarrs[i], x, y)) continue;
         dx = dxs[i];
         dy = dys[i];
         x2 = x + dx;
@@ -268,9 +269,15 @@ void movable_array(State* state, bool* mv, int x, int y, bool shortest_only) {
             }
 
             for(int j = 0;j < 4;j++) {
-                
+                dx2 = dxs[j];
+                dy2 = dys[j];
+                if(!get_bit(state->cross_bitarrs[j], x2, y2)) continue;
+                if(shortest_only && (dist_arr[(x2 + dx2) + (y2 + dy2) * BOARD_LEN] >= dist_arr[x + y * BOARD_LEN])) continue;
+                dx3 = __max(__min(dx + dx2, 1), -1);
+                dy3 = __max(__min(dy + dy2, 1), -1);
+                mv[(dx3 + 1) + (dy3 + 1) * 3] = 1;
             }
-            
+            mv[1 + 3] = 0;  // dx = dy = 0では0
         } else {
             // 進む先にコマがない場合
             if(shortest_only) {

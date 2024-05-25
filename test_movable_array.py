@@ -53,25 +53,33 @@ for dir in dirs:
     ans_W = np.array(np.loadtxt(os.path.join(path, f"ans_W.csv"), delimiter=","), dtype=bool)
     ans_shortest_B = np.array(np.loadtxt(os.path.join(path, f"ans_shortest_B.csv"), delimiter=","), dtype=bool)
     ans_shortest_W = np.array(np.loadtxt(os.path.join(path, f"ans_shortest_W.csv"), delimiter=","), dtype=bool)
+    
+    def print_movable_array(arr):
+        for y in [-1, 0, 1]:
+            for x in [-1, 0, 1]:
+                print(arr[x, y], end="")
+            print()
+        print()
+    
     if not np.all(pred_B == ans_B):
         print(dir, "B")
-        print(pred_B)
-        print(ans_B)
+        print_movable_array(pred_B)
+        print_movable_array(ans_B)
         assert False, "failed"
     if not np.all(pred_W == ans_W):
         print(dir, "W")
-        print(pred_W)
-        print(ans_W)
+        print_movable_array(pred_W)
+        print_movable_array(ans_W)
         assert False, "failed"
     if not np.all(pred_shortest_B == ans_shortest_B):
-        print(dir, "B")
-        print(pred_shortest_B)
-        print(ans_shortest_B)
+        print(dir, "shortest B")
+        print_movable_array(pred_shortest_B)
+        print_movable_array(ans_shortest_B)
         assert False, "failed"
     if not np.all(pred_shortest_W == ans_shortest_W):
-        print(dir, "W")
-        print(pred_shortest_W)
-        print(ans_shortest_W)
+        print(dir, "shortest W")
+        print_movable_array(pred_shortest_W)
+        print_movable_array(ans_shortest_W)
         assert False, "failed"
     
 

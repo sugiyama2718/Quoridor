@@ -99,6 +99,10 @@ color_p_c = lib.color_p
 color_p_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
 color_p_c.restype = Point_c
 
+movable_array_c = lib.movable_array
+movable_array_c.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(ctypes.c_bool), ctypes.c_int, ctypes.c_int, ctypes.c_bool]
+movable_array_c.restype = None
+
 accept_action_str_c = lib.accept_action_str
 accept_action_str_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_char_p, ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
 accept_action_str_c.restype = ctypes.c_bool
@@ -412,6 +416,10 @@ cdef class State:
         self.cross_movable_arr = self.cross_movable_array2(self.row_wall, self.column_wall)
         self.dist_array1 = self.dist_array(0, self.cross_movable_arr)
         self.dist_array2 = self.dist_array(BOARD_LEN - 1, self.cross_movable_arr)
+        for x in range(BOARD_LEN):
+            for y in range(BOARD_LEN):
+                self.state_c.dist_array1[x + y * BOARD_LEN] = self.dist_array1[x, y]
+                self.state_c.dist_array2[x + y * BOARD_LEN] = self.dist_array2[x, y]
 
         placable_r, placable_c = self.calc_placable_array()
         self.placable_r_ = placable_r
@@ -446,49 +454,12 @@ cdef class State:
 
     # shortest_onely=Trueの場合ゴールからの距離を縮める方向のみに1を立てる
     def movable_array(self, x, y, shortest_only=False):
+        mv_c = (ctypes.c_bool * 9)(*([False] * 9))
+        movable_array_c(self.state_c, mv_c, x, y, shortest_only)
         mv = np.zeros((3, 3), dtype="bool")
-        cross = self.cross_movable(x, y)
-        if shortest_only:
-            if CALC_DIST_ARRAY:
-                if self.turn % 2 == 0:
-                    dist_arr = self.dist_array1
-                else:
-                    dist_arr = self.dist_array2
-            else:
-                dist_arr = self.calc_dist_array(0 if self.turn % 2 == 0 else BOARD_LEN - 1)
-        for i, p in enumerate([(0, -1), (1, 0), (0, 1), (-1, 0)]):
-            if not cross[i]:
-                continue
-            x2 = x + p[0]
-            y2 = y + p[1]
-            if (self.Bx == x2 and self.By == y2) or (self.Wx == x2 and self.Wy == y2):
-                cross2 = self.cross_movable(x2, y2)
-
-                # 同じ方向に進むことができるかからチェック。進めるなら斜めには移動できない。
-                if cross2[i]:
-                    if shortest_only:
-                        if dist_arr[x2 + p[0], y2 + p[1]] < dist_arr[x, y]:
-                            mv[p] = 1
-                    else:
-                        mv[p] = 1
-                    continue
-
-                movable_list = []
-                for j, q in enumerate([(0, -1), (1, 0), (0, 1), (-1, 0)]):
-                    if not cross2[j]:
-                        continue
-                    if shortest_only and (dist_arr[x2 + q[0], y2 + q[1]] >= dist_arr[x, y]):
-                        continue
-                    movable_list.append((max(min(p[0] + q[0], 1), -1), max(min(p[1] + q[1], 1), -1)))
-                for movable_p in movable_list:
-                    mv[movable_p] = 1
-                mv[0, 0] = 0
-            else:
-                if shortest_only:
-                    if dist_arr[x2, y2] < dist_arr[x, y]:
-                        mv[p] = 1
-                else:
-                    mv[p] = 1
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                mv[dx, dy] = mv_c[(dx + 1) + (dy + 1) * 3]
 
         return mv
 
