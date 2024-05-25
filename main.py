@@ -431,7 +431,7 @@ def train_without_selfplay_process(x):
 
 
 def measure_inference_time(x):
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # CPUで実行時間計測ならコメントを外す
+    #os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # CPUで実行時間計測ならコメントを外す
 
     filters = 32
     layer_num = 9
@@ -441,15 +441,15 @@ def measure_inference_time(x):
     AI = CNNAI(0)
     #AI.load("data_for_experiment/221204/train_results/parameter/epoch30.ckpt")
 
-    h5file = h5py.File("data_for_experiment/2090/209000.h5", "r")
+    h5file = h5py.File("data_for_experiment/60/6000.h5", "r")
     size = h5file["feature"].shape[0]
     feature_arr = h5file["feature"][:, :, :, :]
 
     s = time.time()
-    INFERENCE_NUM = 100 # MCTS中でpvの計算にかかる時間の測定という想定。大きくしすぎてinput_arrのindexを飛び出さないよう注意
+    INFERENCE_NUM = 1000 # MCTS中でpvの計算にかかる時間の測定という想定。大きくしすぎてinput_arrのindexを飛び出さないよう注意
     total = 0
     for i in tqdm(range(INFERENCE_NUM)):
-        input_arr = feature_arr[i * AI.n_parallel: (i + 1) * AI.n_parallel]
+        input_arr = feature_arr[(i % 50) * AI.n_parallel: ((i % 50) + 1) * AI.n_parallel]
         #input_arr = np.random.rand(*input_arr.shape)
         #p = AI.sess.run(AI.p_tf, feed_dict={AI.x:input_arr})
         p, y_pred = AI.sess.run([AI.p_tf, AI.y], feed_dict={AI.x:input_arr})
@@ -465,6 +465,8 @@ def train_without_selfplay():
     print("="*30)
     with Pool(processes=1) as p:
         p.map(func=measure_inference_time, iterable=[0])
+
+    exit()
 
     print("="*30)
     with Pool(processes=1) as p:
@@ -625,7 +627,7 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
         #     evaluate_2game_process(x)
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name) for j in range(play_num_half)])
-            ret = list(tqdm(imap, total=play_num_half))
+            ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
         new_ai_win_num = play_num - sum(ret)
         win_num_list.append(new_ai_win_num)
         print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.3f}".format(old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num))
@@ -749,7 +751,7 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
 
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=generate_h5_single, iterable=[(h5_id_, h5_id_ % PROCESS_NUM == 0, load_AI_id, search_nodes, epoch) for h5_id_ in h5_list])
-            win_tuple_list = list(tqdm(imap, total=len(h5_list)))
+            win_tuple_list = list(tqdm(imap, total=len(h5_list), file=sys.stdout))
         
         print("")
         #print(win_tuple_list)
@@ -943,7 +945,7 @@ if __name__ == '__main__':
         play_num_half = play_num // 2
         with Pool(processes=1) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
-            ret = list(tqdm(imap, total=play_num_half))
+            ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
         print(sum(ret), play_num - sum(ret))
         
     elif sys.argv[1] == "multiprocess_test":
@@ -962,7 +964,7 @@ if __name__ == '__main__':
         start = time.time()
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=generate_data_single, iterable=range(task_num))
-            turn_list = list(tqdm(imap, total=task_num))
+            turn_list = list(tqdm(imap, total=task_num, file=sys.stdout))
         print(turn_list)
         print(sum(turn_list))
         print("elapsed time = {:.3f}s".format(time.time() - start))
@@ -975,25 +977,14 @@ if __name__ == '__main__':
 
     elif sys.argv[1] == "measure":
         np.random.seed(0)
-        game_num = 2
+        game_num = 10
         seed = 0
-        # master_AI = CNNAI(0, search_nodes=search_nodes, seed=seed, random_playouts=True)
-        # slave_AI = CNNAI(1, search_nodes=search_nodes, seed=seed, random_playouts=True, opponent_AI=master_AI)
-        # AIs = [master_AI, slave_AI]
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, random_playouts=True), CNNAI(1, search_nodes=search_nodes, seed=seed, random_playouts=True)]
-        # path = "data_for_experiment/221219/train_results/parameter"
-        # epoch = 350
-        # path = "backup/221228/train_results/parameter"
-        # epoch = 2700
         path = PARAMETER_DIR
-        #path = "backup/23"
-        # epoch = 120
-        # AIs[0].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
-        # AIs[1].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
-        # AIs[0].load(os.path.join(path, "post.ckpt"))
-        # AIs[1].load(os.path.join(path, "post.ckpt"))
-        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
-        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
+        AIs[0].load(os.path.join(path, "epoch120.ckpt"))
+        AIs[1].load(os.path.join(path, "epoch120.ckpt"))
+        # AIs[0].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
+        # AIs[1].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
 
         start_time = time.time()
         temp_data = generate_data(AIs, game_num, noise=NOISE, display=True, info=True)
