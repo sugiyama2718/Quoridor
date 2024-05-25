@@ -47,8 +47,12 @@ for dir in dirs:
     state.display_cui()
     pred_B = state.movable_array(state.Bx, state.By)
     pred_W = state.movable_array(state.Wx, state.Wy)
+    pred_shortest_B = state.movable_array(state.Bx, state.By, shortest_only=True)
+    pred_shortest_W = state.movable_array(state.Wx, state.Wy, shortest_only=True)
     ans_B = np.array(np.loadtxt(os.path.join(path, f"ans_B.csv"), delimiter=","), dtype=bool)
     ans_W = np.array(np.loadtxt(os.path.join(path, f"ans_W.csv"), delimiter=","), dtype=bool)
+    ans_shortest_B = np.array(np.loadtxt(os.path.join(path, f"ans_shortest_B.csv"), delimiter=","), dtype=bool)
+    ans_shortest_W = np.array(np.loadtxt(os.path.join(path, f"ans_shortest_W.csv"), delimiter=","), dtype=bool)
     if not np.all(pred_B == ans_B):
         print(dir, "B")
         print(pred_B)
@@ -58,6 +62,16 @@ for dir in dirs:
         print(dir, "W")
         print(pred_W)
         print(ans_W)
+        assert False, "failed"
+    if not np.all(pred_shortest_B == ans_shortest_B):
+        print(dir, "B")
+        print(pred_shortest_B)
+        print(ans_shortest_B)
+        assert False, "failed"
+    if not np.all(pred_shortest_W == ans_shortest_W):
+        print(dir, "W")
+        print(pred_shortest_W)
+        print(ans_shortest_W)
         assert False, "failed"
     
 
