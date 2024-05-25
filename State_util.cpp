@@ -254,6 +254,32 @@ void movable_array(State* state, bool* mv, int x, int y, bool shortest_only) {
         dy = dys[i];
         x2 = x + dx;
         y2 = y + dy;
+        if((state->Bx == x2 && state->By == y2) || (state->Wx == x2 && state->Wy == y2)) {
+            // 進む先にコマがある場合
+            
+            // 先に同じ方向に進むことができるかからチェック。進めるなら斜めには移動できない。
+            if(get_bit(state->cross_bitarrs[i], x2, y2)) {
+                if(shortest_only) {
+                    if(dist_arr[(x2 + dx) + (y2 + dy) * BOARD_LEN] < dist_arr[x + y * BOARD_LEN]) mv[(dx + 1) + (dy + 1) * 3] = 1;
+                } else {
+                    mv[(dx + 1) + (dy + 1) * 3] = 1;
+                }
+                continue;
+            }
+
+            for(int j = 0;j < 4;j++) {
+                
+            }
+            
+        } else {
+            // 進む先にコマがない場合
+            if(shortest_only) {
+                if(dist_arr[x2 + y2 * BOARD_LEN] < dist_arr[x + y * BOARD_LEN]) mv[(dx + 1) + (dy + 1) * 3] = 1;
+            } else {
+                mv[(dx + 1) + (dy + 1) * 3] = 1;
+            }
+            
+        }
     }
 }
 
