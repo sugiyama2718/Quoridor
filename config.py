@@ -61,7 +61,7 @@ DEEP_SEARCH_P = 0.15  # 深い探索を実施する確率
 DEEP_TH = 0.5  # prev_v, post_vにどれだけ差があれば深い探索にするか
 EVALUATION_SEARCHNODES = 1000
 
-PROCESS_NUM = 20
+PROCESS_NUM = 15
 
 RATE_TH = 0.1  # レートがいくつ以上あがったら新AIとして採用するか
 RATE_TH2 = 0.5  # レートがいくつ以上あがったらAI listを更新するか
@@ -110,7 +110,7 @@ WEIGHT_DECAY = 1e-4
 EPSILON = 1e-7
 EMA_DECAY = 3e-4
 VALID_EMA_DECAY = EMA_DECAY
-BATCH_SIZE = 256
+BATCH_SIZE = 512
 PER_PROCESS_GPU_MEMORY_FRACTION = 0.07
 WARMUP_STEPS = 0.1
 N_PARALLEL = 32
