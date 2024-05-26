@@ -170,8 +170,6 @@ def state_copy(s):
     ret.seen = copy.copy(s.seen)
     ret.row_wall = copy.copy(s.row_wall)
     ret.column_wall = copy.copy(s.column_wall)
-    ret.must_be_checked_x = copy.copy(s.must_be_checked_x)
-    ret.must_be_checked_y = copy.copy(s.must_be_checked_y)
     ret.placable_r_ = copy.copy(s.placable_r_)
     ret.placable_c_ = copy.copy(s.placable_c_)
     ret.placable_rb = copy.copy(s.placable_rb)

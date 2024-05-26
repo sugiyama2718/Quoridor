@@ -1,5 +1,5 @@
 # coding:utf-8
-from State import State, BIT_BOARD_LEN, State_c, State_init, 
+from State import State, BIT_BOARD_LEN, State_c, State_init, set_state_by_wall, movable_array
 import numpy as np
 import os, sys
 import ctypes
@@ -36,12 +36,12 @@ eq_state = lib.eq_state
 eq_state.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
 eq_state.restype = ctypes.c_bool
 
-action_list = ["e8", "e2", "a1h"]
-state = State()
-for action_str in action_list:
-    state.accept_action_str(action_str)
-    state.display_cui()
-exit()
+# action_list = ["e8", "e2", "a1h"]
+# state = State()
+# for action_str in action_list:
+#     state.accept_action_str(action_str)
+#     state.display_cui()
+# exit()
 
 results = []
 for i in test_case_list:
@@ -57,12 +57,12 @@ for i in test_case_list:
         state.By = state.state_c.By = p[1]
         state.Wx = state.state_c.Wx = p[2]
         state.Wy = state.state_c.Wy = p[3]
-    set_state_by_wall(set_state_by_wall)
+    set_state_by_wall(state)
     print_state(state.state_c)
     state.display_cui()
 
     movable_array_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/movable_array.csv"), delimiter=","), dtype=bool)
-    movable_array_pred = state.movable_array(state.Bx, state.By)
+    movable_array_pred = movable_array(state, state.Bx, state.By)
     if not np.all(movable_array_pred == movable_array_ans):
         print("movable array failed")
         print("ans")

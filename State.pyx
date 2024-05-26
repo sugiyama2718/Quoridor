@@ -176,7 +176,7 @@ def set_state_by_wall(state):
     state.placable_rb, state.placable_cb = (placable_r * (state.black_walls >= 1), placable_c * state.black_walls >= 1)
     state.placable_rw, state.placable_cw = (placable_r * (state.white_walls >= 1), placable_c * state.white_walls >= 1)
 
-    calc_placable_array_and_set(state)
+    calc_placable_array_and_set(state.state_c)
 
 # -----------------------------------------
 
@@ -189,7 +189,7 @@ def print_bitarr(bitarr):
 
 cdef class State:
     draw_turn = DRAW_TURN
-    cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
+    cdef public np.ndarray seen, row_wall, column_wall, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
     cdef public state_c
@@ -202,8 +202,6 @@ cdef class State:
         self.placable_cb = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_rw = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_cw = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.must_be_checked_x = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.must_be_checked_y = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.Bx = BOARD_LEN // 2
         self.By = BOARD_LEN - 1
         self.Wx = BOARD_LEN // 2
@@ -254,6 +252,10 @@ cdef class State:
         # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
         
         ret = accept_action_str_c(self.state_c, s.encode('utf-8'), calc_placable_array, check_movable)
+        if not ret:
+            self.display_cui()
+            print(s)
+            assert ret
 
         self.Bx = self.state_c.Bx
         self.By = self.state_c.By
@@ -281,8 +283,6 @@ cdef class State:
         self.pseudo_terminate = self.state_c.pseudo_terminate
         self.pseudo_reward = self.state_c.pseudo_reward
 
-        self.placable_r_ = np.array([self.state_c.dist_array1[i] for i in range((BOARD_LEN - 1) * (BOARD_LEN - 1))], dtype=DTYPE).reshape(BOARD_LEN - 1, BOARD_LEN - 1).T
-
         row_placable_bitarr = bitarray(128)
         column_placable_bitarr = bitarray(128)
         row_placable_bitarr[:64] = int2ba(self.state_c.placable_r_bitarr[1], length=64)
@@ -294,9 +294,13 @@ cdef class State:
             for y in range(BOARD_LEN - 1):
                 self.placable_r_[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
                 self.placable_c_[x, y] = column_placable_bitarr[x + y * BIT_BOARD_LEN]
+        self.placable_rb, self.placable_cb = (self.placable_r_ * (self.black_walls >= 1), self.placable_c_ * self.black_walls >= 1)
+        self.placable_rw, self.placable_cw = (self.placable_r_ * (self.white_walls >= 1), self.placable_c_ * self.white_walls >= 1)
 
         self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
         self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+
+        self.cross_movable_arr = self.cross_movable_array2(self.row_wall, self.column_wall)
 
         return ret
 
@@ -578,14 +582,14 @@ cdef class State:
             row_f = False
         if self.column_wall[x, max(y - 1, 0)] or self.column_wall[x, min(y + 1, BOARD_LEN - 2)]:
             column_f = False
-        if row_f and self.must_be_checked_y[x, y]:
+        if row_f:
             self.row_wall[x, y] = 1
             set_row_wall_1(self.state_c, x, y)
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.row_wall[x, y] = 0
             set_row_wall_0(self.state_c, x, y)
             row_f = row_f and f
-        if column_f and self.must_be_checked_x[x, y]:
+        if column_f:
             self.column_wall[x, y] = 1
             set_column_wall_1(self.state_c, x, y)
             f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
