@@ -60,6 +60,7 @@ void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column
 int arrivable_by_cross(__uint128_t cross_bitarrs[4], int pawn_x, int pawn_y, int goal_y);
 void calc_dist_array(State* state, int goal_y);
 int arrivable_(State* state, int pawn_x, int pawn_y, int goal_y);
+void calc_placable_array_and_set(State* state);
 
 struct BitArrayPair {
     __uint128_t bitarr1;
@@ -296,7 +297,7 @@ void movable_array(State* state, bool* mv, int x, int y, bool shortest_only=fals
     }
 }
 
-bool accept_action_str(State* state, const char* s, bool check_placable, bool calc_placable_array, bool check_movable) {
+bool accept_action_str(State* state, const char* s, bool calc_placable_array=true, bool check_movable=true) {
     // その行動が合法手で実行できればtrue, そうでなければfalseを返す
     if(strlen(s) <= 1 || strlen(s) >= 4) return false;
     if(s[0] < 'a' && s[0] > 'i') return false;
@@ -305,6 +306,8 @@ bool accept_action_str(State* state, const char* s, bool check_placable, bool ca
     int x = s[0] - 'a', y = s[1] - '1';
     int x2, y2, dx, dy, x3, y3;
     bool mv[9] = {false}; // 配列の最初の要素をfalseで初期化し、残りの要素もfalseで初期化される
+    int walls;
+    bool rf, cf;
 
     if(strlen(s) == 2) {
         //移動
@@ -337,11 +340,44 @@ bool accept_action_str(State* state, const char* s, bool check_placable, bool ca
             }
 
             if(calc_placable_array) {
-
+                calc_placable_array_and_set(state);
             }
         }
     } else {
         //壁置き
+
+        if(state->turn % 2 == 0) walls = state->black_walls;
+        else walls = state->white_walls;
+
+        rf = get_bit(state->placable_r_bitarr, x, y);
+        cf = get_bit(state->placable_c_bitarr, x, y);
+
+        if(s[2] == 'h') {
+            if(rf && walls >= 1) {
+                set_row_wall_1(state, x, y);
+                if(state->turn % 2 == 0) state->black_walls -= 1;
+                else state->white_walls -= 1;
+            } else {
+                return false;
+            }
+        } else if(s[2] == 'v') {
+            if(cf && walls >= 1) {
+                set_column_wall_1(state, x, y);
+                if(state->turn % 2 == 0) state->black_walls -= 1;
+                else state->white_walls -= 1;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+
+        if(calc_placable_array) {
+            calc_placable_array_and_set(state);
+        }
+
+        calc_dist_array(state, 0);
+        calc_dist_array(state, BOARD_LEN - 1);
     }
     //printf("%s, %d %d\n", s, x, y);
     return true;
@@ -450,6 +486,7 @@ int arrivable_by_cross(__uint128_t cross_bitarrs[4], int pawn_x, int pawn_y, int
 }
 
 void calc_dist_array(State* state, int goal_y) {
+    // goal_yの値から判断して結果をstateのdist_arrayに格納
     Point_uint8 point_queue[BOARD_LEN * BOARD_LEN];
     int q_s = 0, q_e = 0;
     int x2, y2, x3, y3, dx, dy;
@@ -559,6 +596,12 @@ BitArrayPair calc_placable_array_(State* state) {
     }
 
     return ret;
+}
+
+void calc_placable_array_and_set(State* state) {
+    BitArrayPair pair = calc_placable_array_(state);
+    state->placable_r_bitarr = pair.bitarr1;
+    state->placable_c_bitarr = pair.bitarr2;
 }
 
 }
