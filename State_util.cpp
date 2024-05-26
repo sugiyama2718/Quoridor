@@ -18,11 +18,14 @@ struct State {
     uint8_t dist_array1[81];  // x + y * BOARD_LENでアクセスするものとする。1が先手、2は後手
     uint8_t dist_array2[81];
     __uint128_t placable_r_bitarr, placable_c_bitarr;
+    bool terminate, wall0_terminate, pseudo_terminate;
+    int reward, pseudo_reward;
 };
 
 const int BOARD_LEN = 9;
 const int BIT_BOARD_LEN = 11;
 const int ACTION_NUM = 137;
+const int DRAW_TURN = 300;
 enum DIRECTION {
     UP,
     RIGHT,
@@ -95,6 +98,9 @@ void State_init(State* state) {
 
     state->placable_r_bitarr = BIT_SMALL_BOARD_MASK;
     state->placable_c_bitarr = BIT_SMALL_BOARD_MASK;
+
+    state->terminate = state->wall0_terminate = state->pseudo_terminate = false;
+    state->reward = state->pseudo_reward = 0;
 }
 
 bool eq_state(State* state1, State* state2) {
@@ -379,7 +385,19 @@ bool accept_action_str(State* state, const char* s, bool calc_placable_array=tru
         calc_dist_array(state, 0);
         calc_dist_array(state, BOARD_LEN - 1);
     }
-    //printf("%s, %d %d\n", s, x, y);
+    state->turn++;
+
+    if(state->By == 0) {
+        state->terminate = true;
+        state->reward = 1;
+    } else if(state->Wy == BOARD_LEN - 1) {
+        state->terminate = true;
+        state->reward = -1;        
+    } else if(state->turn == DRAW_TURN) {
+        state->terminate = true;
+        state->reward = 0;    
+    }
+
     return true;
 }
 
