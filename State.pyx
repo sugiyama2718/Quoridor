@@ -108,7 +108,7 @@ movable_array_c.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(ctypes.c_boo
 movable_array_c.restype = None
 
 accept_action_str_c = lib.accept_action_str
-accept_action_str_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_char_p, ctypes.c_bool, ctypes.c_bool]
+accept_action_str_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_char_p, ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
 accept_action_str_c.restype = ctypes.c_bool
 
 is_mirror_match = lib.is_mirror_match
@@ -250,7 +250,7 @@ cdef class State:
     def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
         # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
         
-        ret = accept_action_str_c(self.state_c, s.encode('utf-8'), calc_placable_array, check_movable)
+        ret = accept_action_str_c(self.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
 
         self.Bx = self.state_c.Bx
         self.By = self.state_c.By

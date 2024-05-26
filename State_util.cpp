@@ -304,7 +304,7 @@ void movable_array(State* state, bool* mv, int x, int y, bool shortest_only=fals
     }
 }
 
-bool accept_action_str(State* state, const char* s, bool calc_placable_array=true, bool check_movable=true) {
+bool accept_action_str(State* state, const char* s, bool check_placable=true, bool calc_placable_array=true, bool check_movable=true) {
     // 文字列sで表される行動を実行しようとし、その行動が合法手で実行できればtrue, そうでなければfalseを返す
     if(strlen(s) <= 1 || strlen(s) >= 4) return false;
     if(s[0] < 'a' && s[0] > 'i') return false;
@@ -342,6 +342,7 @@ bool accept_action_str(State* state, const char* s, bool calc_placable_array=tru
         if(check_movable) {
             movable_array(state, mv, x2, y2);
             if(!mv[(dx + 1) + (dy + 1) * 3]) {
+                printf("%d %d\n", dx, dy);
                 printf("not movable!!!!!!!\n");
                 return false;
             }
@@ -366,26 +367,38 @@ bool accept_action_str(State* state, const char* s, bool calc_placable_array=tru
         rf = get_bit(state->placable_r_bitarr, x, y);
         cf = get_bit(state->placable_c_bitarr, x, y);
 
-        if(s[2] == 'h') {
-            if(rf && walls >= 1) {
+        if(check_placable) {
+            if(s[2] == 'h') {
+                if(rf && walls >= 1) {
+                    set_row_wall_1(state, x, y);
+                    if(state->turn % 2 == 0) state->black_walls -= 1;
+                    else state->white_walls -= 1;
+                } else {
+                    return false;
+                }
+            } else if(s[2] == 'v') {
+                if(cf && walls >= 1) {
+                    set_column_wall_1(state, x, y);
+                    if(state->turn % 2 == 0) state->black_walls -= 1;
+                    else state->white_walls -= 1;
+                } else {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else {
+            if(s[2] == 'h') {
                 set_row_wall_1(state, x, y);
                 if(state->turn % 2 == 0) state->black_walls -= 1;
                 else state->white_walls -= 1;
-            } else {
-                printf("h %d %d\n", rf, walls);
-                return false;
-            }
-        } else if(s[2] == 'v') {
-            if(cf && walls >= 1) {
+            } else if(s[2] == 'v') {
                 set_column_wall_1(state, x, y);
                 if(state->turn % 2 == 0) state->black_walls -= 1;
                 else state->white_walls -= 1;
             } else {
-                printf("v %d %d\n", cf, walls);
                 return false;
             }
-        } else {
-            return false;
         }
 
         if(calc_placable_array) {
