@@ -1004,7 +1004,7 @@ if __name__ == '__main__':
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, tau=0.32),
                CNNAI(1, search_nodes=search_nodes, seed=seed, tau=0.32)]
         path = PARAMETER_DIR
-        epoch = 3985
+        epoch = 240
 
         AIs[0].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
         AIs[1].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
