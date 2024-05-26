@@ -467,6 +467,7 @@ class BasicAI(Agent):
         state = state_copy(root_state)
         for i, action in enumerate(actions):
             try:
+                # checkしないため、内部的には非合法手扱いされることがありFalseになることがある。ただし、actionsが合法手からなるので問題なし。
                 state.accept_action_str(actionid2str(state, action), check_placable=False, calc_placable_array=False, check_movable=False)
             except:
                 print("{} error action={}".format(i, action))

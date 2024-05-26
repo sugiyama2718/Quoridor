@@ -252,10 +252,10 @@ cdef class State:
         # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
         
         ret = accept_action_str_c(self.state_c, s.encode('utf-8'), calc_placable_array, check_movable)
-        if not ret:
-            self.display_cui()
-            print(s)
-            assert ret
+        # if not ret:
+        #     self.display_cui()
+        #     print(s)
+        #     assert ret
 
         self.Bx = self.state_c.Bx
         self.By = self.state_c.By
@@ -296,6 +296,12 @@ cdef class State:
                 self.placable_c_[x, y] = column_placable_bitarr[x + y * BIT_BOARD_LEN]
         self.placable_rb, self.placable_cb = (self.placable_r_ * (self.black_walls >= 1), self.placable_c_ * self.black_walls >= 1)
         self.placable_rw, self.placable_cw = (self.placable_r_ * (self.white_walls >= 1), self.placable_c_ * self.white_walls >= 1)
+
+        # placable_r, placable_c = self.calc_placable_array()
+        # self.placable_r_ = placable_r
+        # self.placable_c_ = placable_c
+        # self.placable_rb, self.placable_cb = (placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1)
+        # self.placable_rw, self.placable_cw = (placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1)
 
         self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
         self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
