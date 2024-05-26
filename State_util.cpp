@@ -244,7 +244,7 @@ float C_puct, float estimated_V, int color, int turn) {
 const int dxs[4] = {0, 1, 0, -1};
 const int dys[4] = {-1, 0, 1, 0};
 
-void movable_array(State* state, bool* mv, int x, int y, bool shortest_only) {
+void movable_array(State* state, bool* mv, int x, int y, bool shortest_only=false) {
     // mvにmv[(dx + 1) + (dy + 1) * 3]の形で結果を格納
     uint8_t* dist_arr;
     int dx, dy, dx2, dy2, x2, y2, dx3, dy3;
@@ -300,10 +300,11 @@ bool accept_action_str(State* state, const char* s, bool check_placable, bool ca
     if(s[1] < '1' && s[1] > '9') return false;
 
     int x = s[0] - 'a', y = s[1] - '1';
+    int x2, y2, dx, dy, x3, y3;
+    bool mv[9] = {false}; // 配列の最初の要素をfalseで初期化し、残りの要素もfalseで初期化される
 
     if(strlen(s) == 2) {
         //移動
-        int x2, y2, dx, dy;
         if(state->turn % 2 == 0) {
             x2 = state->Bx;
             y2 = state->By;
@@ -315,7 +316,20 @@ bool accept_action_str(State* state, const char* s, bool check_placable, bool ca
         dy = y - y2;
         if(std::abs(dx) + std::abs(dy) >= 3) return false;
         if(std::abs(dx) == 2 || std::abs(dy) == 2) {
+            x3 = x2 + dx / 2;
+            y3 = y2 + dy / 2;
+            if(!((state->Bx == x3 && state->By == y3) || (state->Wx == x3 && state->Wy == y3))) return false;
+            dx /= 2;
+            dy /= 2;
+            if(check_movable) {
+                movable_array(state, mv, x2, y2);
+                if(!mv[(dx + 1) + (dy + 1) * 3]) return false;
+            }
+            if(state->turn & 2 == 0) {
 
+            } {
+
+            }
         }
     } else {
         //壁置き
