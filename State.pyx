@@ -240,7 +240,6 @@ cdef class State:
 
     def __eq__(self, state):
         assert False
-        return False
 
     def get_player_dist_from_goal(self):
         return self.dist_array1[self.Bx, self.By], self.dist_array2[self.Wx, self.Wy]
@@ -252,10 +251,6 @@ cdef class State:
         # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
         
         ret = accept_action_str_c(self.state_c, s.encode('utf-8'), calc_placable_array, check_movable)
-        # if not ret:
-        #     self.display_cui()
-        #     print(s)
-        #     assert ret
 
         self.Bx = self.state_c.Bx
         self.By = self.state_c.By
@@ -297,180 +292,18 @@ cdef class State:
         self.placable_rb, self.placable_cb = (self.placable_r_ * (self.black_walls >= 1), self.placable_c_ * self.black_walls >= 1)
         self.placable_rw, self.placable_cw = (self.placable_r_ * (self.white_walls >= 1), self.placable_c_ * self.white_walls >= 1)
 
-        # placable_r, placable_c = self.calc_placable_array()
-        # self.placable_r_ = placable_r
-        # self.placable_c_ = placable_c
-        # self.placable_rb, self.placable_cb = (placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1)
-        # self.placable_rw, self.placable_cw = (placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1)
-
         self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
         self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
-        self.cross_movable_arr = self.cross_movable_array2(self.row_wall, self.column_wall)
+        for i in range(4):
+            cross_bitarr = bitarray(128)
+            cross_bitarr[:64] = int2ba(self.state_c.cross_bitarrs[i * 2 + 1], length=64)
+            cross_bitarr[64:] = int2ba(self.state_c.cross_bitarrs[i * 2], length=64)
+            for x in range(BOARD_LEN):
+                for y in range(BOARD_LEN):
+                    self.cross_movable_arr[x, y, i] = cross_bitarr[x + y * BIT_BOARD_LEN]
 
         return ret
-
-        # if len(s) <= 1 or len(s) >= 4:
-        #     return False
-        # if s[0] not in notation_dict.keys():
-        #     return False
-        # if not s[1].isdigit():
-        #     return False
-        # x = notation_dict[s[0]]
-        # y = int(s[1]) - 1
-        # if len(s) == 2:
-        #     if self.turn % 2 == 0:
-        #         x2 = self.Bx
-        #         y2 = self.By
-        #     else:
-        #         x2 = self.Wx
-        #         y2 = self.Wy
-        #     dx = x - x2
-        #     dy = y - y2
-        #     if abs(dx) + abs(dy) >= 3:
-        #         return False
-        #     if abs(dx) == 2 or abs(dy) == 2:
-        #         x3 = x2 + dx // 2
-        #         y3 = y2 + dy // 2
-        #         if not ((self.Bx == x3 and self.By == y3) or (self.Wx == x3 and self.Wy == y3)):
-        #             return False
-        #         dx //= 2
-        #         dy //= 2
-        #     if check_movable:
-        #         mv = movable_array(self, x2, y2)
-        #         if not mv[dx, dy]:
-        #             return False
-        #     if self.turn % 2 == 0:
-        #         self.Bx = self.state_c.Bx = x
-        #         self.By = self.state_c.By = y
-                
-        #     else:
-        #         self.Wx = self.state_c.Wx = x
-        #         self.Wy = self.state_c.Wy = y
-
-        #     # placable_arrayを更新
-        #     if calc_placable_array:
-        #         placable_r, placable_c = self.calc_placable_array(skip_calc_graph=True)
-        #         self.placable_r_ = placable_r
-        #         self.placable_c_ = placable_c
-        #         self.placable_rb, self.placable_cb = (placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1)
-        #         self.placable_rw, self.placable_cw = (placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1)
-
-        # elif len(s) == 3:
-        #     if self.turn % 2 == 0:
-        #         walls = self.black_walls
-        #     else:
-        #         walls = self.white_walls
-
-        #     if check_placable:
-        #         #rf, cf = self.placable(x, y)
-        #         rf = self.placable_r_[x, y]  # 240121修正。こうしないとGUI.pyなどで道を塞げてしまう。むしろこれで問題ないなら速度の観点からもこちらに統一すべき
-        #         cf = self.placable_c_[x, y]
-        #         #print(rf, cf)
-
-        #         if s[2] == "h":
-        #             if rf and walls >= 1:
-        #                 self.row_wall[x, y] = 1
-        #                 set_row_wall_1(self.state_c, x, y)
-        #                 if self.turn % 2 == 0:
-        #                     self.black_walls -= 1
-        #                     self.state_c.black_walls -= 1
-        #                 else:
-        #                     self.white_walls -= 1
-        #                     self.state_c.white_walls -= 1
-        #             else:
-        #                 return False
-        #         elif s[2] == "v":
-        #             if cf and walls >= 1:
-        #                 self.column_wall[x, y] = 1
-        #                 set_column_wall_1(self.state_c, x, y)
-        #                 if self.turn % 2 == 0:
-        #                     self.black_walls -= 1
-        #                     self.state_c.black_walls -= 1
-        #                 else:
-        #                     self.white_walls -= 1
-        #                     self.state_c.white_walls -= 1
-        #             else:
-        #                 return False
-        #         else:
-        #             return False
-        #     else:  # 非合法手が来ない前提で、placableを省略して高速化
-        #         if s[2] == "h":
-        #             if walls >= 1:
-        #                 self.row_wall[x, y] = 1
-        #                 set_row_wall_1(self.state_c, x, y)
-        #                 if self.turn % 2 == 0:
-        #                     self.black_walls -= 1
-        #                     self.state_c.black_walls -= 1
-        #                 else:
-        #                     self.white_walls -= 1
-        #                     self.state_c.white_walls -= 1
-        #             else:
-        #                 return False
-        #         elif s[2] == "v":
-        #             if walls >= 1:
-        #                 self.column_wall[x, y] = 1
-        #                 set_column_wall_1(self.state_c, x, y)
-        #                 if self.turn % 2 == 0:
-        #                     self.black_walls -= 1
-        #                     self.state_c.black_walls -= 1
-        #                 else:
-        #                     self.white_walls -= 1
-        #                     self.state_c.white_walls -= 1
-        #             else:
-        #                 return False
-        #         else:
-        #             return False
-
-        #     # 壁置きの場合計算しなおし
-        #     self.cross_movable_arr = self.cross_movable_array_by_diff(self.cross_movable_arr, x, y, s[2] == "h")
-        #     if calc_placable_array:
-        #         placable_r, placable_c = self.calc_placable_array()
-        #         self.placable_r_ = placable_r
-        #         self.placable_c_ = placable_c
-        #         self.placable_rb, self.placable_cb = (placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1)
-        #         self.placable_rw, self.placable_cw = (placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1)
-            
-        #     # dist_arrayも計算しなおし
-        #     if CALC_DIST_ARRAY:
-        #         self.dist_array1 = self.calc_dist_array(0)
-        #         self.dist_array2 = self.calc_dist_array(BOARD_LEN - 1)
-        # self.turn += 1
-        # self.state_c.turn += 1
-
-        # if self.By == 0:
-        #     self.terminate = True
-        #     self.reward = 1
-        # elif self.Wy == BOARD_LEN - 1:
-        #     self.terminate = True
-        #     self.reward = -1
-        # elif self.turn == self.draw_turn:
-        #     self.terminate = True
-        #     self.reward = 0
-
-        # if (self.black_walls == 0 and self.white_walls == 0) or self.terminate:
-        #     self.wall0_terminate = True
-        
-        # if self.terminate:
-        #     self.pseudo_terminate = True
-        #     self.pseudo_reward = self.reward
-        # else:
-        #     B_dist = self.dist_array1[self.Bx, self.By]
-        #     W_dist = self.dist_array2[self.Wx, self.Wy]
-        #     if self.black_walls == 0 and (W_dist + (1 - self.turn % 2) <= B_dist - 1):
-        #         self.pseudo_terminate = True
-        #         self.pseudo_reward = -1
-        #     elif self.white_walls == 0 and (B_dist + self.turn % 2 <= W_dist - 1):
-        #         self.pseudo_terminate = True
-        #         self.pseudo_reward = 1
-        #     elif is_mirror_match(self.state_c):
-        #         self.pseudo_terminate = True
-        #         self.pseudo_reward = -1
-        #     else:
-        #         self.pseudo_terminate = False
-        #         self.pseudo_reward = 0
-
-        return True
 
     def is_certain_path_terminate(self, color=None):
         B_dist = self.dist_array1[self.Bx, self.By]
@@ -493,28 +326,8 @@ cdef class State:
 
         return False
 
-    # 上，右，下，左
-    def cross_movable(self, x, y):
-        ret = np.zeros((4,), dtype="bool")
-        ret[UP] = (not (y == 0 or self.row_wall[min(x, BOARD_LEN - 2), y - 1] or self.row_wall[max(x - 1, 0), y - 1]))
-        ret[RIGHT] = (not (x == BOARD_LEN - 1 or self.column_wall[x, min(y, BOARD_LEN - 2)] or self.column_wall[x, max(y - 1, 0)]))
-        ret[DOWN] = (not (y == BOARD_LEN - 1 or self.row_wall[min(x, BOARD_LEN - 2), y] or self.row_wall[max(x - 1, 0), y]))
-        ret[LEFT] = (not (x == 0 or self.column_wall[x - 1, min(y, BOARD_LEN - 2)] or self.column_wall[x - 1, max(y - 1, 0)]))
-        return ret
-
     def set_state_by_wall(self):
         assert False
-
-    def cross_movable_array_by_diff(self, DTYPE_t[:, :, :] prev_cross_movable_arr, int wall_x, int wall_y, int is_row):
-        if is_row:
-            for x in range(wall_x, wall_x + 2):
-                prev_cross_movable_arr[x, wall_y, DOWN] = 0
-                prev_cross_movable_arr[x, wall_y+1, UP] = 0
-        else:
-            for y in range(wall_y, wall_y + 2):
-                prev_cross_movable_arr[wall_x, y, RIGHT] = 0
-                prev_cross_movable_arr[wall_x+1, y, LEFT] = 0
-        return prev_cross_movable_arr
 
     def cross_movable_array2(self, row_wall, column_wall):
         cdef int x, y
@@ -573,32 +386,6 @@ cdef class State:
                 f = self.arrivable(self.Bx, self.By, 0)
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.column_wall[x, y] = 0
-            set_column_wall_0(self.state_c, x, y)
-            column_f = column_f and f
-        return row_f, column_f
-    
-    cdef (int, int) placable(self, x, y):
-        if self.row_wall[x, y] or self.column_wall[x, y]:
-            return False, False
-        row_f = True
-        column_f = True
-
-        if self.row_wall[max(x - 1, 0), y] or self.row_wall[min(x + 1, BOARD_LEN - 2), y]:
-            row_f = False
-        if self.column_wall[x, max(y - 1, 0)] or self.column_wall[x, min(y + 1, BOARD_LEN - 2)]:
-            column_f = False
-        if row_f:
-            self.row_wall[x, y] = 1
-            set_row_wall_1(self.state_c, x, y)
-            f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.row_wall[x, y] = 0
-            set_row_wall_0(self.state_c, x, y)
-            row_f = row_f and f
-        if column_f:
-            self.column_wall[x, y] = 1
-            set_column_wall_1(self.state_c, x, y)
-            f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
             set_column_wall_0(self.state_c, x, y)
             column_f = column_f and f

@@ -329,7 +329,7 @@ bool accept_action_str(State* state, const char* s, bool calc_placable_array=tru
         dx = x - x2;
         dy = y - y2;
         if(std::abs(dx) + std::abs(dy) >= 3) {
-            //printf("dx + dy!!!!!!!\n");
+            printf("dx + dy!!!!!!!\n");
             return false;
         }
         if(std::abs(dx) == 2 || std::abs(dy) == 2) {
@@ -342,7 +342,7 @@ bool accept_action_str(State* state, const char* s, bool calc_placable_array=tru
         if(check_movable) {
             movable_array(state, mv, x2, y2);
             if(!mv[(dx + 1) + (dy + 1) * 3]) {
-                //printf("not movable!!!!!!!\n");
+                printf("not movable!!!!!!!\n");
                 return false;
             }
         }
@@ -372,7 +372,7 @@ bool accept_action_str(State* state, const char* s, bool calc_placable_array=tru
                 if(state->turn % 2 == 0) state->black_walls -= 1;
                 else state->white_walls -= 1;
             } else {
-                //printf("h %d %d\n", rf, walls);
+                printf("h %d %d\n", rf, walls);
                 return false;
             }
         } else if(s[2] == 'v') {
@@ -381,7 +381,7 @@ bool accept_action_str(State* state, const char* s, bool calc_placable_array=tru
                 if(state->turn % 2 == 0) state->black_walls -= 1;
                 else state->white_walls -= 1;
             } else {
-                //printf("v %d %d\n", cf, walls);
+                printf("v %d %d\n", cf, walls);
                 return false;
             }
         } else {
