@@ -17,6 +17,7 @@ struct State {
     int black_walls, white_walls;
     uint8_t dist_array1[81];  // x + y * BOARD_LENでアクセスするものとする。1が先手、2は後手
     uint8_t dist_array2[81];
+    __uint128_t placable_r_bitarr, placable_c_bitarr;
 };
 
 const int BOARD_LEN = 9;
@@ -91,6 +92,8 @@ void State_init(State* state) {
         }
     }
 
+    state->placable_r_bitarr = BIT_SMALL_BOARD_MASK;
+    state->placable_c_bitarr = BIT_SMALL_BOARD_MASK;
 }
 
 bool eq_state(State* state1, State* state2) {
@@ -326,8 +329,14 @@ bool accept_action_str(State* state, const char* s, bool check_placable, bool ca
                 if(!mv[(dx + 1) + (dy + 1) * 3]) return false;
             }
             if(state->turn & 2 == 0) {
-
+                state->Bx = x;
+                state->By = y;
             } {
+                state->Wx = x;
+                state->Wy = y;
+            }
+
+            if(calc_placable_array) {
 
             }
         }
