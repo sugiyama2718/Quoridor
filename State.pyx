@@ -139,6 +139,35 @@ def movable_array(state, x, y, shortest_only=False):
 
     return mv
 
+def set_state_by_wall(state):
+    # row_wallなどを直接指定して状態を作るときに用いる
+    # 差分計算している部分を計算する
+
+    for x in range(BOARD_LEN - 1):
+        for y in range(BOARD_LEN - 1):
+            if state.row_wall[x, y]:
+                set_row_wall_1(state.state_c, x, y)
+            else:
+                set_row_wall_0(state.state_c, x, y)
+            if state.column_wall[x, y]:
+                set_column_wall_1(state.state_c, x, y)
+            else:
+                set_column_wall_0(state.state_c, x, y)
+
+    state.cross_movable_arr = state.cross_movable_array2(state.row_wall, state.column_wall)
+    state.dist_array1 = state.dist_array(0, state.cross_movable_arr)
+    state.dist_array2 = state.dist_array(BOARD_LEN - 1, state.cross_movable_arr)
+    for x in range(BOARD_LEN):
+        for y in range(BOARD_LEN):
+            state.state_c.dist_array1[x + y * BOARD_LEN] = state.dist_array1[x, y]
+            state.state_c.dist_array2[x + y * BOARD_LEN] = state.dist_array2[x, y]
+
+    placable_r, placable_c = state.calc_placable_array()
+    state.placable_r_ = placable_r
+    state.placable_c_ = placable_c
+    state.placable_rb, state.placable_cb = (placable_r * (state.black_walls >= 1), placable_c * state.black_walls >= 1)
+    state.placable_rw, state.placable_cw = (placable_r * (state.white_walls >= 1), placable_c * state.white_walls >= 1)
+
 # -----------------------------------------
 
 def print_bitarr(bitarr):
@@ -409,33 +438,7 @@ cdef class State:
         return ret
 
     def set_state_by_wall(self):
-        # row_wallなどを直接指定して状態を作るときに用いる
-        # 差分計算している部分を計算する
-
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                if self.row_wall[x, y]:
-                    set_row_wall_1(self.state_c, x, y)
-                else:
-                    set_row_wall_0(self.state_c, x, y)
-                if self.column_wall[x, y]:
-                    set_column_wall_1(self.state_c, x, y)
-                else:
-                    set_column_wall_0(self.state_c, x, y)
-
-        self.cross_movable_arr = self.cross_movable_array2(self.row_wall, self.column_wall)
-        self.dist_array1 = self.dist_array(0, self.cross_movable_arr)
-        self.dist_array2 = self.dist_array(BOARD_LEN - 1, self.cross_movable_arr)
-        for x in range(BOARD_LEN):
-            for y in range(BOARD_LEN):
-                self.state_c.dist_array1[x + y * BOARD_LEN] = self.dist_array1[x, y]
-                self.state_c.dist_array2[x + y * BOARD_LEN] = self.dist_array2[x, y]
-
-        placable_r, placable_c = self.calc_placable_array()
-        self.placable_r_ = placable_r
-        self.placable_c_ = placable_c
-        self.placable_rb, self.placable_cb = (placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1)
-        self.placable_rw, self.placable_cw = (placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1)
+        assert False
 
     def cross_movable_array_by_diff(self, DTYPE_t[:, :, :] prev_cross_movable_arr, int wall_x, int wall_y, int is_row):
         if is_row:
