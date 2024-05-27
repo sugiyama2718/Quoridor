@@ -170,13 +170,20 @@ def set_state_by_wall(state):
             state.state_c.dist_array1[x + y * BOARD_LEN] = state.dist_array1[x, y]
             state.state_c.dist_array2[x + y * BOARD_LEN] = state.dist_array2[x, y]
 
-    placable_r, placable_c = state.calc_placable_array()
-    state.placable_r_ = placable_r
-    state.placable_c_ = placable_c
-
     calc_placable_array_and_set(state.state_c)
 
 # -----------------------------------------
+
+def get_numpy_arr(bitarr, len_):
+    ret = np.zeros((len_, len_), dtype=bool)
+    row_placable_bitarr = bitarray(128)
+    row_placable_bitarr[:64] = int2ba(bitarr[1], length=64)
+    row_placable_bitarr[64:] = int2ba(bitarr[0], length=64)
+
+    for x in range(len_):
+        for y in range(len_):
+            ret[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
+    return ret
 
 def print_bitarr(bitarr):
     print()
@@ -187,15 +194,13 @@ def print_bitarr(bitarr):
 
 cdef class State:
     draw_turn = DRAW_TURN
-    cdef public np.ndarray seen, row_wall, column_wall, placable_r_, placable_c_, dist_array1, dist_array2
+    cdef public np.ndarray seen, row_wall, column_wall, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
     cdef public state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_r_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_c_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.Bx = BOARD_LEN // 2
         self.By = BOARD_LEN - 1
         self.Wx = BOARD_LEN // 2
@@ -287,19 +292,6 @@ cdef class State:
                     for y in range(BOARD_LEN):
                         self.cross_movable_arr[x, y, i] = cross_bitarr[x + y * BIT_BOARD_LEN]
 
-        if calc_placable_array:
-            row_placable_bitarr = bitarray(128)
-            column_placable_bitarr = bitarray(128)
-            row_placable_bitarr[:64] = int2ba(self.state_c.placable_r_bitarr[1], length=64)
-            row_placable_bitarr[64:] = int2ba(self.state_c.placable_r_bitarr[0], length=64)
-            column_placable_bitarr[:64] = int2ba(self.state_c.placable_c_bitarr[1], length=64)
-            column_placable_bitarr[64:] = int2ba(self.state_c.placable_c_bitarr[0], length=64)
-
-            for x in range(BOARD_LEN - 1):
-                for y in range(BOARD_LEN - 1):
-                    self.placable_r_[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
-                    self.placable_c_[x, y] = column_placable_bitarr[x + y * BIT_BOARD_LEN]
-
         return ret
 
     def is_certain_path_terminate(self, color=None):
@@ -350,10 +342,12 @@ cdef class State:
         return True
 
     def placable_array(self, color):
+        placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
+        placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
         if color == 0:
-            return self.placable_r_ * (self.black_walls >= 1), self.placable_c_ * self.black_walls >= 1
+            return placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1
         else:
-            return self.placable_r_ * (self.white_walls >= 1), self.placable_c_ * self.white_walls >= 1
+            return placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1
 
     cdef (int, int) placable_with_color(self, x, y, color):
         # すべてarrivableで確かめる。
@@ -580,8 +574,8 @@ cdef class State:
         column_wall = self.column_wall
         dist1, dist2 = self.get_player_dist_from_goal()
         cross_arr = np.copy(self.cross_movable_arr)
-        placable_r = self.placable_r_
-        placable_c = self.placable_c_
+        placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
+        placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
         if xflip:
             Bx = 8 - Bx
             Wx = 8 - Wx

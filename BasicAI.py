@@ -170,8 +170,6 @@ def state_copy(s):
     ret.seen = copy.copy(s.seen)
     ret.row_wall = copy.copy(s.row_wall)
     ret.column_wall = copy.copy(s.column_wall)
-    ret.placable_r_ = copy.copy(s.placable_r_)
-    ret.placable_c_ = copy.copy(s.placable_c_)
     ret.Bx = s.Bx
     ret.By = s.By
     ret.Wx = s.Wx
