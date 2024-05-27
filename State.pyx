@@ -279,7 +279,6 @@ cdef class State:
             self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
             for i in range(4):
-                X = get_numpy_arr(self.state_c.cross_bitarrs, BOARD_LEN, i * 2)
                 self.cross_movable_arr[:, :, i] = get_numpy_arr(self.state_c.cross_bitarrs, BOARD_LEN, i * 2)
 
         return ret
