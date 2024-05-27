@@ -156,6 +156,18 @@ void set_column_wall_0(State* state, int x, int y) {
     calc_cross_bitarrs(state, state->row_wall_bitarr, state->column_wall_bitarr);
 }
 
+// __uint128_tをbool型の配列に変換する関数
+bool boolArrayRet[128];
+bool* uint128ToBoolArray(uint64_t value_high, uint64_t value_low) {
+    __uint128_t value = ((__uint128_t)value_high << 64) | value_low;
+    for (int i = 0; i < 128; ++i) {
+        boolArrayRet[127 - i] = value & 1; // 最下位ビットを取り出す
+        value >>= 1;              // 右に1ビットシフト
+    }
+
+    return boolArrayRet;
+}
+
 void print_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BOARD_LEN; y++) {
         for(int x = 0; x < BOARD_LEN; x++) {
