@@ -981,8 +981,8 @@ if __name__ == '__main__':
         seed = 0
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, random_playouts=True), CNNAI(1, search_nodes=search_nodes, seed=seed, random_playouts=True)]
         path = PARAMETER_DIR
-        AIs[0].load(os.path.join(path, "epoch120.ckpt"))
-        AIs[1].load(os.path.join(path, "epoch120.ckpt"))
+        AIs[0].load(os.path.join(path, "epoch240.ckpt"))
+        AIs[1].load(os.path.join(path, "epoch240.ckpt"))
         # AIs[0].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
         # AIs[1].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
 
