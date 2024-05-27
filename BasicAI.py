@@ -183,7 +183,6 @@ def state_copy(s):
     ret.pseudo_reward = s.pseudo_reward
     ret.dist_array1 = np.copy(s.dist_array1)
     ret.dist_array2 = np.copy(s.dist_array2)
-    ret.cross_movable_arr = np.copy(s.cross_movable_arr)
     copy_state_c(ret.state_c, s.state_c)
     return ret
 

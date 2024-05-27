@@ -1,3 +1,4 @@
+from sys import exit
 # coding: utf-8
 # cython: language_level=3, boundscheck=False
 # cython: profile=True
@@ -165,9 +166,9 @@ def set_state_by_wall(state):
             else:
                 set_column_wall_0(state.state_c, x, y)
 
-    state.cross_movable_arr = state.cross_movable_array2(state.row_wall, state.column_wall)
-    state.dist_array1 = state.dist_array(0, state.cross_movable_arr)
-    state.dist_array2 = state.dist_array(BOARD_LEN - 1, state.cross_movable_arr)
+    cross_movable_arr = state.cross_movable_array2(state.row_wall, state.column_wall)
+    state.dist_array1 = state.dist_array(0, cross_movable_arr)
+    state.dist_array2 = state.dist_array(BOARD_LEN - 1, cross_movable_arr)
     for x in range(BOARD_LEN):
         for y in range(BOARD_LEN):
             state.state_c.dist_array1[x + y * BOARD_LEN] = state.dist_array1[x, y]
@@ -199,7 +200,7 @@ cdef class State:
     draw_turn = DRAW_TURN
     cdef public np.ndarray seen, row_wall, column_wall, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
-    cdef public np.ndarray prev, cross_movable_arr
+    cdef public np.ndarray prev
     cdef public state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -229,16 +230,6 @@ cdef class State:
         for y in range(BOARD_LEN):
             self.dist_array1[:, y] = y
             self.dist_array2[:, y] = BOARD_LEN - 1 - y
-
-        self.cross_movable_arr = np.ones((BOARD_LEN, BOARD_LEN, 4), dtype="int32")
-        for x in range(BOARD_LEN):
-            self.cross_movable_arr[x, 0, UP] = 0
-        for y in range(BOARD_LEN):
-            self.cross_movable_arr[BOARD_LEN - 1, y, RIGHT] = 0
-        for x in range(BOARD_LEN):
-            self.cross_movable_arr[x, BOARD_LEN - 1, DOWN] = 0
-        for y in range(BOARD_LEN):
-            self.cross_movable_arr[0, y, LEFT] = 0
 
     def __eq__(self, state):
         assert False
@@ -277,9 +268,6 @@ cdef class State:
 
             self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
             self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-
-            for i in range(4):
-                self.cross_movable_arr[:, :, i] = get_numpy_arr(self.state_c.cross_bitarrs, BOARD_LEN, i * 2)
 
         return ret
 
@@ -524,14 +512,6 @@ cdef class State:
             ret += "{}:1p turn".format(self.turn) + os.linesep
         else:
             ret += "{}:2p turn".format(self.turn) + os.linesep
-        # print(total_time1, total_time2)
-        # for i in range(4):
-        #     print("-"*30)
-        #     print(i)
-        #     for y in range(BOARD_LEN):
-        #         for x in range(BOARD_LEN):
-        #             print(self.cross_movable_arr[x, y, i], end=" ")
-        #         print("")
         if ret_str:
             return ret
         else:
@@ -552,6 +532,11 @@ cdef class State:
 
     def feature_CNN(self, xflip=False, yflip=False):
         feature = np.zeros((9, 9, CHANNEL))
+
+        cross_arr = np.zeros((9, 9, 4))
+        for i in range(4):
+            cross_arr[:, :, i] = get_numpy_arr(self.state_c.cross_bitarrs, BOARD_LEN, i * 2)
+            
         Bx = self.Bx
         By = self.By
         Wx = self.Wx
@@ -562,7 +547,6 @@ cdef class State:
         row_wall = self.row_wall
         column_wall = self.column_wall
         dist1, dist2 = self.get_player_dist_from_goal()
-        cross_arr = np.copy(self.cross_movable_arr)
         placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
         placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
         if xflip:
