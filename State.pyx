@@ -1,4 +1,3 @@
-from sys import exit
 # coding: utf-8
 # cython: language_level=3, boundscheck=False
 # cython: profile=True
@@ -178,11 +177,11 @@ def set_state_by_wall(state):
 
 # -----------------------------------------
 
-def get_numpy_arr(bitarr, int len_):
+def get_numpy_arr(bitarr, int len_, int offset=0):
     cdef np.ndarray[DTYPE_t, ndim = 2] ret
     cdef int x, y
     ret = np.zeros((len_, len_), dtype=DTYPE)
-    bool_p = uint128ToBoolArray(bitarr[1], bitarr[0])
+    bool_p = uint128ToBoolArray(bitarr[1 + offset], bitarr[0 + offset])
     for x in range(len_):
         for y in range(len_):
             ret[x, y] = bool_p[x + y * BIT_BOARD_LEN]
@@ -200,7 +199,7 @@ cdef class State:
     draw_turn = DRAW_TURN
     cdef public np.ndarray seen, row_wall, column_wall, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
-    cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
+    cdef public np.ndarray prev, cross_movable_arr
     cdef public state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -273,28 +272,15 @@ cdef class State:
 
         # 壁置きなら
         if old_wall_num != self.black_walls + self.white_walls:
-            row_wall_bitarr = bitarray(128)
-            column_wall_bitarr = bitarray(128)
-            row_wall_bitarr[:64] = int2ba(self.state_c.row_wall_bitarr[1], length=64)
-            row_wall_bitarr[64:] = int2ba(self.state_c.row_wall_bitarr[0], length=64)
-            column_wall_bitarr[:64] = int2ba(self.state_c.column_wall_bitarr[1], length=64)
-            column_wall_bitarr[64:] = int2ba(self.state_c.column_wall_bitarr[0], length=64)
-
-            for x in range(BOARD_LEN - 1):
-                for y in range(BOARD_LEN - 1):
-                    self.row_wall[x, y] = row_wall_bitarr[x + y * BIT_BOARD_LEN]
-                    self.column_wall[x, y] = column_wall_bitarr[x + y * BIT_BOARD_LEN]
+            self.row_wall = get_numpy_arr(self.state_c.row_wall_bitarr, BOARD_LEN - 1)
+            self.column_wall = get_numpy_arr(self.state_c.column_wall_bitarr, BOARD_LEN - 1)
 
             self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
             self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
             for i in range(4):
-                cross_bitarr = bitarray(128)
-                cross_bitarr[:64] = int2ba(self.state_c.cross_bitarrs[i * 2 + 1], length=64)
-                cross_bitarr[64:] = int2ba(self.state_c.cross_bitarrs[i * 2], length=64)
-                for x in range(BOARD_LEN):
-                    for y in range(BOARD_LEN):
-                        self.cross_movable_arr[x, y, i] = cross_bitarr[x + y * BIT_BOARD_LEN]
+                X = get_numpy_arr(self.state_c.cross_bitarrs, BOARD_LEN, i * 2)
+                self.cross_movable_arr[:, :, i] = get_numpy_arr(self.state_c.cross_bitarrs, BOARD_LEN, i * 2)
 
         return ret
 
