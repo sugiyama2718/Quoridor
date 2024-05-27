@@ -119,6 +119,10 @@ calc_placable_array_and_set = lib.calc_placable_array_and_set
 calc_placable_array_and_set.argtypes = [ctypes.POINTER(State_c)]
 calc_placable_array_and_set.restype = None
 
+uint128ToBoolArray = lib.uint128ToBoolArray
+uint128ToBoolArray.argtypes = [ctypes.c_uint64, ctypes.c_uint64]
+uint128ToBoolArray.restype = ctypes.POINTER(ctypes.c_bool)
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
@@ -175,15 +179,23 @@ def set_state_by_wall(state):
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, len_):
-    ret = np.zeros((len_, len_), dtype=bool)
-    row_placable_bitarr = bitarray(128)
-    row_placable_bitarr[:64] = int2ba(bitarr[1], length=64)
-    row_placable_bitarr[64:] = int2ba(bitarr[0], length=64)
+    # ret = np.zeros((len_, len_), dtype=bool)
+    # row_placable_bitarr = bitarray(128)
+    # row_placable_bitarr[:64] = int2ba(bitarr[1], length=64)
+    # row_placable_bitarr[64:] = int2ba(bitarr[0], length=64)
+    # for x in range(len_):
+    #     for y in range(len_):
+    #         ret[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
+    # return ret
 
+    ret = np.zeros((len_, len_), dtype=bool)
+    bool_p = uint128ToBoolArray(bitarr[1], bitarr[0])
     for x in range(len_):
         for y in range(len_):
-            ret[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
+            ret[x, y] = bool_p[x + y * BIT_BOARD_LEN]
     return ret
+
+    
 
 def print_bitarr(bitarr):
     print()
