@@ -173,8 +173,6 @@ def set_state_by_wall(state):
     placable_r, placable_c = state.calc_placable_array()
     state.placable_r_ = placable_r
     state.placable_c_ = placable_c
-    state.placable_rb, state.placable_cb = (placable_r * (state.black_walls >= 1), placable_c * state.black_walls >= 1)
-    state.placable_rw, state.placable_cw = (placable_r * (state.white_walls >= 1), placable_c * state.white_walls >= 1)
 
     calc_placable_array_and_set(state.state_c)
 
@@ -189,7 +187,7 @@ def print_bitarr(bitarr):
 
 cdef class State:
     draw_turn = DRAW_TURN
-    cdef public np.ndarray seen, row_wall, column_wall, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
+    cdef public np.ndarray seen, row_wall, column_wall, placable_r_, placable_c_, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
     cdef public state_c
@@ -198,10 +196,6 @@ cdef class State:
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_r_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.placable_c_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_rb = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_cb = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_rw = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_cw = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.Bx = BOARD_LEN // 2
         self.By = BOARD_LEN - 1
         self.Wx = BOARD_LEN // 2
@@ -249,6 +243,8 @@ cdef class State:
 
     def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
         # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
+
+        old_wall_num = self.black_walls + self.white_walls
         
         ret = accept_action_str_c(self.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
 
@@ -260,48 +256,49 @@ cdef class State:
         self.black_walls = self.state_c.black_walls
         self.white_walls = self.state_c.white_walls
 
-        row_wall_bitarr = bitarray(128)
-        column_wall_bitarr = bitarray(128)
-        row_wall_bitarr[:64] = int2ba(self.state_c.row_wall_bitarr[1], length=64)
-        row_wall_bitarr[64:] = int2ba(self.state_c.row_wall_bitarr[0], length=64)
-        column_wall_bitarr[:64] = int2ba(self.state_c.column_wall_bitarr[1], length=64)
-        column_wall_bitarr[64:] = int2ba(self.state_c.column_wall_bitarr[0], length=64)
-
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                self.row_wall[x, y] = row_wall_bitarr[x + y * BIT_BOARD_LEN]
-                self.column_wall[x, y] = column_wall_bitarr[x + y * BIT_BOARD_LEN]
-
         self.terminate = self.state_c.terminate
         self.reward = self.state_c.reward
         self.wall0_terminate = self.state_c.wall0_terminate
         self.pseudo_terminate = self.state_c.pseudo_terminate
         self.pseudo_reward = self.state_c.pseudo_reward
 
-        row_placable_bitarr = bitarray(128)
-        column_placable_bitarr = bitarray(128)
-        row_placable_bitarr[:64] = int2ba(self.state_c.placable_r_bitarr[1], length=64)
-        row_placable_bitarr[64:] = int2ba(self.state_c.placable_r_bitarr[0], length=64)
-        column_placable_bitarr[:64] = int2ba(self.state_c.placable_c_bitarr[1], length=64)
-        column_placable_bitarr[64:] = int2ba(self.state_c.placable_c_bitarr[0], length=64)
+        # 壁置きなら
+        if old_wall_num != self.black_walls + self.white_walls:
+            row_wall_bitarr = bitarray(128)
+            column_wall_bitarr = bitarray(128)
+            row_wall_bitarr[:64] = int2ba(self.state_c.row_wall_bitarr[1], length=64)
+            row_wall_bitarr[64:] = int2ba(self.state_c.row_wall_bitarr[0], length=64)
+            column_wall_bitarr[:64] = int2ba(self.state_c.column_wall_bitarr[1], length=64)
+            column_wall_bitarr[64:] = int2ba(self.state_c.column_wall_bitarr[0], length=64)
 
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                self.placable_r_[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
-                self.placable_c_[x, y] = column_placable_bitarr[x + y * BIT_BOARD_LEN]
-        self.placable_rb, self.placable_cb = (self.placable_r_ * (self.black_walls >= 1), self.placable_c_ * self.black_walls >= 1)
-        self.placable_rw, self.placable_cw = (self.placable_r_ * (self.white_walls >= 1), self.placable_c_ * self.white_walls >= 1)
+            for x in range(BOARD_LEN - 1):
+                for y in range(BOARD_LEN - 1):
+                    self.row_wall[x, y] = row_wall_bitarr[x + y * BIT_BOARD_LEN]
+                    self.column_wall[x, y] = column_wall_bitarr[x + y * BIT_BOARD_LEN]
 
-        self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-        self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+            self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+            self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
-        for i in range(4):
-            cross_bitarr = bitarray(128)
-            cross_bitarr[:64] = int2ba(self.state_c.cross_bitarrs[i * 2 + 1], length=64)
-            cross_bitarr[64:] = int2ba(self.state_c.cross_bitarrs[i * 2], length=64)
-            for x in range(BOARD_LEN):
-                for y in range(BOARD_LEN):
-                    self.cross_movable_arr[x, y, i] = cross_bitarr[x + y * BIT_BOARD_LEN]
+            for i in range(4):
+                cross_bitarr = bitarray(128)
+                cross_bitarr[:64] = int2ba(self.state_c.cross_bitarrs[i * 2 + 1], length=64)
+                cross_bitarr[64:] = int2ba(self.state_c.cross_bitarrs[i * 2], length=64)
+                for x in range(BOARD_LEN):
+                    for y in range(BOARD_LEN):
+                        self.cross_movable_arr[x, y, i] = cross_bitarr[x + y * BIT_BOARD_LEN]
+
+        if calc_placable_array:
+            row_placable_bitarr = bitarray(128)
+            column_placable_bitarr = bitarray(128)
+            row_placable_bitarr[:64] = int2ba(self.state_c.placable_r_bitarr[1], length=64)
+            row_placable_bitarr[64:] = int2ba(self.state_c.placable_r_bitarr[0], length=64)
+            column_placable_bitarr[:64] = int2ba(self.state_c.placable_c_bitarr[1], length=64)
+            column_placable_bitarr[64:] = int2ba(self.state_c.placable_c_bitarr[0], length=64)
+
+            for x in range(BOARD_LEN - 1):
+                for y in range(BOARD_LEN - 1):
+                    self.placable_r_[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
+                    self.placable_c_[x, y] = column_placable_bitarr[x + y * BIT_BOARD_LEN]
 
         return ret
 
@@ -354,9 +351,9 @@ cdef class State:
 
     def placable_array(self, color):
         if color == 0:
-            return self.placable_rb, self.placable_cb
+            return self.placable_r_ * (self.black_walls >= 1), self.placable_c_ * self.black_walls >= 1
         else:
-            return self.placable_rw, self.placable_cw
+            return self.placable_r_ * (self.white_walls >= 1), self.placable_c_ * self.white_walls >= 1
 
     cdef (int, int) placable_with_color(self, x, y, color):
         # すべてarrivableで確かめる。
