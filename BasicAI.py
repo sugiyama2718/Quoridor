@@ -170,14 +170,6 @@ def state_copy(s):
     ret.seen = copy.copy(s.seen)
     ret.row_wall = copy.copy(s.row_wall)
     ret.column_wall = copy.copy(s.column_wall)
-    ret.must_be_checked_x = copy.copy(s.must_be_checked_x)
-    ret.must_be_checked_y = copy.copy(s.must_be_checked_y)
-    ret.placable_r_ = copy.copy(s.placable_r_)
-    ret.placable_c_ = copy.copy(s.placable_c_)
-    ret.placable_rb = copy.copy(s.placable_rb)
-    ret.placable_cb = copy.copy(s.placable_cb)
-    ret.placable_rw = copy.copy(s.placable_rw)
-    ret.placable_cw = copy.copy(s.placable_cw)
     ret.Bx = s.Bx
     ret.By = s.By
     ret.Wx = s.Wx
@@ -469,6 +461,7 @@ class BasicAI(Agent):
         state = state_copy(root_state)
         for i, action in enumerate(actions):
             try:
+                # checkしないため、内部的には非合法手扱いされることがありFalseになることがある。ただし、actionsが合法手からなるので問題なし。
                 state.accept_action_str(actionid2str(state, action), check_placable=False, calc_placable_array=False, check_movable=False)
             except:
                 print("{} error action={}".format(i, action))

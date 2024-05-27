@@ -17,11 +17,15 @@ struct State {
     int black_walls, white_walls;
     uint8_t dist_array1[81];  // x + y * BOARD_LENでアクセスするものとする。1が先手、2は後手
     uint8_t dist_array2[81];
+    __uint128_t placable_r_bitarr, placable_c_bitarr;
+    bool terminate, wall0_terminate, pseudo_terminate;
+    int reward, pseudo_reward;
 };
 
 const int BOARD_LEN = 9;
 const int BIT_BOARD_LEN = 11;
 const int ACTION_NUM = 137;
+const int DRAW_TURN = 300;
 enum DIRECTION {
     UP,
     RIGHT,
@@ -59,6 +63,8 @@ void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column
 int arrivable_by_cross(__uint128_t cross_bitarrs[4], int pawn_x, int pawn_y, int goal_y);
 void calc_dist_array(State* state, int goal_y);
 int arrivable_(State* state, int pawn_x, int pawn_y, int goal_y);
+void calc_placable_array_and_set(State* state);
+bool is_mirror_match(State* state);
 
 struct BitArrayPair {
     __uint128_t bitarr1;
@@ -91,6 +97,11 @@ void State_init(State* state) {
         }
     }
 
+    state->placable_r_bitarr = BIT_SMALL_BOARD_MASK;
+    state->placable_c_bitarr = BIT_SMALL_BOARD_MASK;
+
+    state->terminate = state->wall0_terminate = state->pseudo_terminate = false;
+    state->reward = state->pseudo_reward = 0;
 }
 
 bool eq_state(State* state1, State* state2) {
@@ -244,7 +255,7 @@ float C_puct, float estimated_V, int color, int turn) {
 const int dxs[4] = {0, 1, 0, -1};
 const int dys[4] = {-1, 0, 1, 0};
 
-void movable_array(State* state, bool* mv, int x, int y, bool shortest_only) {
+void movable_array(State* state, bool* mv, int x, int y, bool shortest_only=false) {
     // mvにmv[(dx + 1) + (dy + 1) * 3]の形で結果を格納
     uint8_t* dist_arr;
     int dx, dy, dx2, dy2, x2, y2, dx3, dy3;
@@ -293,17 +304,21 @@ void movable_array(State* state, bool* mv, int x, int y, bool shortest_only) {
     }
 }
 
-bool accept_action_str(State* state, const char* s, bool check_placable, bool calc_placable_array, bool check_movable) {
-    // その行動が合法手で実行できればtrue, そうでなければfalseを返す
+bool accept_action_str(State* state, const char* s, bool check_placable=true, bool calc_placable_array=true, bool check_movable=true) {
+    // 文字列sで表される行動を実行しようとし、その行動が合法手で実行できればtrue, そうでなければfalseを返す
     if(strlen(s) <= 1 || strlen(s) >= 4) return false;
     if(s[0] < 'a' && s[0] > 'i') return false;
     if(s[1] < '1' && s[1] > '9') return false;
 
     int x = s[0] - 'a', y = s[1] - '1';
+    int x2, y2, dx, dy, x3, y3;
+    bool mv[9] = {false}; // 配列の最初の要素をfalseで初期化し、残りの要素もfalseで初期化される
+    int walls;
+    int B_dist, W_dist;
+    bool rf, cf;
 
     if(strlen(s) == 2) {
         //移動
-        int x2, y2, dx, dy;
         if(state->turn % 2 == 0) {
             x2 = state->Bx;
             y2 = state->By;
@@ -313,14 +328,125 @@ bool accept_action_str(State* state, const char* s, bool check_placable, bool ca
         }
         dx = x - x2;
         dy = y - y2;
-        if(std::abs(dx) + std::abs(dy) >= 3) return false;
+        if(std::abs(dx) + std::abs(dy) >= 3) {
+            printf("dx + dy!!!!!!!\n");
+            return false;
+        }
         if(std::abs(dx) == 2 || std::abs(dy) == 2) {
+            x3 = x2 + dx / 2;
+            y3 = y2 + dy / 2;
+            if(!((state->Bx == x3 && state->By == y3) || (state->Wx == x3 && state->Wy == y3))) return false;
+            dx /= 2;
+            dy /= 2;
+        }
+        if(check_movable) {
+            movable_array(state, mv, x2, y2);
+            if(!mv[(dx + 1) + (dy + 1) * 3]) {
+                printf("%d %d\n", dx, dy);
+                printf("not movable!!!!!!!\n");
+                return false;
+            }
+        }
+        if(state->turn % 2 == 0) {
+            state->Bx = x;
+            state->By = y;
+        } else {
+            state->Wx = x;
+            state->Wy = y;
+        }
 
+        if(calc_placable_array) {
+            calc_placable_array_and_set(state);
         }
     } else {
         //壁置き
+
+        if(state->turn % 2 == 0) walls = state->black_walls;
+        else walls = state->white_walls;
+
+        rf = get_bit(state->placable_r_bitarr, x, y);
+        cf = get_bit(state->placable_c_bitarr, x, y);
+
+        if(check_placable) {
+            if(s[2] == 'h') {
+                if(rf && walls >= 1) {
+                    set_row_wall_1(state, x, y);
+                    if(state->turn % 2 == 0) state->black_walls -= 1;
+                    else state->white_walls -= 1;
+                } else {
+                    return false;
+                }
+            } else if(s[2] == 'v') {
+                if(cf && walls >= 1) {
+                    set_column_wall_1(state, x, y);
+                    if(state->turn % 2 == 0) state->black_walls -= 1;
+                    else state->white_walls -= 1;
+                } else {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else {
+            if(s[2] == 'h') {
+                set_row_wall_1(state, x, y);
+                if(state->turn % 2 == 0) state->black_walls -= 1;
+                else state->white_walls -= 1;
+            } else if(s[2] == 'v') {
+                set_column_wall_1(state, x, y);
+                if(state->turn % 2 == 0) state->black_walls -= 1;
+                else state->white_walls -= 1;
+            } else {
+                return false;
+            }
+        }
+
+        if(calc_placable_array) {
+            calc_placable_array_and_set(state);
+        }
+
+        calc_dist_array(state, 0);
+        calc_dist_array(state, BOARD_LEN - 1);
     }
-    //printf("%s, %d %d\n", s, x, y);
+    state->turn++;
+
+    //printf("%d %d\n", state->Bx, state->By);
+    //printf("%d %d\n", state->Wx, state->Wy);
+
+    if(state->By == 0) {
+        state->terminate = true;
+        state->reward = 1;
+    } else if(state->Wy == BOARD_LEN - 1) {
+        state->terminate = true;
+        state->reward = -1;        
+    } else if(state->turn == DRAW_TURN) {
+        state->terminate = true;
+        state->reward = 0;    
+    }
+
+    if((state->black_walls == 0 && state->white_walls == 0) || state->terminate) state->wall0_terminate = true;
+
+    if(state->terminate) {
+        state->pseudo_terminate = true;
+        state->pseudo_reward = state->reward;
+    } else {
+        B_dist = state->dist_array1[state->Bx + state->By * BOARD_LEN];
+        W_dist = state->dist_array2[state->Wx + state->Wy * BOARD_LEN];
+        if(state->black_walls == 0 && (W_dist + (1 - state->turn % 2) <= B_dist - 1)) {
+            state->pseudo_terminate = true;
+            state->pseudo_reward = -1;
+        } else if(state->white_walls == 0 && (B_dist + state->turn % 2 <= W_dist - 1)) {
+            state->pseudo_terminate = true;
+            state->pseudo_reward = 1;
+        } else if(is_mirror_match(state)) {
+            state->pseudo_terminate = true;
+            state->pseudo_reward = -1;
+        } else {
+            state->pseudo_terminate = false;
+            state->pseudo_reward = 0;
+        }
+    }
+
     return true;
 }
 
@@ -427,6 +553,7 @@ int arrivable_by_cross(__uint128_t cross_bitarrs[4], int pawn_x, int pawn_y, int
 }
 
 void calc_dist_array(State* state, int goal_y) {
+    // goal_yの値から判断して結果をstateのdist_arrayに格納
     Point_uint8 point_queue[BOARD_LEN * BOARD_LEN];
     int q_s = 0, q_e = 0;
     int x2, y2, x3, y3, dx, dy;
@@ -536,6 +663,12 @@ BitArrayPair calc_placable_array_(State* state) {
     }
 
     return ret;
+}
+
+void calc_placable_array_and_set(State* state) {
+    BitArrayPair pair = calc_placable_array_(state);
+    state->placable_r_bitarr = pair.bitarr1;
+    state->placable_c_bitarr = pair.bitarr2;
 }
 
 }

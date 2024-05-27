@@ -51,7 +51,11 @@ class State_c(ctypes.Structure):
                 ("Bx", ctypes.c_int), ("By", ctypes.c_int), ("Wx", ctypes.c_int), ("Wy", ctypes.c_int),
                 ("turn", ctypes.c_int),
                 ("black_walls", ctypes.c_int), ("white_walls", ctypes.c_int),
-                ("dist_array1", ctypes.c_uint8 * 81), ("dist_array2", ctypes.c_uint8 * 81)]
+                ("dist_array1", ctypes.c_uint8 * 81), ("dist_array2", ctypes.c_uint8 * 81),
+                ("placable_r_bitarr", ctypes.c_uint64 * 2),
+                ("placable_c_bitarr", ctypes.c_uint64 * 2),
+                ("terminate", ctypes.c_bool), ("wall0_terminate", ctypes.c_bool), ("pseudo_terminate", ctypes.c_bool),
+                ("reward", ctypes.c_int), ("pseudo_reward", ctypes.c_int)]
     
 class Point_c(ctypes.Structure):
     _fields_ = [("x", ctypes.c_int), ("y", ctypes.c_int)]
@@ -111,6 +115,10 @@ is_mirror_match = lib.is_mirror_match
 is_mirror_match.argtypes = [ctypes.POINTER(State_c)]
 is_mirror_match.restype = ctypes.c_bool
 
+calc_placable_array_and_set = lib.calc_placable_array_and_set
+calc_placable_array_and_set.argtypes = [ctypes.POINTER(State_c)]
+calc_placable_array_and_set.restype = None
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
@@ -139,7 +147,43 @@ def movable_array(state, x, y, shortest_only=False):
 
     return mv
 
+def set_state_by_wall(state):
+    # row_wallなどを直接指定して状態を作るときに用いる
+    # 差分計算している部分を計算する
+
+    for x in range(BOARD_LEN - 1):
+        for y in range(BOARD_LEN - 1):
+            if state.row_wall[x, y]:
+                set_row_wall_1(state.state_c, x, y)
+            else:
+                set_row_wall_0(state.state_c, x, y)
+            if state.column_wall[x, y]:
+                set_column_wall_1(state.state_c, x, y)
+            else:
+                set_column_wall_0(state.state_c, x, y)
+
+    state.cross_movable_arr = state.cross_movable_array2(state.row_wall, state.column_wall)
+    state.dist_array1 = state.dist_array(0, state.cross_movable_arr)
+    state.dist_array2 = state.dist_array(BOARD_LEN - 1, state.cross_movable_arr)
+    for x in range(BOARD_LEN):
+        for y in range(BOARD_LEN):
+            state.state_c.dist_array1[x + y * BOARD_LEN] = state.dist_array1[x, y]
+            state.state_c.dist_array2[x + y * BOARD_LEN] = state.dist_array2[x, y]
+
+    calc_placable_array_and_set(state.state_c)
+
 # -----------------------------------------
+
+def get_numpy_arr(bitarr, len_):
+    ret = np.zeros((len_, len_), dtype=bool)
+    row_placable_bitarr = bitarray(128)
+    row_placable_bitarr[:64] = int2ba(bitarr[1], length=64)
+    row_placable_bitarr[64:] = int2ba(bitarr[0], length=64)
+
+    for x in range(len_):
+        for y in range(len_):
+            ret[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
+    return ret
 
 def print_bitarr(bitarr):
     print()
@@ -150,21 +194,13 @@ def print_bitarr(bitarr):
 
 cdef class State:
     draw_turn = DRAW_TURN
-    cdef public np.ndarray seen, row_wall, column_wall, must_be_checked_x, must_be_checked_y, placable_r_, placable_c_, placable_rb, placable_cb, placable_rw, placable_cw, dist_array1, dist_array2
+    cdef public np.ndarray seen, row_wall, column_wall, dist_array1, dist_array2
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public DTYPE_t[:, :, :] prev, cross_movable_arr
     cdef public state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_r_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_c_ = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_rb = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_cb = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_rw = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.placable_cw = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.must_be_checked_x = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.must_be_checked_y = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.Bx = BOARD_LEN // 2
         self.By = BOARD_LEN - 1
         self.Wx = BOARD_LEN // 2
@@ -203,7 +239,6 @@ cdef class State:
 
     def __eq__(self, state):
         assert False
-        return False
 
     def get_player_dist_from_goal(self):
         return self.dist_array1[self.Bx, self.By], self.dist_array2[self.Wx, self.Wy]
@@ -213,170 +248,51 @@ cdef class State:
 
     def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
         # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
+
+        old_wall_num = self.black_walls + self.white_walls
         
-        accept_action_str_c(self.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
+        ret = accept_action_str_c(self.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
 
-        if len(s) <= 1 or len(s) >= 4:
-            return False
-        if s[0] not in notation_dict.keys():
-            return False
-        if not s[1].isdigit():
-            return False
-        x = notation_dict[s[0]]
-        y = int(s[1]) - 1
-        if len(s) == 2:
-            if self.turn % 2 == 0:
-                x2 = self.Bx
-                y2 = self.By
-            else:
-                x2 = self.Wx
-                y2 = self.Wy
-            dx = x - x2
-            dy = y - y2
-            if abs(dx) + abs(dy) >= 3:
-                return False
-            if abs(dx) == 2 or abs(dy) == 2:
-                x3 = x2 + dx // 2
-                y3 = y2 + dy // 2
-                if not ((self.Bx == x3 and self.By == y3) or (self.Wx == x3 and self.Wy == y3)):
-                    return False
-                dx //= 2
-                dy //= 2
-            if check_movable:
-                mv = movable_array(self, x2, y2)
-                if not mv[dx, dy]:
-                    return False
-            if self.turn % 2 == 0:
-                self.Bx = self.state_c.Bx = x
-                self.By = self.state_c.By = y
-                
-            else:
-                self.Wx = self.state_c.Wx = x
-                self.Wy = self.state_c.Wy = y
+        self.Bx = self.state_c.Bx
+        self.By = self.state_c.By
+        self.Wx = self.state_c.Wx
+        self.Wy = self.state_c.Wy
+        self.turn = self.state_c.turn
+        self.black_walls = self.state_c.black_walls
+        self.white_walls = self.state_c.white_walls
 
-            # placable_arrayを更新
-            if calc_placable_array:
-                placable_r, placable_c = self.calc_placable_array(skip_calc_graph=True)
-                self.placable_r_ = placable_r
-                self.placable_c_ = placable_c
-                self.placable_rb, self.placable_cb = (placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1)
-                self.placable_rw, self.placable_cw = (placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1)
+        self.terminate = self.state_c.terminate
+        self.reward = self.state_c.reward
+        self.wall0_terminate = self.state_c.wall0_terminate
+        self.pseudo_terminate = self.state_c.pseudo_terminate
+        self.pseudo_reward = self.state_c.pseudo_reward
 
-        elif len(s) == 3:
-            if self.turn % 2 == 0:
-                walls = self.black_walls
-            else:
-                walls = self.white_walls
+        # 壁置きなら
+        if old_wall_num != self.black_walls + self.white_walls:
+            row_wall_bitarr = bitarray(128)
+            column_wall_bitarr = bitarray(128)
+            row_wall_bitarr[:64] = int2ba(self.state_c.row_wall_bitarr[1], length=64)
+            row_wall_bitarr[64:] = int2ba(self.state_c.row_wall_bitarr[0], length=64)
+            column_wall_bitarr[:64] = int2ba(self.state_c.column_wall_bitarr[1], length=64)
+            column_wall_bitarr[64:] = int2ba(self.state_c.column_wall_bitarr[0], length=64)
 
-            if check_placable:
-                #rf, cf = self.placable(x, y)
-                rf = self.placable_r_[x, y]  # 240121修正。こうしないとGUI.pyなどで道を塞げてしまう。むしろこれで問題ないなら速度の観点からもこちらに統一すべき
-                cf = self.placable_c_[x, y]
-                #print(rf, cf)
+            for x in range(BOARD_LEN - 1):
+                for y in range(BOARD_LEN - 1):
+                    self.row_wall[x, y] = row_wall_bitarr[x + y * BIT_BOARD_LEN]
+                    self.column_wall[x, y] = column_wall_bitarr[x + y * BIT_BOARD_LEN]
 
-                if s[2] == "h":
-                    if rf and walls >= 1:
-                        self.row_wall[x, y] = 1
-                        set_row_wall_1(self.state_c, x, y)
-                        if self.turn % 2 == 0:
-                            self.black_walls -= 1
-                            self.state_c.black_walls -= 1
-                        else:
-                            self.white_walls -= 1
-                            self.state_c.white_walls -= 1
-                    else:
-                        return False
-                elif s[2] == "v":
-                    if cf and walls >= 1:
-                        self.column_wall[x, y] = 1
-                        set_column_wall_1(self.state_c, x, y)
-                        if self.turn % 2 == 0:
-                            self.black_walls -= 1
-                            self.state_c.black_walls -= 1
-                        else:
-                            self.white_walls -= 1
-                            self.state_c.white_walls -= 1
-                    else:
-                        return False
-                else:
-                    return False
-            else:  # 非合法手が来ない前提で、placableを省略して高速化
-                if s[2] == "h":
-                    if walls >= 1:
-                        self.row_wall[x, y] = 1
-                        set_row_wall_1(self.state_c, x, y)
-                        if self.turn % 2 == 0:
-                            self.black_walls -= 1
-                            self.state_c.black_walls -= 1
-                        else:
-                            self.white_walls -= 1
-                            self.state_c.white_walls -= 1
-                    else:
-                        return False
-                elif s[2] == "v":
-                    if walls >= 1:
-                        self.column_wall[x, y] = 1
-                        set_column_wall_1(self.state_c, x, y)
-                        if self.turn % 2 == 0:
-                            self.black_walls -= 1
-                            self.state_c.black_walls -= 1
-                        else:
-                            self.white_walls -= 1
-                            self.state_c.white_walls -= 1
-                    else:
-                        return False
-                else:
-                    return False
+            self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+            self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
-            # 壁置きの場合計算しなおし
-            self.cross_movable_arr = self.cross_movable_array_by_diff(self.cross_movable_arr, x, y, s[2] == "h")
-            if calc_placable_array:
-                placable_r, placable_c = self.calc_placable_array()
-                self.placable_r_ = placable_r
-                self.placable_c_ = placable_c
-                self.placable_rb, self.placable_cb = (placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1)
-                self.placable_rw, self.placable_cw = (placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1)
-            
-            # dist_arrayも計算しなおし
-            if CALC_DIST_ARRAY:
-                self.dist_array1 = self.calc_dist_array(0)
-                self.dist_array2 = self.calc_dist_array(BOARD_LEN - 1)
-        self.turn += 1
-        self.state_c.turn += 1
+            for i in range(4):
+                cross_bitarr = bitarray(128)
+                cross_bitarr[:64] = int2ba(self.state_c.cross_bitarrs[i * 2 + 1], length=64)
+                cross_bitarr[64:] = int2ba(self.state_c.cross_bitarrs[i * 2], length=64)
+                for x in range(BOARD_LEN):
+                    for y in range(BOARD_LEN):
+                        self.cross_movable_arr[x, y, i] = cross_bitarr[x + y * BIT_BOARD_LEN]
 
-        if self.By == 0:
-            self.terminate = True
-            self.reward = 1
-        elif self.Wy == BOARD_LEN - 1:
-            self.terminate = True
-            self.reward = -1
-        elif self.turn == self.draw_turn:
-            self.terminate = True
-            self.reward = 0
-
-        if (self.black_walls == 0 and self.white_walls == 0) or self.terminate:
-            self.wall0_terminate = True
-        
-        if self.terminate:
-            self.pseudo_terminate = True
-            self.pseudo_reward = self.reward
-        else:
-            B_dist = self.dist_array1[self.Bx, self.By]
-            W_dist = self.dist_array2[self.Wx, self.Wy]
-            if self.black_walls == 0 and (W_dist + (1 - self.turn % 2) <= B_dist - 1):
-                self.pseudo_terminate = True
-                self.pseudo_reward = -1
-            elif self.white_walls == 0 and (B_dist + self.turn % 2 <= W_dist - 1):
-                self.pseudo_terminate = True
-                self.pseudo_reward = 1
-            elif is_mirror_match(self.state_c):
-                self.pseudo_terminate = True
-                self.pseudo_reward = -1
-            else:
-                self.pseudo_terminate = False
-                self.pseudo_reward = 0
-
-        return True
+        return ret
 
     def is_certain_path_terminate(self, color=None):
         B_dist = self.dist_array1[self.Bx, self.By]
@@ -399,54 +315,8 @@ cdef class State:
 
         return False
 
-    # 上，右，下，左
-    def cross_movable(self, x, y):
-        ret = np.zeros((4,), dtype="bool")
-        ret[UP] = (not (y == 0 or self.row_wall[min(x, BOARD_LEN - 2), y - 1] or self.row_wall[max(x - 1, 0), y - 1]))
-        ret[RIGHT] = (not (x == BOARD_LEN - 1 or self.column_wall[x, min(y, BOARD_LEN - 2)] or self.column_wall[x, max(y - 1, 0)]))
-        ret[DOWN] = (not (y == BOARD_LEN - 1 or self.row_wall[min(x, BOARD_LEN - 2), y] or self.row_wall[max(x - 1, 0), y]))
-        ret[LEFT] = (not (x == 0 or self.column_wall[x - 1, min(y, BOARD_LEN - 2)] or self.column_wall[x - 1, max(y - 1, 0)]))
-        return ret
-
     def set_state_by_wall(self):
-        # row_wallなどを直接指定して状態を作るときに用いる
-        # 差分計算している部分を計算する
-
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                if self.row_wall[x, y]:
-                    set_row_wall_1(self.state_c, x, y)
-                else:
-                    set_row_wall_0(self.state_c, x, y)
-                if self.column_wall[x, y]:
-                    set_column_wall_1(self.state_c, x, y)
-                else:
-                    set_column_wall_0(self.state_c, x, y)
-
-        self.cross_movable_arr = self.cross_movable_array2(self.row_wall, self.column_wall)
-        self.dist_array1 = self.dist_array(0, self.cross_movable_arr)
-        self.dist_array2 = self.dist_array(BOARD_LEN - 1, self.cross_movable_arr)
-        for x in range(BOARD_LEN):
-            for y in range(BOARD_LEN):
-                self.state_c.dist_array1[x + y * BOARD_LEN] = self.dist_array1[x, y]
-                self.state_c.dist_array2[x + y * BOARD_LEN] = self.dist_array2[x, y]
-
-        placable_r, placable_c = self.calc_placable_array()
-        self.placable_r_ = placable_r
-        self.placable_c_ = placable_c
-        self.placable_rb, self.placable_cb = (placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1)
-        self.placable_rw, self.placable_cw = (placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1)
-
-    def cross_movable_array_by_diff(self, DTYPE_t[:, :, :] prev_cross_movable_arr, int wall_x, int wall_y, int is_row):
-        if is_row:
-            for x in range(wall_x, wall_x + 2):
-                prev_cross_movable_arr[x, wall_y, DOWN] = 0
-                prev_cross_movable_arr[x, wall_y+1, UP] = 0
-        else:
-            for y in range(wall_y, wall_y + 2):
-                prev_cross_movable_arr[wall_x, y, RIGHT] = 0
-                prev_cross_movable_arr[wall_x+1, y, LEFT] = 0
-        return prev_cross_movable_arr
+        assert False
 
     def cross_movable_array2(self, row_wall, column_wall):
         cdef int x, y
@@ -472,10 +342,12 @@ cdef class State:
         return True
 
     def placable_array(self, color):
+        placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
+        placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
         if color == 0:
-            return self.placable_rb, self.placable_cb
+            return placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1
         else:
-            return self.placable_rw, self.placable_cw
+            return placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1
 
     cdef (int, int) placable_with_color(self, x, y, color):
         # すべてarrivableで確かめる。
@@ -505,32 +377,6 @@ cdef class State:
                 f = self.arrivable(self.Bx, self.By, 0)
             else:
                 f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.column_wall[x, y] = 0
-            set_column_wall_0(self.state_c, x, y)
-            column_f = column_f and f
-        return row_f, column_f
-    
-    cdef (int, int) placable(self, x, y):
-        if self.row_wall[x, y] or self.column_wall[x, y]:
-            return False, False
-        row_f = True
-        column_f = True
-
-        if self.row_wall[max(x - 1, 0), y] or self.row_wall[min(x + 1, BOARD_LEN - 2), y]:
-            row_f = False
-        if self.column_wall[x, max(y - 1, 0)] or self.column_wall[x, min(y + 1, BOARD_LEN - 2)]:
-            column_f = False
-        if row_f and self.must_be_checked_y[x, y]:
-            self.row_wall[x, y] = 1
-            set_row_wall_1(self.state_c, x, y)
-            f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.row_wall[x, y] = 0
-            set_row_wall_0(self.state_c, x, y)
-            row_f = row_f and f
-        if column_f and self.must_be_checked_x[x, y]:
-            self.column_wall[x, y] = 1
-            set_column_wall_1(self.state_c, x, y)
-            f = self.arrivable(self.Bx, self.By, 0) and self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
             self.column_wall[x, y] = 0
             set_column_wall_0(self.state_c, x, y)
             column_f = column_f and f
@@ -728,8 +574,8 @@ cdef class State:
         column_wall = self.column_wall
         dist1, dist2 = self.get_player_dist_from_goal()
         cross_arr = np.copy(self.cross_movable_arr)
-        placable_r = self.placable_r_
-        placable_c = self.placable_c_
+        placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
+        placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
         if xflip:
             Bx = 8 - Bx
             Wx = 8 - Wx
