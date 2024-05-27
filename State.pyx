@@ -122,6 +122,10 @@ uint128ToBoolArray = lib.uint128ToBoolArray
 uint128ToBoolArray.argtypes = [ctypes.c_uint64, ctypes.c_uint64]
 uint128ToBoolArray.restype = ctypes.POINTER(ctypes.c_bool)
 
+uint128To2dBoolArray = lib.uint128To2dBoolArray
+uint128To2dBoolArray.argtypes = [ctypes.c_uint64, ctypes.c_uint64, ctypes.c_int]
+uint128To2dBoolArray.restype = ctypes.POINTER(ctypes.c_bool)
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
@@ -178,14 +182,17 @@ def set_state_by_wall(state):
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
-    cdef np.ndarray[DTYPE_t, ndim = 2] ret
-    cdef int x, y
-    ret = np.zeros((len_, len_), dtype=DTYPE)
-    bool_p = uint128ToBoolArray(bitarr[1 + offset], bitarr[0 + offset])
-    for x in range(len_):
-        for y in range(len_):
-            ret[x, y] = bool_p[x + y * BIT_BOARD_LEN]
-    return ret
+    # cdef np.ndarray[DTYPE_t, ndim = 2] ret
+    # cdef int x, y
+    # ret = np.zeros((len_, len_), dtype=DTYPE)
+
+    bool_arr = np.ctypeslib.as_array(uint128To2dBoolArray(bitarr[1 + offset], bitarr[offset], len_), shape=(len_, len_))
+    #print(bool_arr)
+    # for x in range(len_):
+    #     for y in range(len_):
+    #         ret[x, y] = bool_p[x + y * BIT_BOARD_LEN]
+    #return ret
+    return bool_arr
 
 
 def print_bitarr(bitarr):
@@ -310,8 +317,8 @@ cdef class State:
 
     def cross_movable_array2(self, row_wall, column_wall):
         cdef int x, y
-        #cdef np.ndarray[DTYPE_t, ndim = 3] ret = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
-        cdef DTYPE_t[:, :, :] ret = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim = 3] ret = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
+        #cdef DTYPE_t[:, :, :] ret = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
 
         for x in range(BOARD_LEN):
             for y in range(BOARD_LEN):

@@ -168,6 +168,28 @@ bool* uint128ToBoolArray(uint64_t value_high, uint64_t value_low) {
     return boolArrayRet;
 }
 
+bool* uint128To2dBoolArray(uint64_t value_high, uint64_t value_low, int len) {
+    __uint128_t value = ((__uint128_t)value_high << 64) | value_low;
+    //print_full_bitarray(value);
+    int size = len * len;
+    int x, y;
+    bool *ret = new bool[size];
+    
+    for (int i = 127; i >= 0; i--) {
+        x = i % BIT_BOARD_LEN;
+        y = i / BIT_BOARD_LEN;
+        //printf("%d, %d, %d\n", x, y, value & 1);
+        if(x >= len || y >= len) {
+            value >>= 1;  
+            continue;
+        }
+        ret[x * len + y] = value & 1; // 最下位ビットを取り出す
+        value >>= 1; 
+    }
+
+    return ret;
+}
+
 void print_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BOARD_LEN; y++) {
         for(int x = 0; x < BOARD_LEN; x++) {
