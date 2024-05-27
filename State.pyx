@@ -178,24 +178,16 @@ def set_state_by_wall(state):
 
 # -----------------------------------------
 
-def get_numpy_arr(bitarr, len_):
-    # ret = np.zeros((len_, len_), dtype=bool)
-    # row_placable_bitarr = bitarray(128)
-    # row_placable_bitarr[:64] = int2ba(bitarr[1], length=64)
-    # row_placable_bitarr[64:] = int2ba(bitarr[0], length=64)
-    # for x in range(len_):
-    #     for y in range(len_):
-    #         ret[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
-    # return ret
-
-    ret = np.zeros((len_, len_), dtype=bool)
+def get_numpy_arr(bitarr, int len_):
+    cdef np.ndarray[DTYPE_t, ndim = 2] ret
+    cdef int x, y
+    ret = np.zeros((len_, len_), dtype=DTYPE)
     bool_p = uint128ToBoolArray(bitarr[1], bitarr[0])
     for x in range(len_):
         for y in range(len_):
             ret[x, y] = bool_p[x + y * BIT_BOARD_LEN]
     return ret
 
-    
 
 def print_bitarr(bitarr):
     print()
@@ -357,9 +349,9 @@ cdef class State:
         placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
         placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
         if color == 0:
-            return placable_r * (self.black_walls >= 1), placable_c * self.black_walls >= 1
+            return placable_r * int(self.black_walls >= 1), placable_c * int(self.black_walls >= 1)
         else:
-            return placable_r * (self.white_walls >= 1), placable_c * self.white_walls >= 1
+            return placable_r * int(self.white_walls >= 1), placable_c * int(self.white_walls >= 1)
 
     cdef (int, int) placable_with_color(self, x, y, color):
         # すべてarrivableで確かめる。
