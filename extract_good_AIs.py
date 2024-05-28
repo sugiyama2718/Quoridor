@@ -96,11 +96,15 @@ def calc_match_score_arr(N_arr, r_arr):
 
 
 def evaluate_2game_process_2id(arg_tuple):
+    arg_i, arg_j, AI_id1, AI_id2, seed, search_nodes1, search_nodes2, wait_time = arg_tuple
+
+    import time
+    time.sleep(wait_time)
+    
     from main import evaluate
     from CNNAI import CNNAI
     # 先後で２試合して勝利数を返す
-    arg_i, arg_j, AI_id1, AI_id2, seed, search_nodes1, search_nodes2 = arg_tuple
-
+    
     if AI_id1 == -1:
         AI1 = CNNAI(0, search_nodes=search_nodes1, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
     else:
@@ -236,8 +240,11 @@ if __name__ == "__main__":
 
     def apply_matches(matches, total_game_num):
         args = []
+        wait_time_list = [0] * len(matches)
+        for i in range(len(matches)):
+            wait_time_list[i] = i
         for k, (i, j) in enumerate(matches):
-            args.append((i, j, AI_id_list[i], AI_id_list[j], (k + total_game_num) * 10000, search_nodes_list[i], search_nodes_list[j]))
+            args.append((i, j, AI_id_list[i], AI_id_list[j], (k + total_game_num) * 10000, search_nodes_list[i], search_nodes_list[j], wait_time_list[k]))
 
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process_2id, iterable=args)

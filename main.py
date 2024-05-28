@@ -563,7 +563,8 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
 
 
 def generate_h5_single(pair):
-    h5_id_, display, AI_id, search_nodes, epoch = pair
+    h5_id_, display, AI_id, search_nodes, epoch, wait_time = pair
+    time.sleep(wait_time)
     return generate_h5(h5_id_, display, AI_id, search_nodes, epoch)
 
 
@@ -745,12 +746,10 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
         h5_exist_set = set([int(s.split(".")[0]) for s in files])
         h5_list = list(h5_set - h5_exist_set)
         h5_list = sorted(h5_list)
-
-        # for x in [(h5_id_, h5_id_ % PROCESS_NUM == 0, load_AI_id, search_nodes, epoch) for h5_id_ in h5_list]:
-        #     generate_h5_single(x)
+        wait_time_list = [(x - min(h5_list)) * 2 if x - min(h5_list) < PROCESS_NUM else 0 for x in h5_list]
 
         with Pool(processes=PROCESS_NUM) as p:
-            imap = p.imap(func=generate_h5_single, iterable=[(h5_id_, h5_id_ % PROCESS_NUM == 0, load_AI_id, search_nodes, epoch) for h5_id_ in h5_list])
+            imap = p.imap(func=generate_h5_single, iterable=[(h5_id_, h5_id_ % PROCESS_NUM == 0, load_AI_id, search_nodes, epoch, wait_time) for h5_id_, wait_time in zip(h5_list, wait_time_list)])
             win_tuple_list = list(tqdm(imap, total=len(h5_list), file=sys.stdout))
         
         print("")
