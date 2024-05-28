@@ -176,6 +176,37 @@ def set_state_by_wall(state):
 
     calc_placable_array_and_set(state.state_c)
 
+def accept_action_str(state, s, check_placable=True, calc_placable_array=True, check_movable=True):
+    # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
+
+    old_wall_num = state.black_walls + state.white_walls
+    
+    ret = accept_action_str_c(state.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
+
+    state.Bx = state.state_c.Bx
+    state.By = state.state_c.By
+    state.Wx = state.state_c.Wx
+    state.Wy = state.state_c.Wy
+    state.turn = state.state_c.turn
+    state.black_walls = state.state_c.black_walls
+    state.white_walls = state.state_c.white_walls
+
+    state.terminate = state.state_c.terminate
+    state.reward = state.state_c.reward
+    state.wall0_terminate = state.state_c.wall0_terminate
+    state.pseudo_terminate = state.state_c.pseudo_terminate
+    state.pseudo_reward = state.state_c.pseudo_reward
+
+    # 壁置きなら
+    if old_wall_num != state.black_walls + state.white_walls:
+        state.row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+        state.column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+
+        state.dist_array1 = np.array([state.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+        state.dist_array2 = np.array([state.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+
+    return ret
+
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
@@ -241,35 +272,7 @@ cdef class State:
         assert False
 
     def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
-        # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
-
-        old_wall_num = self.black_walls + self.white_walls
-        
-        ret = accept_action_str_c(self.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
-
-        self.Bx = self.state_c.Bx
-        self.By = self.state_c.By
-        self.Wx = self.state_c.Wx
-        self.Wy = self.state_c.Wy
-        self.turn = self.state_c.turn
-        self.black_walls = self.state_c.black_walls
-        self.white_walls = self.state_c.white_walls
-
-        self.terminate = self.state_c.terminate
-        self.reward = self.state_c.reward
-        self.wall0_terminate = self.state_c.wall0_terminate
-        self.pseudo_terminate = self.state_c.pseudo_terminate
-        self.pseudo_reward = self.state_c.pseudo_reward
-
-        # 壁置きなら
-        if old_wall_num != self.black_walls + self.white_walls:
-            self.row_wall = get_numpy_arr(self.state_c.row_wall_bitarr, BOARD_LEN - 1)
-            self.column_wall = get_numpy_arr(self.state_c.column_wall_bitarr, BOARD_LEN - 1)
-
-            self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-            self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-
-        return ret
+        assert False
 
     def is_certain_path_terminate(self, color=None):
         B_dist = self.dist_array1[self.Bx, self.By]

@@ -1,7 +1,7 @@
 import os
 from Tree import OpeningTree
 from tqdm import tqdm
-from State import State, State_init
+from State import State, State_init, accept_action_str
 
 def Glendenning2Official(s):
     """
@@ -75,7 +75,7 @@ def get_state_from_action_list(action_list):
     state = State()
     State_init(state)
     for a in action_list:
-        state.accept_action_str(a)
+        accept_action_str(state, a)
     return state
 
 
@@ -120,8 +120,8 @@ def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
         path = [node]
 
         for action_str, mirror_action_str, normalized_action_str, depth in zip(action_list, mirror_action_list, normalized_action_list, range(len(action_list))):
-            state.accept_action_str(action_str, check_placable=False, calc_placable_array=False, check_movable=False)
-            mirror_state.accept_action_str(mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
+            accept_action_str(state, action_str, check_placable=False, calc_placable_array=False, check_movable=False)
+            accept_action_str(mirror_state, mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
 
             state_vec = tuple(state.feature_int().flatten())
             mirror_state_vec = tuple(mirror_state.feature_int().flatten())

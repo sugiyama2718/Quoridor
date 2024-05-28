@@ -1,5 +1,5 @@
 import os, sys
-from State import State, State_init
+from State import State, State_init, accept_action_str
 from Agent import actionid2str, str2actionid
 from BasicAI import state_copy
 from util import Glendenning2Official, Official2Glendenning
@@ -70,7 +70,7 @@ class UCIEngine:
         color = self.state.turn % 2
         state_backup = state_copy(self.state)
 
-        if not self.state.accept_action_str(Official2Glendenning(action)):
+        if not accept_action_str(self.state, Official2Glendenning(action)):
             print(action)
             print("this action is impossible")
             return

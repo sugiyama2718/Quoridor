@@ -23,7 +23,7 @@ from kivy.uix.popup import Popup
 from kivy.uix.filechooser import FileChooserListView
 
 from Agent import actionid2str
-from State import State, CHANNEL, State_init
+from State import State, CHANNEL, State_init, accept_action_str
 from State import DRAW_TURN
 from CNNAI import CNNAI
 from BasicAI import state_copy, get_state_vec
@@ -412,7 +412,7 @@ class Quoridor(Widget):
                 state = State()
                 State_init(state)
                 for a in all_actions:
-                    state.accept_action_str(Official2Glendenning(a))
+                    accept_action_str(state, Official2Glendenning(a))
                 ptag_string = state.display_cui(ret_str=True) + os.linesep
             else:
                 next_depth = depth
@@ -551,10 +551,6 @@ class Quoridor(Widget):
         #action_list = self.action_history[1:self.turn + 1]
 
         for i, a in enumerate(action_list):
-            # if not s.accept_action_str(a):
-            #     print(f"{a} is impossible")
-            #     return
-            
             key = Glendenning2Official(a)
 
             if key not in node.children.keys():
@@ -632,7 +628,7 @@ class Quoridor(Widget):
             if isOfficial:
                 a = Official2Glendenning(a)
 
-            if not self.state.accept_action_str(a):
+            if not accept_action_str(self.state, a):
                 print(a)
                 print("this action is impossible")
                 return
@@ -791,7 +787,7 @@ class Quoridor(Widget):
             a = actionid2str(self.state, s)
         else:
             a = s
-        if not self.state.accept_action_str(a):
+        if not accept_action_str(self.state, a):
             print(a)
             print("this action is impossible")
             return

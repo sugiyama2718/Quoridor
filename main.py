@@ -1,7 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, eq_state
+from State import State, CHANNEL, State_init, eq_state, accept_action_str
 from State import DRAW_TURN
 from Human import Human
 from CNNAI import CNNAI
@@ -45,7 +45,7 @@ def normal_play(agents, initial_state=None):
             a = actionid2str(state, s)
         else:
             a = s
-        while not state.accept_action_str(a):
+        while not accept_action_str(state, a):
             print(a)
             print("this action is impossible")
             s = agents[0].act(state, showNQ=True)
@@ -68,7 +68,7 @@ def normal_play(agents, initial_state=None):
             a = actionid2str(state, s)
         else:
             a = s
-        while not state.accept_action_str(a):
+        while not accept_action_str(state, a):
             print(a)
             print("this action is impossible")
             s = agents[1].act(state, showNQ=True)
@@ -120,7 +120,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
                 AIs[1].tau = TAU_MIN
             s, pi, v_prev, v_post, searched_node_num = AIs[0].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[1].prev_tree)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
                 state.display_cui()
@@ -154,7 +154,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
                 featuress[i].append(state.feature_CNN(b1, b2))
             s, pi, v_prev, v_post, searched_node_num = AIs[1].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[0].prev_tree)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
                 state.display_cui()
@@ -295,7 +295,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
                 state.display_cui()
             s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
                 a = actionid2str(state, s)
@@ -314,7 +314,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
 
             s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
                 a = actionid2str(state, s)

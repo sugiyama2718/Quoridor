@@ -1,5 +1,5 @@
 # coding:utf-8
-from State import State, BIT_BOARD_LEN, State_c, State_init, set_state_by_wall, movable_array
+from State import State, BIT_BOARD_LEN, State_c, State_init, set_state_by_wall, movable_array, accept_action_str
 import numpy as np
 import os, sys
 import ctypes
@@ -39,7 +39,7 @@ eq_state.restype = ctypes.c_bool
 # action_list = ["e8", "e2", "a1h"]
 # state = State()
 # for action_str in action_list:
-#     state.accept_action_str(action_str)
+#     accept_action_str(state, action_str)
 #     state.display_cui()
 # exit()
 

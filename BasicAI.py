@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array
+from State import State_c, State_init, color_p, movable_array, accept_action_str
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -113,7 +113,7 @@ def get_graphviz_tree_for_shared_tree(tree, g, threshold=5, root=True, color=Non
             if int(tree.N[key]) >= threshold:
                 g.edge(str(tree.node_id), str(node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
                 state = state_copy(tree.s)
-                state.accept_action_str(actionid2str(tree.s, key))
+                accept_action_str(state, actionid2str(tree.s, key))
                 if color == 0:
                     v = state.pseudo_reward
                 else:
@@ -156,7 +156,7 @@ def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
 
                     g.edge(str(parent_count), str(count), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
                     state = state_copy(tree.s)
-                    state.accept_action_str(actionid2str(tree.s, key))
+                    accept_action_str(state, actionid2str(tree.s, key))
                     if color == 0:
                         v = state.pseudo_reward
                     else:
@@ -305,7 +305,7 @@ def calc_optimal_move_by_DP(s):
 
 def calc_next_state(x):
     state, action = x
-    state.accept_action_str(actionid2str(state, action), check_placable=False)
+    accept_action_str(state, actionid2str(state, action), check_placable=False)
     return state
 
 
@@ -461,7 +461,7 @@ class BasicAI(Agent):
         for i, action in enumerate(actions):
             try:
                 # checkしないため、内部的には非合法手扱いされることがありFalseになることがある。ただし、actionsが合法手からなるので問題なし。
-                state.accept_action_str(actionid2str(state, action), check_placable=False, calc_placable_array=False, check_movable=False)
+                accept_action_str(state, actionid2str(state, action), check_placable=False, calc_placable_array=False, check_movable=False)
             except:
                 print("{} error action={}".format(i, action))
                 print(actions)
@@ -711,7 +711,7 @@ class BasicAI(Agent):
                 leaf_movable_arrs.append(self.calc_leaf_movable_arr(state, actions))
                 s = state_copy(nodes[-1].s)
                 #print([self.actionid2str(node.s, action) for node, action in zip(nodes, actions)])
-                s.accept_action_str(actionid2str(s, actions[-1]), check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
+                accept_action_str(s, actionid2str(s, actions[-1]), check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
                 states.append(s)
             node_num += len(states)
 
