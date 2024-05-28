@@ -87,13 +87,11 @@ for i in test_case_list:
         print(placablec_pred)
         assert False
 
-    # np.savetxt(os.path.join(TEST_DIR, f"{i}/dist_0.csv"), state.dist_array(0, state.cross_movable_array2(state.row_wall, state.column_wall)),delimiter=",")
-    # np.savetxt(os.path.join(TEST_DIR, f"{i}/dist_8.csv"), state.dist_array(8, state.cross_movable_array2(state.row_wall, state.column_wall)),delimiter=",")
     if os.path.exists(os.path.join(TEST_DIR, f"{i}/dist_0.csv")):
         dist_0 = np.loadtxt(os.path.join(TEST_DIR, f"{i}/dist_0.csv"), delimiter=",")
         dist_8 = np.loadtxt(os.path.join(TEST_DIR, f"{i}/dist_8.csv"), delimiter=",")
-        dist_0_pred = state.dist_array(0, state.cross_movable_array2(state.row_wall, state.column_wall))
-        dist_8_pred = state.dist_array(8, state.cross_movable_array2(state.row_wall, state.column_wall))
+        dist_0_pred = state.calc_dist_array(0)
+        dist_8_pred = state.calc_dist_array(8)
         if not np.all(dist_0_pred == dist_0):
             print("dist_0")
             print(dist_0)

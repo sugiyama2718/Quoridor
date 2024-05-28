@@ -174,9 +174,8 @@ def set_state_by_wall(state):
             else:
                 set_column_wall_0(state.state_c, x, y)
 
-    cross_movable_arr = state.cross_movable_array2(state.row_wall, state.column_wall)
-    dist_array1 = state.dist_array(0, cross_movable_arr)
-    dist_array2 = state.dist_array(BOARD_LEN - 1, cross_movable_arr)
+    dist_array1 = state.calc_dist_array(0)
+    dist_array2 = state.calc_dist_array(BOARD_LEN - 1)
     for x in range(BOARD_LEN):
         for y in range(BOARD_LEN):
             state.state_c.dist_array1[x + y * BOARD_LEN] = dist_array1[x, y]
@@ -384,26 +383,6 @@ cdef class State:
                         prev[x3, y3, 0] = x2
                         prev[x3, y3, 1] = y2
         return np.min(dist[:, goal_y])
-
-    def dist_array(self, int goal_y, DTYPE_t[:, :, :] cross_arr):
-        cdef int x, x2, y2, x3, y3, i, dx, dy
-        cdef np.ndarray[DTYPE_t, ndim = 2] dist = np.ones((BOARD_LEN, BOARD_LEN), dtype=DTYPE) * BOARD_LEN * BOARD_LEN * 2
-
-        queue = []
-        for x in range(BOARD_LEN):
-            dist[x, goal_y] = 0
-            queue.append((x, goal_y))
-        while len(queue) > 0:
-            x2, y2 = queue.pop(0)
-            for i, dx, dy in [(0, 0, -1), (1, 1, 0), (2, 0, 1), (3, -1, 0)]:
-                x3 = x2 + dx
-                y3 = y2 + dy
-                if cross_arr[x2, y2, i] and dist[x3, y3] > dist[x2, y2] + 1:
-                    dist[x3, y3] = dist[x2, y2] + 1
-                    queue.append((x3, y3))
-        dist[dist == BOARD_LEN * BOARD_LEN * 2] = -1
-        dist[dist == -1] = np.max(dist) + 1
-        return dist
 
     def calc_dist_array(self, int goal_y):
         calc_dist_array_c(self.state_c, goal_y)
