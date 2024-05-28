@@ -123,6 +123,14 @@ uint128ToBoolArray = lib.uint128ToBoolArray
 uint128ToBoolArray.argtypes = [ctypes.c_uint64, ctypes.c_uint64]
 uint128ToBoolArray.restype = ctypes.POINTER(ctypes.c_bool)
 
+get_player1_dist_from_goal = lib.get_player1_dist_from_goal
+get_player1_dist_from_goal.argtypes = [ctypes.POINTER(State_c)]
+get_player1_dist_from_goal.restype = ctypes.c_int
+
+get_player2_dist_from_goal = lib.get_player2_dist_from_goal
+get_player2_dist_from_goal.argtypes = [ctypes.POINTER(State_c)]
+get_player2_dist_from_goal.restype = ctypes.c_int
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
@@ -207,6 +215,9 @@ def accept_action_str(state, s, check_placable=True, calc_placable_array=True, c
 
     return ret
 
+def get_player_dist_from_goal(state):
+    return get_player1_dist_from_goal(state.state_c), get_player2_dist_from_goal(state.state_c)
+
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
@@ -258,9 +269,7 @@ cdef class State:
         assert False
 
     def get_player_dist_from_goal(self):
-        dist_array1 = get_dist_array_from_c_arr(self.state_c.dist_array1)
-        dist_array2 = get_dist_array_from_c_arr(self.state_c.dist_array2)
-        return dist_array1[self.Bx, self.By], dist_array2[self.Wx, self.Wy]
+        assert False
 
     def color_p(self, color):
         assert False
@@ -545,7 +554,7 @@ cdef class State:
         turn = self.turn
         row_wall = self.row_wall
         column_wall = self.column_wall
-        dist1, dist2 = self.get_player_dist_from_goal()
+        dist1, dist2 = get_player_dist_from_goal(self)
         placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
         placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
         if xflip:

@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN
+from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -506,7 +506,7 @@ class BasicAI(Agent):
 
         wall_num = state.black_walls + state.white_walls
 
-        B_dist, W_dist = state.get_player_dist_from_goal()
+        B_dist, W_dist = get_player_dist_from_goal(state)
 
         # 自分の道が確定していて相手よりも早く着くなら最短路を進むだけ
         if state.is_certain_path_terminate():
@@ -780,7 +780,7 @@ class BasicAI(Agent):
                     lose_reward = -1 if node.s.turn % 2 == 0 else 1
 
                     if action not in node.children.keys():  # 葉ノードを子に持つ
-                        s_B_dist, s_W_dist = s.get_player_dist_from_goal()
+                        s_B_dist, s_W_dist = get_player_dist_from_goal(s)
                         node.dist_diff_arr[action] = max(s_W_dist - s_B_dist + (1 - s.turn % 2), s_B_dist - s_W_dist + s.turn % 2)
                     elif  node.children[action].result != 0:  # 勝敗が決定した子ノードを持つ
                         node.dist_diff_arr[action] = int(np.min(node.children[action].dist_diff_arr))

@@ -342,7 +342,6 @@ class Quoridor(Widget):
 
         self.prev_act_time = time.time()
         self.ai_wait_time = AI_WAIT_TIME
-        #print(self.state.get_player_dist_from_goal())
         touched = False
 
         if self.mode == TRAINING_MODE and isinstance(self.agents[color], CNNAI) and self.turn >= len(self.training_joseki) and self.remaining_time >= 0.0:

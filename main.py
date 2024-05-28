@@ -1,8 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN
-from State import DRAW_TURN
+from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN, get_player_dist_from_goal
 from Human import Human
 from CNNAI import CNNAI
 from BasicAI import state_copy
@@ -193,7 +192,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             continue
 
         # stateは終端状態になっている
-        B_dist, W_dist = state.get_player_dist_from_goal()
+        B_dist, W_dist = get_player_dist_from_goal(state)
         dist_diff = W_dist - B_dist  # 何マス差で勝ったか。勝ちで正になるよう、W-Bにしている
         all_turn_num = state.turn
         move_count[0] += B_dist

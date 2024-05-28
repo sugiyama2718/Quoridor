@@ -462,6 +462,14 @@ bool accept_action_str(State* state, const char* s, bool check_placable=true, bo
     return true;
 }
 
+int get_player1_dist_from_goal(State* state) {
+    return state->dist_array1[state->Bx + state->By * BOARD_LEN];
+}
+
+int get_player2_dist_from_goal(State* state) {
+    return state->dist_array2[state->Wx + state->Wy * BOARD_LEN];
+}
+
 __uint128_t flip_bitarr(__uint128_t bitarr) {
     // 8*8を縦軸・横軸両方でflipする
 

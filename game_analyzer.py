@@ -827,7 +827,6 @@ class Quoridor(Widget):
 
         self.prev_act_time = time.time()
         self.ai_wait_time = AI_WAIT_TIME
-        #print(self.state.get_player_dist_from_goal())
         touched = False
 
     def turn0(self):

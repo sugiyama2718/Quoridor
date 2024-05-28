@@ -5,7 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
-from State import CHANNEL, color_p, movable_array
+from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -435,7 +435,7 @@ class CNNAI(BasicAI):
         if self.v_is_dist:
             y = np.zeros((len(states),))
             for i, s in enumerate(states):
-                B_dist, W_dist = s.get_player_dist_from_goal()
+                B_dist, W_dist = get_player_dist_from_goal(s)
                 y[i] = np.tanh((W_dist - B_dist) * 0.15)
         else:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
