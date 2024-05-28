@@ -1,7 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, eq_state
+from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN
 from State import DRAW_TURN
 from Human import Human
 from CNNAI import CNNAI
@@ -45,7 +45,7 @@ def normal_play(agents, initial_state=None):
             a = actionid2str(state, s)
         else:
             a = s
-        while not state.accept_action_str(a):
+        while not accept_action_str(state, a):
             print(a)
             print("this action is impossible")
             s = agents[0].act(state, showNQ=True)
@@ -68,7 +68,7 @@ def normal_play(agents, initial_state=None):
             a = actionid2str(state, s)
         else:
             a = s
-        while not state.accept_action_str(a):
+        while not accept_action_str(state, a):
             print(a)
             print("this action is impossible")
             s = agents[1].act(state, showNQ=True)
@@ -120,7 +120,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
                 AIs[1].tau = TAU_MIN
             s, pi, v_prev, v_post, searched_node_num = AIs[0].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[1].prev_tree)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
                 state.display_cui()
@@ -154,7 +154,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
                 featuress[i].append(state.feature_CNN(b1, b2))
             s, pi, v_prev, v_post, searched_node_num = AIs[1].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[0].prev_tree)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
                 state.display_cui()
@@ -193,12 +193,14 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             continue
 
         # stateは終端状態になっている
-        B_dist = state.dist_array1[state.Bx, state.By]
-        W_dist = state.dist_array2[state.Wx, state.Wy]
+        B_dist, W_dist = state.get_player_dist_from_goal()
         dist_diff = W_dist - B_dist  # 何マス差で勝ったか。勝ちで正になるよう、W-Bにしている
         all_turn_num = state.turn
         move_count[0] += B_dist
         move_count[1] += W_dist
+
+        dist_array1 = state.calc_dist_array(0)
+        dist_array2 = state.calc_dist_array(BOARD_LEN - 1)
 
         def calc_traversed_arr_list(xy_list):
             traversed_arr = np.zeros((9, 9))
@@ -253,21 +255,21 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
             data.append((feature1, pi, state.reward, v_prev, v_post, searched_node_num, 
                          dist_diff, state.black_walls, state.white_walls, all_turn_num - turn, move_count[0] - mid_move_count[0], move_count[1] - mid_move_count[1],
-                         state.row_wall, state.column_wall, state.dist_array1, state.dist_array2, B_traversed_arr, W_traversed_arr, next_pi))
+                         state.row_wall, state.column_wall, dist_array1, dist_array2, B_traversed_arr, W_traversed_arr, next_pi))
 
             data.append((feature2, pi_flip1(pi), state.reward, v_prev, v_post, searched_node_num, 
                          dist_diff, state.black_walls, state.white_walls, all_turn_num - turn, move_count[0] - mid_move_count[0], move_count[1] - mid_move_count[1],
-                         np.flip(state.row_wall, 0), np.flip(state.column_wall, 0), np.flip(state.dist_array1, 0), np.flip(state.dist_array2, 0), np.flip(B_traversed_arr, 0), np.flip(W_traversed_arr, 0),
+                         np.flip(state.row_wall, 0), np.flip(state.column_wall, 0), np.flip(dist_array1, 0), np.flip(dist_array2, 0), np.flip(B_traversed_arr, 0), np.flip(W_traversed_arr, 0),
                          pi_flip1(next_pi)))
 
             data.append((feature3, pi_flip2(pi), -state.reward, -v_prev, -v_post, searched_node_num, 
                          -dist_diff, state.white_walls, state.black_walls, all_turn_num - turn, move_count[1] - mid_move_count[1], move_count[0] - mid_move_count[0],
-                         np.flip(state.row_wall, 1), np.flip(state.column_wall, 1), np.flip(state.dist_array2, 1), np.flip(state.dist_array1, 1), np.flip(W_traversed_arr, 1), np.flip(B_traversed_arr, 1),
+                         np.flip(state.row_wall, 1), np.flip(state.column_wall, 1), np.flip(dist_array2, 1), np.flip(dist_array1, 1), np.flip(W_traversed_arr, 1), np.flip(B_traversed_arr, 1),
                          pi_flip2(next_pi)))
 
             data.append((feature4, pi_flip3(pi), -state.reward, -v_prev, -v_post, searched_node_num, 
                          -dist_diff, state.white_walls, state.black_walls, all_turn_num - turn, move_count[1] - mid_move_count[1], move_count[0] - mid_move_count[0],
-                         np.flip(np.flip(state.row_wall, 1), 0), np.flip(np.flip(state.column_wall, 1), 0), np.flip(np.flip(state.dist_array2, 1), 0), np.flip(np.flip(state.dist_array1, 1), 0), np.flip(np.flip(W_traversed_arr, 1), 0), np.flip(np.flip(B_traversed_arr, 1), 0),
+                         np.flip(np.flip(state.row_wall, 1), 0), np.flip(np.flip(state.column_wall, 1), 0), np.flip(np.flip(dist_array2, 1), 0), np.flip(np.flip(dist_array1, 1), 0), np.flip(np.flip(W_traversed_arr, 1), 0), np.flip(np.flip(B_traversed_arr, 1), 0),
                          pi_flip3(next_pi)))
     if info:
         print("hash = {}".format(hash_))
@@ -295,7 +297,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
                 state.display_cui()
             s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
                 a = actionid2str(state, s)
@@ -314,7 +316,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
 
             s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
                 a = actionid2str(state, s)

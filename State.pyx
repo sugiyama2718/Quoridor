@@ -73,9 +73,9 @@ calc_placable_array_ = lib.calc_placable_array_
 calc_placable_array_.argtypes = [ctypes.POINTER(State_c)]
 calc_placable_array_.restype = BitArrayPair
 
-calc_dist_array = lib.calc_dist_array
-calc_dist_array.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
-calc_dist_array.restype = None
+calc_dist_array_c = lib.calc_dist_array
+calc_dist_array_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+calc_dist_array_c.restype = None
 
 print_state = lib.print_state
 print_state.argtypes = [ctypes.POINTER(State_c)]
@@ -167,14 +167,45 @@ def set_state_by_wall(state):
                 set_column_wall_0(state.state_c, x, y)
 
     cross_movable_arr = state.cross_movable_array2(state.row_wall, state.column_wall)
-    state.dist_array1 = state.dist_array(0, cross_movable_arr)
-    state.dist_array2 = state.dist_array(BOARD_LEN - 1, cross_movable_arr)
+    dist_array1 = state.dist_array(0, cross_movable_arr)
+    dist_array2 = state.dist_array(BOARD_LEN - 1, cross_movable_arr)
     for x in range(BOARD_LEN):
         for y in range(BOARD_LEN):
-            state.state_c.dist_array1[x + y * BOARD_LEN] = state.dist_array1[x, y]
-            state.state_c.dist_array2[x + y * BOARD_LEN] = state.dist_array2[x, y]
+            state.state_c.dist_array1[x + y * BOARD_LEN] = dist_array1[x, y]
+            state.state_c.dist_array2[x + y * BOARD_LEN] = dist_array2[x, y]
 
     calc_placable_array_and_set(state.state_c)
+
+def get_dist_array_from_c_arr(c_dist_arr):
+    return np.array([c_dist_arr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+
+def accept_action_str(state, s, check_placable=True, calc_placable_array=True, check_movable=True):
+    # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
+
+    old_wall_num = state.black_walls + state.white_walls
+    
+    ret = accept_action_str_c(state.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
+
+    state.Bx = state.state_c.Bx
+    state.By = state.state_c.By
+    state.Wx = state.state_c.Wx
+    state.Wy = state.state_c.Wy
+    state.turn = state.state_c.turn
+    state.black_walls = state.state_c.black_walls
+    state.white_walls = state.state_c.white_walls
+
+    state.terminate = state.state_c.terminate
+    state.reward = state.state_c.reward
+    state.wall0_terminate = state.state_c.wall0_terminate
+    state.pseudo_terminate = state.state_c.pseudo_terminate
+    state.pseudo_reward = state.state_c.pseudo_reward
+
+    # 壁置きなら
+    if old_wall_num != state.black_walls + state.white_walls:
+        state.row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+        state.column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+
+    return ret
 
 # -----------------------------------------
 
@@ -198,7 +229,7 @@ def print_bitarr(bitarr):
 
 cdef class State:
     draw_turn = DRAW_TURN
-    cdef public np.ndarray seen, row_wall, column_wall, dist_array1, dist_array2
+    cdef public np.ndarray row_wall, column_wall
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public np.ndarray prev
     cdef public state_c
@@ -219,61 +250,29 @@ cdef class State:
         self.pseudo_terminate = False  # 相手の壁が0でこちらの方が2近い等、勝敗が確定しているときにTrue
         self.pseudo_reward = 0
 
-        self.seen = np.zeros((BOARD_LEN, BOARD_LEN), dtype="bool")
-        self.dist_array1 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
-        self.dist_array2 = np.zeros((BOARD_LEN, BOARD_LEN), dtype="int8")
-
         self.state_c = State_c()
         State_init_(self.state_c)
         # print_state(self.state_c)
-
-        for y in range(BOARD_LEN):
-            self.dist_array1[:, y] = y
-            self.dist_array2[:, y] = BOARD_LEN - 1 - y
 
     def __eq__(self, state):
         assert False
 
     def get_player_dist_from_goal(self):
-        return self.dist_array1[self.Bx, self.By], self.dist_array2[self.Wx, self.Wy]
+        dist_array1 = get_dist_array_from_c_arr(self.state_c.dist_array1)
+        dist_array2 = get_dist_array_from_c_arr(self.state_c.dist_array2)
+        return dist_array1[self.Bx, self.By], dist_array2[self.Wx, self.Wy]
 
     def color_p(self, color):
         assert False
 
     def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
-        # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
-
-        old_wall_num = self.black_walls + self.white_walls
-        
-        ret = accept_action_str_c(self.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
-
-        self.Bx = self.state_c.Bx
-        self.By = self.state_c.By
-        self.Wx = self.state_c.Wx
-        self.Wy = self.state_c.Wy
-        self.turn = self.state_c.turn
-        self.black_walls = self.state_c.black_walls
-        self.white_walls = self.state_c.white_walls
-
-        self.terminate = self.state_c.terminate
-        self.reward = self.state_c.reward
-        self.wall0_terminate = self.state_c.wall0_terminate
-        self.pseudo_terminate = self.state_c.pseudo_terminate
-        self.pseudo_reward = self.state_c.pseudo_reward
-
-        # 壁置きなら
-        if old_wall_num != self.black_walls + self.white_walls:
-            self.row_wall = get_numpy_arr(self.state_c.row_wall_bitarr, BOARD_LEN - 1)
-            self.column_wall = get_numpy_arr(self.state_c.column_wall_bitarr, BOARD_LEN - 1)
-
-            self.dist_array1 = np.array([self.state_c.dist_array1[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-            self.dist_array2 = np.array([self.state_c.dist_array2[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-
-        return ret
+        assert False
 
     def is_certain_path_terminate(self, color=None):
-        B_dist = self.dist_array1[self.Bx, self.By]
-        W_dist = self.dist_array2[self.Wx, self.Wy]
+        dist_array1 = get_dist_array_from_c_arr(self.state_c.dist_array1)
+        dist_array2 = get_dist_array_from_c_arr(self.state_c.dist_array2)
+        B_dist = dist_array1[self.Bx, self.By]
+        W_dist = dist_array2[self.Wx, self.Wy]
 
         # 先手後手それぞれで確定路があるか調べる
         if (color is None or color == 0) and B_dist + self.turn % 2 <= W_dist - 1:  #  B_dist <= B_certain_distなのでこれを満たさないときは判定不要
@@ -397,8 +396,8 @@ cdef class State:
         dist[dist == -1] = np.max(dist) + 1
         return dist
 
-    cdef np.ndarray[DTYPE_t, ndim = 2] calc_dist_array(self, int goal_y):
-        calc_dist_array(self.state_c, goal_y)
+    def calc_dist_array(self, int goal_y):
+        calc_dist_array_c(self.state_c, goal_y)
         if goal_y == 0:
             array_ptr = self.state_c.dist_array1
         else:

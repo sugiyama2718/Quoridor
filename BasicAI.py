@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array
+from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -113,7 +113,7 @@ def get_graphviz_tree_for_shared_tree(tree, g, threshold=5, root=True, color=Non
             if int(tree.N[key]) >= threshold:
                 g.edge(str(tree.node_id), str(node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
                 state = state_copy(tree.s)
-                state.accept_action_str(actionid2str(tree.s, key))
+                accept_action_str(state, actionid2str(tree.s, key))
                 if color == 0:
                     v = state.pseudo_reward
                 else:
@@ -156,7 +156,7 @@ def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
 
                     g.edge(str(parent_count), str(count), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
                     state = state_copy(tree.s)
-                    state.accept_action_str(actionid2str(tree.s, key))
+                    accept_action_str(state, actionid2str(tree.s, key))
                     if color == 0:
                         v = state.pseudo_reward
                     else:
@@ -167,7 +167,6 @@ def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
 
 def state_copy(s):
     ret = State.State()
-    ret.seen = copy.copy(s.seen)
     ret.row_wall = copy.copy(s.row_wall)
     ret.column_wall = copy.copy(s.column_wall)
     ret.Bx = s.Bx
@@ -181,8 +180,6 @@ def state_copy(s):
     ret.reward = s.reward
     ret.pseudo_terminate = s.pseudo_terminate
     ret.pseudo_reward = s.pseudo_reward
-    ret.dist_array1 = np.copy(s.dist_array1)
-    ret.dist_array2 = np.copy(s.dist_array2)
     copy_state_c(ret.state_c, s.state_c)
     return ret
 
@@ -190,13 +187,16 @@ def calc_optimal_move_by_DP(s):
     s = state_copy(s)
     boards = list(product(range(9), range(9), range(9), range(9), range(2)))  # 壁0なので、(Bx, By, Wx, Wy, 手番)で盤面が一意に定まる。のでそれで盤面を表現。
 
+    dist_array1 = s.calc_dist_array(0)
+    dist_array2 = s.calc_dist_array(BOARD_LEN - 1)
+
     # 合法手のみに絞る
     def is_legal(board):
         Bx, By, Wx, Wy, _ = board
         if Bx == Wx and By == Wy:
             return False
-        Bd = s.dist_array1[Bx, By]
-        Wd = s.dist_array2[Wx, Wy]
+        Bd = dist_array1[Bx, By]
+        Wd = dist_array2[Wx, Wy]
         if Bd == 0 and Wd == 0:
             return False
 
@@ -220,8 +220,8 @@ def calc_optimal_move_by_DP(s):
     boards_d = [(-1, -1, -1, -1, -1, -1, -1)] * len(boards)
     for i, board in enumerate(boards):
         Bx, By, Wx, Wy, is_black = board
-        Bd = s.dist_array1[Bx, By]
-        Wd = s.dist_array2[Wx, Wy]
+        Bd = dist_array1[Bx, By]
+        Wd = dist_array2[Wx, Wy]
         boards_d[i] = (Bx, By, Wx, Wy, is_black, Bd, Wd)
 
     # ゴールからの距離の和でソート
@@ -265,7 +265,7 @@ def calc_optimal_move_by_DP(s):
                     if new_Bx == new_Wx and new_By == new_Wy:  # 相手のいる方向に進む場合、乗り越える
                         new_Bx = new_Bx + dx
                         new_By = new_By + dy
-                    new_d = s.dist_array1[new_Bx, new_By]
+                    new_d = dist_array1[new_Bx, new_By]
                 else:
                     new_Bx = Bx
                     new_By = By
@@ -274,7 +274,7 @@ def calc_optimal_move_by_DP(s):
                     if new_Bx == new_Wx and new_By == new_Wy:  # 相手のいる方向に進む場合、乗り越える
                         new_Wx = new_Wx + dx
                         new_Wy = new_Wy + dy
-                    new_d = s.dist_array2[new_Wx, new_Wy]
+                    new_d = dist_array2[new_Wx, new_Wy]
                 
                 if new_d < d and (new_Bx, new_By, new_Wx, new_Wy, not is_black) in optimal_dict.keys():
                     cands.append((new_Bx, new_By, new_Wx, new_Wy, not is_black, optimal_dict[(new_Bx, new_By, new_Wx, new_Wy, not is_black)][5], True))
@@ -305,7 +305,7 @@ def calc_optimal_move_by_DP(s):
 
 def calc_next_state(x):
     state, action = x
-    state.accept_action_str(actionid2str(state, action), check_placable=False)
+    accept_action_str(state, actionid2str(state, action), check_placable=False)
     return state
 
 
@@ -461,7 +461,7 @@ class BasicAI(Agent):
         for i, action in enumerate(actions):
             try:
                 # checkしないため、内部的には非合法手扱いされることがありFalseになることがある。ただし、actionsが合法手からなるので問題なし。
-                state.accept_action_str(actionid2str(state, action), check_placable=False, calc_placable_array=False, check_movable=False)
+                accept_action_str(state, actionid2str(state, action), check_placable=False, calc_placable_array=False, check_movable=False)
             except:
                 print("{} error action={}".format(i, action))
                 print(actions)
@@ -506,9 +506,7 @@ class BasicAI(Agent):
 
         wall_num = state.black_walls + state.white_walls
 
-        B_dist = state.dist_array1[state.Bx, state.By]
-        W_dist = state.dist_array2[state.Wx, state.Wy]
-        #print(B_dist, W_dist)
+        B_dist, W_dist = state.get_player_dist_from_goal()
 
         # 自分の道が確定していて相手よりも早く着くなら最短路を進むだけ
         if state.is_certain_path_terminate():
@@ -711,7 +709,7 @@ class BasicAI(Agent):
                 leaf_movable_arrs.append(self.calc_leaf_movable_arr(state, actions))
                 s = state_copy(nodes[-1].s)
                 #print([self.actionid2str(node.s, action) for node, action in zip(nodes, actions)])
-                s.accept_action_str(actionid2str(s, actions[-1]), check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
+                accept_action_str(s, actionid2str(s, actions[-1]), check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
                 states.append(s)
             node_num += len(states)
 
@@ -782,8 +780,7 @@ class BasicAI(Agent):
                     lose_reward = -1 if node.s.turn % 2 == 0 else 1
 
                     if action not in node.children.keys():  # 葉ノードを子に持つ
-                        s_B_dist = s.dist_array1[s.Bx, s.By]
-                        s_W_dist = s.dist_array2[s.Wx, s.Wy]
+                        s_B_dist, s_W_dist = s.get_player_dist_from_goal()
                         node.dist_diff_arr[action] = max(s_W_dist - s_B_dist + (1 - s.turn % 2), s_B_dist - s_W_dist + s.turn % 2)
                     elif  node.children[action].result != 0:  # 勝敗が決定した子ノードを持つ
                         node.dist_diff_arr[action] = int(np.min(node.children[action].dist_diff_arr))
