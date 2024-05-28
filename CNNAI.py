@@ -1,7 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # warning抑制
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
