@@ -1,7 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, eq_state, accept_action_str
+from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN
 from State import DRAW_TURN
 from Human import Human
 from CNNAI import CNNAI
@@ -193,12 +193,14 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             continue
 
         # stateは終端状態になっている
-        B_dist = state.dist_array1[state.Bx, state.By]
-        W_dist = state.dist_array2[state.Wx, state.Wy]
+        B_dist, W_dist = state.get_player_dist_from_goal()
         dist_diff = W_dist - B_dist  # 何マス差で勝ったか。勝ちで正になるよう、W-Bにしている
         all_turn_num = state.turn
         move_count[0] += B_dist
         move_count[1] += W_dist
+
+        dist_array1 = state.calc_dist_array(0)
+        dist_array2 = state.calc_dist_array(BOARD_LEN - 1)
 
         def calc_traversed_arr_list(xy_list):
             traversed_arr = np.zeros((9, 9))
@@ -253,21 +255,21 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
             data.append((feature1, pi, state.reward, v_prev, v_post, searched_node_num, 
                          dist_diff, state.black_walls, state.white_walls, all_turn_num - turn, move_count[0] - mid_move_count[0], move_count[1] - mid_move_count[1],
-                         state.row_wall, state.column_wall, state.dist_array1, state.dist_array2, B_traversed_arr, W_traversed_arr, next_pi))
+                         state.row_wall, state.column_wall, dist_array1, dist_array2, B_traversed_arr, W_traversed_arr, next_pi))
 
             data.append((feature2, pi_flip1(pi), state.reward, v_prev, v_post, searched_node_num, 
                          dist_diff, state.black_walls, state.white_walls, all_turn_num - turn, move_count[0] - mid_move_count[0], move_count[1] - mid_move_count[1],
-                         np.flip(state.row_wall, 0), np.flip(state.column_wall, 0), np.flip(state.dist_array1, 0), np.flip(state.dist_array2, 0), np.flip(B_traversed_arr, 0), np.flip(W_traversed_arr, 0),
+                         np.flip(state.row_wall, 0), np.flip(state.column_wall, 0), np.flip(dist_array1, 0), np.flip(dist_array2, 0), np.flip(B_traversed_arr, 0), np.flip(W_traversed_arr, 0),
                          pi_flip1(next_pi)))
 
             data.append((feature3, pi_flip2(pi), -state.reward, -v_prev, -v_post, searched_node_num, 
                          -dist_diff, state.white_walls, state.black_walls, all_turn_num - turn, move_count[1] - mid_move_count[1], move_count[0] - mid_move_count[0],
-                         np.flip(state.row_wall, 1), np.flip(state.column_wall, 1), np.flip(state.dist_array2, 1), np.flip(state.dist_array1, 1), np.flip(W_traversed_arr, 1), np.flip(B_traversed_arr, 1),
+                         np.flip(state.row_wall, 1), np.flip(state.column_wall, 1), np.flip(dist_array2, 1), np.flip(dist_array1, 1), np.flip(W_traversed_arr, 1), np.flip(B_traversed_arr, 1),
                          pi_flip2(next_pi)))
 
             data.append((feature4, pi_flip3(pi), -state.reward, -v_prev, -v_post, searched_node_num, 
                          -dist_diff, state.white_walls, state.black_walls, all_turn_num - turn, move_count[1] - mid_move_count[1], move_count[0] - mid_move_count[0],
-                         np.flip(np.flip(state.row_wall, 1), 0), np.flip(np.flip(state.column_wall, 1), 0), np.flip(np.flip(state.dist_array2, 1), 0), np.flip(np.flip(state.dist_array1, 1), 0), np.flip(np.flip(W_traversed_arr, 1), 0), np.flip(np.flip(B_traversed_arr, 1), 0),
+                         np.flip(np.flip(state.row_wall, 1), 0), np.flip(np.flip(state.column_wall, 1), 0), np.flip(np.flip(dist_array2, 1), 0), np.flip(np.flip(dist_array1, 1), 0), np.flip(np.flip(W_traversed_arr, 1), 0), np.flip(np.flip(B_traversed_arr, 1), 0),
                          pi_flip3(next_pi)))
     if info:
         print("hash = {}".format(hash_))
