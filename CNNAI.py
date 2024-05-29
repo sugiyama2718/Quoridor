@@ -727,7 +727,6 @@ class CNNAI(BasicAI):
 
             valid_size = len(x_arr_dict["feature"])
             valid_step_num = (valid_size - 1) // self.batch_size + 1
-            #print(valid_size, valid_step_num)
 
             for j in range(valid_step_num):
                 loss = self.sess.run(self.loss_without_regularizer, feed_dict={
@@ -736,10 +735,8 @@ class CNNAI(BasicAI):
                     self.y_:x_arr_dict["reward"][j * self.batch_size:(j + 1) * self.batch_size].reshape(-1, 1),
                     self.warmup_coef: 1.0, self.searched_node: x_arr_dict["searched_node_num"][j * self.batch_size:(j + 1) * self.batch_size]})
                 valid_ema = valid_ema * (1 - VALID_EMA_DECAY) + loss * VALID_EMA_DECAY
-                sys.stderr.write('\r\033[K' + str(step) + " "  + str(j * self.batch_size) + "/" + str(x_arr_dict["feature"].shape[0]) + " valid loss = {:.4f}".format(valid_ema) + f" warmup coef = {coef}")
-                sys.stderr.flush()
+                print('\r' + str(step) + " "  + str(j * self.batch_size) + "/" + str(x_arr_dict["feature"].shape[0]) + " valid loss = {:.4f}".format(valid_ema) + f" warmup coef = {coef}", end="")
             print()
-        #pprint(loss_dict)
         return loss_dict, valid_ema
 
     def save(self, path):
