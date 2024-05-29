@@ -561,6 +561,26 @@ bool placable_c_with_color(State* state, int x, int y, int color) {
     return ret;
 }
 
+__uint128_t calc_oneside_placable_r_cand_from_color(State* state, int color) {
+    __uint128_t ret = 0;
+    for(int y = 0; y < BOARD_LEN - 1; y++) {
+        for(int x = 0; x < BOARD_LEN - 1; x++) {
+            if(placable_r_with_color(state, x, y, color)) set_1(&ret, x, y);
+        }
+    }
+    return ret;
+}
+
+__uint128_t calc_oneside_placable_c_cand_from_color(State* state, int color) {
+    __uint128_t ret = 0;
+    for(int y = 0; y < BOARD_LEN - 1; y++) {
+        for(int x = 0; x < BOARD_LEN - 1; x++) {
+            if(placable_c_with_color(state, x, y, color)) set_1(&ret, x, y);
+        }
+    }
+    return ret;
+}
+
 void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column_bitarr) {
     state->cross_bitarrs[UP] = UP_EDGE;
     state->cross_bitarrs[UP] |= down_shift(row_bitarr);
