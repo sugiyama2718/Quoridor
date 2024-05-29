@@ -527,6 +527,40 @@ bool is_mirror_match(State* state) {
     return true;
 }
 
+bool placable_r_with_color(State* state, int x, int y, int color) {
+    if(get_bit(state->row_wall_bitarr, x, y) || get_bit(state->column_wall_bitarr, x, y)) return false;
+    if(get_bit(state->row_wall_bitarr, max(x - 1, 0), y) || get_bit(state->row_wall_bitarr, min(x + 1, BOARD_LEN - 2), y)) return false;
+    
+    bool ret;
+    
+    set_row_wall_1(state, x, y);
+    if(color == 0) {
+        ret = arrivable_(state, state->Bx, state->By, 0);
+    } else {
+        ret = arrivable_(state, state->Wx, state->Wy, BOARD_LEN - 1);
+    }
+    set_row_wall_0(state, x, y);
+
+    return ret;
+}
+
+bool placable_c_with_color(State* state, int x, int y, int color) {
+    if(get_bit(state->row_wall_bitarr, x, y) || get_bit(state->column_wall_bitarr, x, y)) return false;
+    if(get_bit(state->column_wall_bitarr, x, max(y - 1, 0)) || get_bit(state->column_wall_bitarr, x, min(y + 1, BOARD_LEN - 2))) return false;
+    
+    bool ret;
+    
+    set_column_wall_1(state, x, y);
+    if(color == 0) {
+        ret = arrivable_(state, state->Bx, state->By, 0);
+    } else {
+        ret = arrivable_(state, state->Wx, state->Wy, BOARD_LEN - 1);
+    }
+    set_column_wall_0(state, x, y);
+
+    return ret;
+}
+
 void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column_bitarr) {
     state->cross_bitarrs[UP] = UP_EDGE;
     state->cross_bitarrs[UP] |= down_shift(row_bitarr);
