@@ -45,6 +45,14 @@ for dir in dirs:
     set_state_by_wall(state)
 
     state.display_cui()
+    #np.savetxt(os.path.join(path, f"ans.txt"), np.array([state.is_certain_path_terminate(0), state.is_certain_path_terminate(1)]), delimiter=",")
+    B_ans, W_ans = np.array(np.loadtxt(os.path.join(path, f"ans.txt")), dtype=bool)
+    B_pred = state.is_certain_path_terminate(0)
+    W_pred = state.is_certain_path_terminate(1)
 
-    
+    if not (B_pred == B_ans and W_pred == W_ans):
+        print("pred")
+        print(B_pred, W_pred)
+        print("ans")
+        print(B_ans, W_ans)
 
