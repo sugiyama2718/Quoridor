@@ -18,9 +18,17 @@ if os.name == "nt":
     lib = ctypes.CDLL('./State_util.dll')
 else:
     lib = ctypes.CDLL('./State_util.so')
-# is_mirror_match = lib.is_mirror_match
-# is_mirror_match.argtypes = [ctypes.POINTER(State_c)]
-# is_mirror_match.restype = ctypes.c_bool
+calc_oneside_placable_r_cand_from_color = lib.calc_oneside_placable_r_cand_from_color
+calc_oneside_placable_r_cand_from_color.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+calc_oneside_placable_r_cand_from_color.restype = (ctypes.c_uint64) * 2
+calc_oneside_placable_c_cand_from_color = lib.calc_oneside_placable_c_cand_from_color
+calc_oneside_placable_c_cand_from_color.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+calc_oneside_placable_c_cand_from_color.restype = (ctypes.c_uint64) * 2
+
+state = State()
+State_init(state)
+calc_oneside_placable_r_cand_from_color(state.state_c, 0)
+calc_oneside_placable_c_cand_from_color(state.state_c, 0)
 
 results = []
 for dir in dirs:
@@ -45,6 +53,10 @@ for dir in dirs:
     set_state_by_wall(state)
 
     state.display_cui()
+
+    calc_oneside_placable_r_cand_from_color(state.state_c, 0)
+    calc_oneside_placable_c_cand_from_color(state.state_c, 0)
+
     #np.savetxt(os.path.join(path, f"ans.txt"), np.array([state.is_certain_path_terminate(0), state.is_certain_path_terminate(1)]), delimiter=",")
     B_ans, W_ans = np.array(np.loadtxt(os.path.join(path, f"ans.txt")), dtype=bool)
     B_pred = state.is_certain_path_terminate(0)
@@ -55,4 +67,5 @@ for dir in dirs:
         print(B_pred, W_pred)
         print("ans")
         print(B_ans, W_ans)
+        assert False
 
