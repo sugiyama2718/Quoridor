@@ -289,20 +289,6 @@ cdef class State:
     def set_state_by_wall(self):
         assert False
 
-    def cross_movable_array2(self, row_wall, column_wall):
-        cdef int x, y
-        #cdef np.ndarray[DTYPE_t, ndim = 3] ret = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
-        cdef DTYPE_t[:, :, :] ret = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
-
-        for x in range(BOARD_LEN):
-            for y in range(BOARD_LEN):
-                ret[x, y, 0] = (not (y == 0 or row_wall[min(x, BOARD_LEN - 2), y - 1] or row_wall[max(x - 1, 0), y - 1]))
-                ret[x, y, 1] = (not (x == BOARD_LEN - 1 or column_wall[x, min(y, BOARD_LEN - 2)] or column_wall[x, max(y - 1, 0)]))
-                ret[x, y, 2] = (not (y == BOARD_LEN - 1 or row_wall[min(x, BOARD_LEN - 2), y] or row_wall[max(x - 1, 0), y]))
-                ret[x, y, 3] = (not (x == 0 or column_wall[x - 1, min(y, BOARD_LEN - 2)] or column_wall[x - 1, max(y - 1, 0)]))
-
-        return ret
-
     # shortest_onely=Trueの場合ゴールからの距離を縮める方向のみに1を立てる
     def movable_array(self, x, y, shortest_only=False):
         assert False
@@ -319,39 +305,6 @@ cdef class State:
             return placable_r * int(self.black_walls >= 1), placable_c * int(self.black_walls >= 1)
         else:
             return placable_r * int(self.white_walls >= 1), placable_c * int(self.white_walls >= 1)
-
-    cdef (int, int) placable_with_color(self, x, y, color):
-        # すべてarrivableで確かめる。
-        if self.row_wall[x, y] or self.column_wall[x, y]:
-            return False, False
-        row_f = True
-        column_f = True
-
-        if self.row_wall[max(x - 1, 0), y] or self.row_wall[min(x + 1, BOARD_LEN - 2), y]:
-            row_f = False
-        if self.column_wall[x, max(y - 1, 0)] or self.column_wall[x, min(y + 1, BOARD_LEN - 2)]:
-            column_f = False
-        if row_f:
-            self.row_wall[x, y] = 1
-            set_row_wall_1(self.state_c, x, y)
-            if color == 0:
-                f = self.arrivable(self.Bx, self.By, 0) 
-            else:
-                f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.row_wall[x, y] = 0
-            set_row_wall_0(self.state_c, x, y)
-            row_f = row_f and f
-        if column_f:
-            self.column_wall[x, y] = 1
-            set_column_wall_1(self.state_c, x, y)
-            if color == 0:
-                f = self.arrivable(self.Bx, self.By, 0)
-            else:
-                f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.column_wall[x, y] = 0
-            set_column_wall_0(self.state_c, x, y)
-            column_f = column_f and f
-        return row_f, column_f
 
     def shortest_path_len(self, x, y, goal_y, cross_arr):
         dist = np.ones((BOARD_LEN, BOARD_LEN)) * BOARD_LEN * BOARD_LEN * 2
@@ -378,18 +331,6 @@ cdef class State:
         else:
             array_ptr = self.state_c.dist_array2
         return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-    
-    def calc_oneside_placable_cand_from_color(self, color):
-        # どちらかのプレイヤー（colorで指定）の路だけで壁置きの可能性を判定する。勝利の確定判定などに用いる。各種内部変数は計算済みと仮定する。
-
-        cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                f1, f2 = self.placable_with_color(x, y, color)
-                row_array[x, y] = f1
-                column_array[x, y] = f2
-        return row_array, column_array
     
     def calc_placable_array(self, skip_calc_graph=False):
         cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
