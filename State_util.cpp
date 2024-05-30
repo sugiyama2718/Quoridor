@@ -22,6 +22,19 @@ struct State {
     int reward, pseudo_reward;
 };
 
+struct BitArrayPair {
+    __uint128_t bitarr1;
+    __uint128_t bitarr2;
+};
+
+struct Point_uint8 {
+    uint8_t x, y;
+};
+
+struct Point_int {
+    int x, y;
+};
+
 const int BOARD_LEN = 9;
 const int BIT_BOARD_LEN = 11;
 const int ACTION_NUM = 137;
@@ -69,19 +82,7 @@ void calc_placable_array_and_set(State* state);
 bool is_mirror_match(State* state);
 void calc_cross_bitarrs_global(__uint128_t row_bitarr, __uint128_t column_bitarr);
 void calc_dist_array_inner(uint8_t* dist_arr_p, int goal_y, __uint128_t cross_bitarrs[4]);
-
-struct BitArrayPair {
-    __uint128_t bitarr1;
-    __uint128_t bitarr2;
-};
-
-struct Point_uint8 {
-    uint8_t x, y;
-};
-
-struct Point_int {
-    int x, y;
-};
+BitArrayPair calc_placable_array_(State* state);
 
 void State_init(State* state) {
     state->row_wall_bitarr = state->column_wall_bitarr = 0;
@@ -621,6 +622,18 @@ bool is_certain_path_terminate(State* state, int color) {
     }
 
     return false;
+}
+
+BitArrayPair placable_array(State* state, int color) {
+    // 壁の枚数も考慮した壁に関する合法手配列を返す
+    BitArrayPair ret;
+    if((color == 0 && state->black_walls == 0) || (color == 1 && state->white_walls == 0)) {
+        ret.bitarr1 = 0;
+        ret.bitarr2 = 0;
+    } else {
+        ret = calc_placable_array_(state);
+    }
+    return ret;
 }
 
 void calc_cross_bitarrs_global(__uint128_t row_bitarr, __uint128_t column_bitarr) {

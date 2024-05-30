@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate
+from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -397,7 +397,7 @@ class BasicAI(Agent):
     def action_array(self, s):
         if s.terminate:
             return np.zeros((2 * (State.BOARD_LEN - 1) * (State.BOARD_LEN - 1) + 9,), dtype="bool")
-        r, c = s.placable_array(s.turn % 2)
+        r, c = placable_array(s, s.turn % 2)
         x, y = color_p(s, s.turn % 2)
         v = np.concatenate([r.flatten(), c.flatten(), movable_array(s, x, y).flatten()])
         return np.asarray(v, dtype="bool")

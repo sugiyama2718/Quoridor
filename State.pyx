@@ -135,6 +135,10 @@ is_certain_path_terminate_c = lib.is_certain_path_terminate
 is_certain_path_terminate_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
 is_certain_path_terminate_c.restype = ctypes.c_bool
 
+placable_array_c = lib.placable_array
+placable_array_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+placable_array_c.restype = BitArrayPair
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
@@ -224,6 +228,10 @@ def get_player_dist_from_goal(state):
 def is_certain_path_terminate(state, color=-1):
     return is_certain_path_terminate_c(state.state_c, color)
 
+def placable_array(state, color):
+    ret = placable_array_c(state.state_c, color)
+    return get_numpy_arr(ret.bitarr1, BOARD_LEN - 1), get_numpy_arr(ret.bitarr2, BOARD_LEN - 1)
+
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
@@ -299,12 +307,7 @@ cdef class State:
         return True
 
     def placable_array(self, color):
-        placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
-        placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
-        if color == 0:
-            return placable_r * int(self.black_walls >= 1), placable_c * int(self.black_walls >= 1)
-        else:
-            return placable_r * int(self.white_walls >= 1), placable_c * int(self.white_walls >= 1)
+        assert False
 
     def shortest_path_len(self, x, y, goal_y, cross_arr):
         dist = np.ones((BOARD_LEN, BOARD_LEN)) * BOARD_LEN * BOARD_LEN * 2

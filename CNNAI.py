@@ -5,7 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
-from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal
+from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal, placable_array
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -464,7 +464,7 @@ class CNNAI(BasicAI):
         mask = np.zeros((len(states), self.action_num))
         if self.p_is_almost_flat:
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
+                r, c = placable_array(s, s.turn % 2)
                 x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
@@ -475,7 +475,7 @@ class CNNAI(BasicAI):
         else:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
+                r, c = placable_array(s, s.turn % 2)
                 x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
@@ -523,7 +523,7 @@ class CNNAI(BasicAI):
         if self.p_is_almost_flat:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
+                r, c = placable_array(s, s.turn % 2)
                 x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
@@ -536,7 +536,7 @@ class CNNAI(BasicAI):
         else:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
+                r, c = placable_array(s, s.turn % 2)
                 x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
