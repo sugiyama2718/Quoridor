@@ -131,6 +131,10 @@ get_player2_dist_from_goal = lib.get_player2_dist_from_goal
 get_player2_dist_from_goal.argtypes = [ctypes.POINTER(State_c)]
 get_player2_dist_from_goal.restype = ctypes.c_int
 
+is_certain_path_terminate_c = lib.is_certain_path_terminate
+is_certain_path_terminate_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+is_certain_path_terminate_c.restype = ctypes.c_bool
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
@@ -276,28 +280,10 @@ cdef class State:
     def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
         assert False
 
-    def is_certain_path_terminate(self, color=None):
-        dist_array1 = get_dist_array_from_c_arr(self.state_c.dist_array1)
-        dist_array2 = get_dist_array_from_c_arr(self.state_c.dist_array2)
-        B_dist = dist_array1[self.Bx, self.By]
-        W_dist = dist_array2[self.Wx, self.Wy]
-
-        # 先手後手それぞれで確定路があるか調べる
-        if (color is None or color == 0) and B_dist + self.turn % 2 <= W_dist - 1:  #  B_dist <= B_certain_distなのでこれを満たさないときは判定不要
-            placable_r, placable_c = self.calc_oneside_placable_cand_from_color(0)
-            certain_cross_movable_arr = self.cross_movable_array2(self.row_wall | placable_r, self.column_wall | placable_c)
-            B_certain_dist = self.shortest_path_len(self.Bx, self.By, 0, certain_cross_movable_arr)
-            if B_certain_dist + self.turn % 2 <= W_dist - 1:
-                return True
-
-        if (color is None or color == 1) and W_dist + (1 - self.turn % 2) <= B_dist - 1:
-            placable_r, placable_c = self.calc_oneside_placable_cand_from_color(1)
-            certain_cross_movable_arr = self.cross_movable_array2(self.row_wall | placable_r, self.column_wall | placable_c)
-            W_certain_dist = self.shortest_path_len(self.Wx, self.Wy, BOARD_LEN - 1, certain_cross_movable_arr)
-            if W_certain_dist + (1 - self.turn % 2) <= B_dist - 1:
-                return True
-
-        return False
+    def is_certain_path_terminate(self, color=-1):
+        if color is None:
+            color = -1
+        return is_certain_path_terminate_c(self.state_c, color)
 
     def set_state_by_wall(self):
         assert False
