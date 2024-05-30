@@ -221,6 +221,9 @@ def accept_action_str(state, s, check_placable=True, calc_placable_array=True, c
 def get_player_dist_from_goal(state):
     return get_player1_dist_from_goal(state.state_c), get_player2_dist_from_goal(state.state_c)
 
+def is_certain_path_terminate(state, color=-1):
+    return is_certain_path_terminate_c(state.state_c, color)
+
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
@@ -281,9 +284,7 @@ cdef class State:
         assert False
 
     def is_certain_path_terminate(self, color=-1):
-        if color is None:
-            color = -1
-        return is_certain_path_terminate_c(self.state_c, color)
+        assert False
 
     def set_state_by_wall(self):
         assert False

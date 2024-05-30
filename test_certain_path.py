@@ -1,4 +1,4 @@
-from State import State, State_init, State_c, movable_array, set_state_by_wall
+from State import State, State_init, State_c, movable_array, set_state_by_wall, is_certain_path_terminate
 import numpy as np
 import os
 from config import *
@@ -57,10 +57,9 @@ for dir in dirs:
     calc_oneside_placable_r_cand_from_color(state.state_c, 0)
     calc_oneside_placable_c_cand_from_color(state.state_c, 0)
 
-    #np.savetxt(os.path.join(path, f"ans.txt"), np.array([state.is_certain_path_terminate(0), state.is_certain_path_terminate(1)]), delimiter=",")
     B_ans, W_ans = np.array(np.loadtxt(os.path.join(path, f"ans.txt")), dtype=bool)
-    B_pred = state.is_certain_path_terminate(0)
-    W_pred = state.is_certain_path_terminate(1)
+    B_pred = is_certain_path_terminate(state, 0)
+    W_pred = is_certain_path_terminate(state, 1)
 
     if not (B_pred == B_ans and W_pred == W_ans):
         print("pred")

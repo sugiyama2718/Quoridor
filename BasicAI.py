@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal
+from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -509,7 +509,7 @@ class BasicAI(Agent):
         B_dist, W_dist = get_player_dist_from_goal(state)
 
         # 自分の道が確定していて相手よりも早く着くなら最短路を進むだけ
-        if state.is_certain_path_terminate():
+        if is_certain_path_terminate(state):
             self.tree_for_visualize = self.prev_tree = None  # 読みが入らなくなるので、prev_treeが参照されないようにNoneを入れておく
             x, y = color_p(state, state.turn % 2)
             movable_arr = movable_array(state, x, y, shortest_only=True)
@@ -808,7 +808,7 @@ class BasicAI(Agent):
 
                             if not node.already_certain_path_confirmed: # 壁置きで負けになる場合、一度確定路判定をする。移動の場合も判定するとだいぶ遅くなるので壁おきに制限。
                                 node.already_certain_path_confirmed = True
-                                if node.s.is_certain_path_terminate((node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
+                                if is_certain_path_terminate(node.s, (node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
                                     node.set_is_lose_child_arr_True(np.arange(128))
                                     # print("!!!certain path !!!")
                                     # print(actions)
