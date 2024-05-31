@@ -38,11 +38,9 @@ for dir in dirs:
     state.By = state.state_c.By = int(pos_arr[1])
     state.Wx = state.state_c.Wx = int(pos_arr[2])
     state.Wy = state.state_c.Wy = int(pos_arr[3])
-    state.row_wall = row_wall
-    state.column_wall = column_wall
     state.black_walls = state.state_c.black_walls = p1_walls
     state.white_walls = state.state_c.white_walls = p2_walls
-    set_state_by_wall(state)
+    set_state_by_wall(state, row_wall, column_wall)
 
     display_cui(state)
     print(is_mirror_match(state.state_c))

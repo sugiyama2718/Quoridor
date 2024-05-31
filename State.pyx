@@ -146,7 +146,7 @@ def State_init(state):
     State_init_(state.state_c)
 
 def eq_state(state1, state2):
-    f = np.all(state1.row_wall == state2.row_wall) and np.all(state1.column_wall == state2.column_wall)
+    f = True
     f = f and state1.Bx == state2.Bx and state1.By == state2.By and state1.Wx == state2.Wx and state1.Wy == state2.Wy
     f = f and state1.black_walls == state2.black_walls and state1.white_walls == state2.white_walls
     f = f and eq_state_c(state1.state_c, state2.state_c)
@@ -167,20 +167,22 @@ def movable_array(state, x, y, shortest_only=False):
 
     return mv
 
-def set_state_by_wall(state):
-    # row_wallなどを直接指定して状態を作るときに用いる
-    # 差分計算している部分を計算する
-
+def set_wall(state, row_wall, column_wall):
     for x in range(BOARD_LEN - 1):
         for y in range(BOARD_LEN - 1):
-            if state.row_wall[x, y]:
+            if row_wall[x, y]:
                 set_row_wall_1(state.state_c, x, y)
             else:
                 set_row_wall_0(state.state_c, x, y)
-            if state.column_wall[x, y]:
+            if column_wall[x, y]:
                 set_column_wall_1(state.state_c, x, y)
             else:
                 set_column_wall_0(state.state_c, x, y)
+
+def set_state_by_wall(state, row_wall, column_wall):
+    # 差分計算している部分を計算する
+
+    set_wall(state, row_wall, column_wall)
 
     dist_array1 = calc_dist_array(state, 0)
     dist_array2 = calc_dist_array(state, BOARD_LEN - 1)
@@ -196,8 +198,6 @@ def get_dist_array_from_c_arr(c_dist_arr):
 
 def accept_action_str(state, s, check_placable=True, calc_placable_array=True, check_movable=True):
     # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
-
-    old_wall_num = state.black_walls + state.white_walls
     
     ret = accept_action_str_c(state.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
 
@@ -214,11 +214,6 @@ def accept_action_str(state, s, check_placable=True, calc_placable_array=True, c
     state.wall0_terminate = state.state_c.wall0_terminate
     state.pseudo_terminate = state.state_c.pseudo_terminate
     state.pseudo_reward = state.state_c.pseudo_reward
-
-    # 壁置きなら
-    if old_wall_num != state.black_walls + state.white_walls:
-        state.row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
-        state.column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
 
     return ret
 
@@ -404,6 +399,12 @@ def feature_CNN(state, xflip=False, yflip=False):
 
     return feature
 
+def get_row_wall(state):
+    return get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+
+def get_column_wall(state):
+    return get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
@@ -426,12 +427,9 @@ def print_bitarr(bitarr):
 
 cdef class State:
     draw_turn = DRAW_TURN
-    cdef public np.ndarray row_wall, column_wall
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
     cdef public state_c
     def __init__(self):
-        self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.Bx = BOARD_LEN // 2
         self.By = BOARD_LEN - 1
         self.Wx = BOARD_LEN // 2

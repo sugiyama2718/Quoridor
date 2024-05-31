@@ -22,7 +22,7 @@ from kivy.core.window import Window
 from kivy.lang import Builder
 
 from Agent import actionid2str, str2actionid
-from State import State, CHANNEL, State_init, accept_action_str, display_cui
+from State import State, CHANNEL, State_init, accept_action_str, display_cui, get_row_wall, get_column_wall
 from State import DRAW_TURN
 from CNNAI import CNNAI
 from BasicAI import state_copy
@@ -637,6 +637,8 @@ class Quoridor(Widget):
                     self.row_wall_colors[y * 8 + x].a = 0
                     self.column_wall_colors[y * 8 + x].a = 0
 
+        row_wall = get_row_wall(self.state)
+        column_wall = get_column_wall(self.state)
         for x in range(8):
             for y in range(8):
                 if self.upside_down:
@@ -646,9 +648,9 @@ class Quoridor(Widget):
                     disp_x = x
                     disp_y = y
 
-                if self.state.row_wall[x, y]:
+                if row_wall[x, y]:
                     self.row_wall_colors[(7 - disp_y) * 8 + disp_x].a = 1
-                if self.state.column_wall[x, y]:
+                if column_wall[x, y]:
                     self.column_wall_colors[(7 - disp_y) * 8 + disp_x].a = 1
 
         self.search_nodes_label.text = f"search nodes = {self.search_nodes}"

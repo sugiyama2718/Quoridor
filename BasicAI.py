@@ -167,8 +167,6 @@ def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
 
 def state_copy(s):
     ret = State.State()
-    ret.row_wall = copy.copy(s.row_wall)
-    ret.column_wall = copy.copy(s.column_wall)
     ret.Bx = s.Bx
     ret.By = s.By
     ret.Wx = s.Wx

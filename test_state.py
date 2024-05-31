@@ -40,8 +40,8 @@ results = []
 for i in test_case_list:
     state = State()
     State_init(state)
-    state.row_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/r.txt".format(i)), delimiter=",").T
-    state.column_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/c.txt".format(i)), delimiter=",").T
+    row_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/r.txt".format(i)), delimiter=",").T
+    column_wall = np.loadtxt(os.path.join(TEST_DIR, "{}/c.txt".format(i)), delimiter=",").T
     
     if os.path.exists(os.path.join(TEST_DIR, "{}/p.txt".format(i))):
         p = np.loadtxt(os.path.join(TEST_DIR, "{}/p.txt".format(i)), delimiter=",")
@@ -50,7 +50,7 @@ for i in test_case_list:
         state.By = state.state_c.By = p[1]
         state.Wx = state.state_c.Wx = p[2]
         state.Wy = state.state_c.Wy = p[3]
-    set_state_by_wall(state)
+    set_state_by_wall(state, row_wall, column_wall)
     print_state(state.state_c)
     display_cui(state)
 

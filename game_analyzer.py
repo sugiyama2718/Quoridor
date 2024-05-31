@@ -23,7 +23,7 @@ from kivy.uix.popup import Popup
 from kivy.uix.filechooser import FileChooserListView
 
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, accept_action_str, display_cui
+from State import State, CHANNEL, State_init, accept_action_str, display_cui, get_row_wall, get_column_wall
 from CNNAI import CNNAI
 from BasicAI import state_copy, get_state_vec
 import time
@@ -816,8 +816,8 @@ class Quoridor(Widget):
 
         array_save_path = os.path.join(DEBUG_DIR, "wall_array")
         os.makedirs(array_save_path, exist_ok=True)
-        np.savetxt(os.path.join(array_save_path, "{}_r.txt".format(self.turn)), self.state.row_wall, fmt='%d')
-        np.savetxt(os.path.join(array_save_path, "{}_c.txt".format(self.turn)), self.state.column_wall, fmt='%d')
+        np.savetxt(os.path.join(array_save_path, "{}_r.txt".format(self.turn)), get_row_wall(self.state), fmt='%d')
+        np.savetxt(os.path.join(array_save_path, "{}_c.txt".format(self.turn)), get_column_wall(self.state), fmt='%d')
         np.savetxt(os.path.join(array_save_path, "{}_w.txt".format(self.turn)), np.array([self.state.black_walls, self.state.white_walls]), fmt='%d')
         np.savetxt(os.path.join(array_save_path, "{}_pos.txt".format(self.turn)), np.array([self.state.Bx, self.state.By, self.state.Wx, self.state.Wy]), fmt='%d')
 
@@ -963,6 +963,8 @@ class Quoridor(Widget):
                     self.row_wall_colors[y * 8 + x].a = 0
                     self.column_wall_colors[y * 8 + x].a = 0
 
+        row_wall = get_row_wall(self.state)
+        column_wall = get_column_wall(self.state)
         for x in range(8):
             for y in range(8):
                 if self.upside_down:
@@ -972,9 +974,9 @@ class Quoridor(Widget):
                     disp_x = x
                     disp_y = y
 
-                if self.state.row_wall[x, y]:
+                if row_wall[x, y]:
                     self.row_wall_colors[(7 - disp_y) * 8 + disp_x].a = 1
-                if self.state.column_wall[x, y]:
+                if column_wall[x, y]:
                     self.column_wall_colors[(7 - disp_y) * 8 + disp_x].a = 1
 
         self.search_nodes_label.text = f"search nodes = {self.search_nodes}"
