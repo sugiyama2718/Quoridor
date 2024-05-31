@@ -1,8 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN
-from State import DRAW_TURN
+from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN, get_player_dist_from_goal, calc_dist_array, display_cui, feature_CNN, get_row_wall, get_column_wall
 from Human import Human
 from CNNAI import CNNAI
 from BasicAI import state_copy
@@ -37,7 +36,7 @@ def normal_play(agents, initial_state=None):
         state = initial_state
         
     while True:
-        state.display_cui()
+        display_cui(state)
         start = time.time()
         s = agents[0].act(state, showNQ=True)
         end = time.time()
@@ -62,7 +61,7 @@ def normal_play(agents, initial_state=None):
             break
         #time.sleep(0.1)
 
-        state.display_cui()
+        display_cui(state)
         s = agents[1].act(state, showNQ=True)
         if isinstance(s, int):
             a = actionid2str(state, s)
@@ -85,7 +84,7 @@ def normal_play(agents, initial_state=None):
         if state.terminate:
             break
 
-    state.display_cui()
+    display_cui(state)
     print("The game finished. reward=({}, {})".format(state.reward, -state.reward))
     return state.reward
 
@@ -100,7 +99,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
         AIs[1].init_prev()
         featuress = [[], [], [], []]
         for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
-            featuress[i].append(state.feature_CNN(b1, b2))
+            featuress[i].append(feature_CNN(state, b1, b2))
 
         pis = []
         states = [state_copy(state)]
@@ -123,7 +122,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
-                state.display_cui()
+                display_cui(state)
                 exit()
             AIs[1].prev_action = s
 
@@ -139,7 +138,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
             if display:
                 print("generate id=", id_)
-                state.display_cui()
+                display_cui(state)
             end = False
             for state2 in states:
                 if equal_draw and eq_state(state, state2):
@@ -151,13 +150,13 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             if state.terminate:
                 break
             for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
-                featuress[i].append(state.feature_CNN(b1, b2))
+                featuress[i].append(feature_CNN(state, b1, b2))
             s, pi, v_prev, v_post, searched_node_num = AIs[1].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[0].prev_tree)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
-                state.display_cui()
+                display_cui(state)
                 exit()
             AIs[0].prev_action = s
 
@@ -173,7 +172,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
             if display:
                 print("generate id=", id_)
-                state.display_cui()
+                display_cui(state)
             end = False
             for state2 in states:
                 if equal_draw and eq_state(state, state2):
@@ -185,7 +184,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             if state.terminate:
                 break
             for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
-                featuress[i].append(state.feature_CNN(b1, b2))
+                featuress[i].append(feature_CNN(state, b1, b2))
         del states
 
         hash_ += state.turn
@@ -193,14 +192,14 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             continue
 
         # stateは終端状態になっている
-        B_dist, W_dist = state.get_player_dist_from_goal()
+        B_dist, W_dist = get_player_dist_from_goal(state)
         dist_diff = W_dist - B_dist  # 何マス差で勝ったか。勝ちで正になるよう、W-Bにしている
         all_turn_num = state.turn
         move_count[0] += B_dist
         move_count[1] += W_dist
 
-        dist_array1 = state.calc_dist_array(0)
-        dist_array2 = state.calc_dist_array(BOARD_LEN - 1)
+        dist_array1 = calc_dist_array(state, 0)
+        dist_array2 = calc_dist_array(state, BOARD_LEN - 1)
 
         def calc_traversed_arr_list(xy_list):
             traversed_arr = np.zeros((9, 9))
@@ -249,27 +248,29 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             c = mvarray2.flatten()
             return np.concatenate([a, b, c])
 
+        row_wall = get_row_wall(state)
+        column_wall = get_column_wall(state)
         for turn, feature1, feature2, feature3, feature4, pi, v_prev, v_post, searched_node_num, mid_move_count, B_traversed_arr, W_traversed_arr, next_pi in zip(
             range(all_turn_num), featuress[0], featuress[1], featuress[2], featuress[3], 
             pis, v_prevs, v_posts, searched_node_nums, move_count_list, B_traversed_arr_list, W_traversed_arr_list, next_pis):
 
             data.append((feature1, pi, state.reward, v_prev, v_post, searched_node_num, 
                          dist_diff, state.black_walls, state.white_walls, all_turn_num - turn, move_count[0] - mid_move_count[0], move_count[1] - mid_move_count[1],
-                         state.row_wall, state.column_wall, dist_array1, dist_array2, B_traversed_arr, W_traversed_arr, next_pi))
+                         row_wall, column_wall, dist_array1, dist_array2, B_traversed_arr, W_traversed_arr, next_pi))
 
             data.append((feature2, pi_flip1(pi), state.reward, v_prev, v_post, searched_node_num, 
                          dist_diff, state.black_walls, state.white_walls, all_turn_num - turn, move_count[0] - mid_move_count[0], move_count[1] - mid_move_count[1],
-                         np.flip(state.row_wall, 0), np.flip(state.column_wall, 0), np.flip(dist_array1, 0), np.flip(dist_array2, 0), np.flip(B_traversed_arr, 0), np.flip(W_traversed_arr, 0),
+                         np.flip(row_wall, 0), np.flip(column_wall, 0), np.flip(dist_array1, 0), np.flip(dist_array2, 0), np.flip(B_traversed_arr, 0), np.flip(W_traversed_arr, 0),
                          pi_flip1(next_pi)))
 
             data.append((feature3, pi_flip2(pi), -state.reward, -v_prev, -v_post, searched_node_num, 
                          -dist_diff, state.white_walls, state.black_walls, all_turn_num - turn, move_count[1] - mid_move_count[1], move_count[0] - mid_move_count[0],
-                         np.flip(state.row_wall, 1), np.flip(state.column_wall, 1), np.flip(dist_array2, 1), np.flip(dist_array1, 1), np.flip(W_traversed_arr, 1), np.flip(B_traversed_arr, 1),
+                         np.flip(row_wall, 1), np.flip(column_wall, 1), np.flip(dist_array2, 1), np.flip(dist_array1, 1), np.flip(W_traversed_arr, 1), np.flip(B_traversed_arr, 1),
                          pi_flip2(next_pi)))
 
             data.append((feature4, pi_flip3(pi), -state.reward, -v_prev, -v_post, searched_node_num, 
                          -dist_diff, state.white_walls, state.black_walls, all_turn_num - turn, move_count[1] - mid_move_count[1], move_count[0] - mid_move_count[0],
-                         np.flip(np.flip(state.row_wall, 1), 0), np.flip(np.flip(state.column_wall, 1), 0), np.flip(np.flip(dist_array2, 1), 0), np.flip(np.flip(dist_array1, 1), 0), np.flip(np.flip(W_traversed_arr, 1), 0), np.flip(np.flip(B_traversed_arr, 1), 0),
+                         np.flip(np.flip(row_wall, 1), 0), np.flip(np.flip(column_wall, 1), 0), np.flip(np.flip(dist_array2, 1), 0), np.flip(np.flip(dist_array1, 1), 0), np.flip(np.flip(W_traversed_arr, 1), 0), np.flip(np.flip(B_traversed_arr, 1), 0),
                          pi_flip3(next_pi)))
     if info:
         print("hash = {}".format(hash_))
@@ -294,7 +295,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         AIs[1 - i % 2].color = 1
         while True:
             if display:
-                state.display_cui()
+                display_cui(state)
             s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
@@ -312,7 +313,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
                 break
 
             if display:
-                state.display_cui()
+                display_cui(state)
 
             s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)

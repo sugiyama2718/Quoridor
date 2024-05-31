@@ -43,13 +43,9 @@ for dir in dirs:
     state.By = int(pos_arr[1])
     state.Wx = int(pos_arr[2])
     state.Wy = int(pos_arr[3])
-    state.row_wall = row_wall
-    state.column_wall = column_wall
     state.black_walls = p1_walls
     state.white_walls = p2_walls
     state.set_state_by_wall()
-    
-    #state.display_cui(check_algo=False)
 
     # 最初のターンによって手番が違うことを考慮
     if turn % 2 == 0:

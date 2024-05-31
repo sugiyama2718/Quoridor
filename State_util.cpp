@@ -22,6 +22,19 @@ struct State {
     int reward, pseudo_reward;
 };
 
+struct BitArrayPair {
+    __uint128_t bitarr1;
+    __uint128_t bitarr2;
+};
+
+struct Point_uint8 {
+    uint8_t x, y;
+};
+
+struct Point_int {
+    int x, y;
+};
+
 const int BOARD_LEN = 9;
 const int BIT_BOARD_LEN = 11;
 const int ACTION_NUM = 137;
@@ -51,6 +64,8 @@ const __uint128_t BOX_10 = ((__uint128_t)0xFFD00A0140280500ULL << 64) | 0xA01402
 
 const __uint128_t CENTER_21_BOX = ((__uint128_t)0xC000000ULL << 64) | 0x0000000000000000ULL;  // (3, 3), (4, 3)の2マス
 
+__uint128_t public_cross_bitarrs[4];
+
 void print_bitarray(__uint128_t bitarr);
 void print_full_bitarray(__uint128_t bitarr);
 inline __uint128_t up_shift(__uint128_t bitarr);
@@ -65,19 +80,9 @@ void calc_dist_array(State* state, int goal_y);
 int arrivable_(State* state, int pawn_x, int pawn_y, int goal_y);
 void calc_placable_array_and_set(State* state);
 bool is_mirror_match(State* state);
-
-struct BitArrayPair {
-    __uint128_t bitarr1;
-    __uint128_t bitarr2;
-};
-
-struct Point_uint8 {
-    uint8_t x, y;
-};
-
-struct Point_int {
-    int x, y;
-};
+void calc_cross_bitarrs_global(__uint128_t row_bitarr, __uint128_t column_bitarr);
+void calc_dist_array_inner(uint8_t* dist_arr_p, int goal_y, __uint128_t cross_bitarrs[4]);
+BitArrayPair calc_placable_array_(State* state);
 
 void State_init(State* state) {
     state->row_wall_bitarr = state->column_wall_bitarr = 0;
@@ -462,6 +467,14 @@ bool accept_action_str(State* state, const char* s, bool check_placable=true, bo
     return true;
 }
 
+int get_player1_dist_from_goal(State* state) {
+    return state->dist_array1[state->Bx + state->By * BOARD_LEN];
+}
+
+int get_player2_dist_from_goal(State* state) {
+    return state->dist_array2[state->Wx + state->Wy * BOARD_LEN];
+}
+
 __uint128_t flip_bitarr(__uint128_t bitarr) {
     // 8*8を縦軸・横軸両方でflipする
 
@@ -519,26 +532,138 @@ bool is_mirror_match(State* state) {
     return true;
 }
 
-void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column_bitarr) {
-    state->cross_bitarrs[UP] = UP_EDGE;
-    state->cross_bitarrs[UP] |= down_shift(row_bitarr);
-    state->cross_bitarrs[UP] |= right_down_shift(row_bitarr);
+bool placable_r_with_color(State* state, int x, int y, int color) {
+    if(get_bit(state->row_wall_bitarr, x, y) || get_bit(state->column_wall_bitarr, x, y)) return false;
+    if(get_bit(state->row_wall_bitarr, max(x - 1, 0), y) || get_bit(state->row_wall_bitarr, min(x + 1, BOARD_LEN - 2), y)) return false;
+    
+    bool ret;
+    
+    set_row_wall_1(state, x, y);
+    if(color == 0) {
+        ret = arrivable_(state, state->Bx, state->By, 0);
+    } else {
+        ret = arrivable_(state, state->Wx, state->Wy, BOARD_LEN - 1);
+    }
+    set_row_wall_0(state, x, y);
 
-    state->cross_bitarrs[RIGHT] = RIGHT_EDGE;
-    state->cross_bitarrs[RIGHT] |= column_bitarr;
-    state->cross_bitarrs[RIGHT] |= down_shift(column_bitarr);
+    return ret;
+}
 
-    state->cross_bitarrs[DOWN] = DOWN_EDGE;
-    state->cross_bitarrs[DOWN] |= row_bitarr;
-    state->cross_bitarrs[DOWN] |= right_shift(row_bitarr);
+bool placable_c_with_color(State* state, int x, int y, int color) {
+    if(get_bit(state->row_wall_bitarr, x, y) || get_bit(state->column_wall_bitarr, x, y)) return false;
+    if(get_bit(state->column_wall_bitarr, x, max(y - 1, 0)) || get_bit(state->column_wall_bitarr, x, min(y + 1, BOARD_LEN - 2))) return false;
+    
+    bool ret;
+    
+    set_column_wall_1(state, x, y);
+    if(color == 0) {
+        ret = arrivable_(state, state->Bx, state->By, 0);
+    } else {
+        ret = arrivable_(state, state->Wx, state->Wy, BOARD_LEN - 1);
+    }
+    set_column_wall_0(state, x, y);
 
-    state->cross_bitarrs[LEFT] = LEFT_EDGE;
-    state->cross_bitarrs[LEFT] |= right_shift(column_bitarr);
-    state->cross_bitarrs[LEFT] |= right_down_shift(column_bitarr);
+    return ret;
+}
+
+__uint128_t calc_oneside_placable_r_cand_from_color(State* state, int color) {
+    __uint128_t ret = 0;
+    for(int y = 0; y < BOARD_LEN - 1; y++) {
+        for(int x = 0; x < BOARD_LEN - 1; x++) {
+            if(placable_r_with_color(state, x, y, color)) set_1(&ret, x, y);
+        }
+    }
+    return ret;
+}
+
+__uint128_t calc_oneside_placable_c_cand_from_color(State* state, int color) {
+    __uint128_t ret = 0;
+    for(int y = 0; y < BOARD_LEN - 1; y++) {
+        for(int x = 0; x < BOARD_LEN - 1; x++) {
+            if(placable_c_with_color(state, x, y, color)) set_1(&ret, x, y);
+        }
+    }
+    return ret;
+}
+
+bool is_certain_path_terminate(State* state, int color) {
+    // color == -1のときは両方判定する
+    int dist1 = get_player1_dist_from_goal(state);
+    int dist2 = get_player2_dist_from_goal(state);
+    __uint128_t placable_r, placable_c;
+    uint8_t certain_dist_arr[81];
+    int max_dist = -1, pawn_dist;
+
+    // 先手後手それぞれで確定路があるか調べる
+    if((color == -1 || color == 0) && (dist1 + state->turn % 2 <= dist2 - 1)) {  // dist1 <= certain_dist1なのでこれを満たさないときは判定不要
+        placable_r = calc_oneside_placable_r_cand_from_color(state, 0);
+        placable_c = calc_oneside_placable_c_cand_from_color(state, 0);
+        calc_cross_bitarrs_global(state->row_wall_bitarr | placable_r, state->column_wall_bitarr | placable_c);
+        calc_dist_array_inner(certain_dist_arr, 0, public_cross_bitarrs);
+        for(int i = 0;i < 81;i++) {
+            if(certain_dist_arr[i] > max_dist) max_dist = certain_dist_arr[i];
+        }
+        pawn_dist = certain_dist_arr[state->Bx + state->By * BOARD_LEN];
+        if(max_dist == pawn_dist) return false;  // 到達不能
+        if(pawn_dist + state->turn % 2 <= dist2 - 1) return true;
+    }
+
+    if((color == -1 || color == 1) && (dist2 + (1 - state->turn % 2) <= dist1 - 1)) { 
+        placable_r = calc_oneside_placable_r_cand_from_color(state, 1);
+        placable_c = calc_oneside_placable_c_cand_from_color(state, 1);
+        calc_cross_bitarrs_global(state->row_wall_bitarr | placable_r, state->column_wall_bitarr | placable_c);
+        calc_dist_array_inner(certain_dist_arr, BOARD_LEN - 1, public_cross_bitarrs);
+        for(int i = 0;i < 81;i++) {
+            if(certain_dist_arr[i] > max_dist) max_dist = certain_dist_arr[i];
+        }
+        pawn_dist = certain_dist_arr[state->Wx + state->Wy * BOARD_LEN];
+        if(max_dist == pawn_dist) return false;  // 到達不能
+        if(pawn_dist + (1 - state->turn % 2) <= dist1 - 1) return true;
+    }
+
+    return false;
+}
+
+BitArrayPair placable_array(State* state, int color) {
+    // 壁の枚数も考慮した壁に関する合法手配列を返す
+    BitArrayPair ret;
+    if((color == 0 && state->black_walls == 0) || (color == 1 && state->white_walls == 0)) {
+        ret.bitarr1 = 0;
+        ret.bitarr2 = 0;
+    } else {
+        ret = calc_placable_array_(state);
+    }
+    return ret;
+}
+
+void calc_cross_bitarrs_global(__uint128_t row_bitarr, __uint128_t column_bitarr) {
+    public_cross_bitarrs[UP] = UP_EDGE;
+    public_cross_bitarrs[UP] |= down_shift(row_bitarr);
+    public_cross_bitarrs[UP] |= right_down_shift(row_bitarr);
+
+    public_cross_bitarrs[RIGHT] = RIGHT_EDGE;
+    public_cross_bitarrs[RIGHT] |= column_bitarr;
+    public_cross_bitarrs[RIGHT] |= down_shift(column_bitarr);
+
+    public_cross_bitarrs[DOWN] = DOWN_EDGE;
+    public_cross_bitarrs[DOWN] |= row_bitarr;
+    public_cross_bitarrs[DOWN] |= right_shift(row_bitarr);
+
+    public_cross_bitarrs[LEFT] = LEFT_EDGE;
+    public_cross_bitarrs[LEFT] |= right_shift(column_bitarr);
+    public_cross_bitarrs[LEFT] |= right_down_shift(column_bitarr);
 
     for(int i = 0; i < 4; i++) {
-        state->cross_bitarrs[i] = ~state->cross_bitarrs[i];
-        state->cross_bitarrs[i] &= BIT_BOARD_MASK;
+        public_cross_bitarrs[i] = ~public_cross_bitarrs[i];
+        public_cross_bitarrs[i] &= BIT_BOARD_MASK;
+    }
+}
+
+void calc_cross_bitarrs(State* state, __uint128_t row_bitarr, __uint128_t column_bitarr) {
+    calc_cross_bitarrs_global(row_bitarr, column_bitarr);
+
+    for(int i = 0; i < 4; i++) {
+        state->cross_bitarrs[i] = public_cross_bitarrs[i];
     }
 }
 
@@ -564,18 +689,14 @@ int arrivable_by_cross(__uint128_t cross_bitarrs[4], int pawn_x, int pawn_y, int
     return false;
 }
 
-void calc_dist_array(State* state, int goal_y) {
-    // goal_yの値から判断して結果をstateのdist_arrayに格納
+void calc_dist_array_inner(uint8_t* dist_arr_p, int goal_y, __uint128_t cross_bitarrs[4]) {
+    // dist_arr_pに格納
     Point_uint8 point_queue[BOARD_LEN * BOARD_LEN];
     int q_s = 0, q_e = 0;
     int x2, y2, x3, y3, dx, dy;
     uint8_t max_dist = 0;
     static const int dxs[4] = {0, 1, 0, -1};
     static const int dys[4] = {-1, 0, 1, 0};
-
-    uint8_t* dist_arr_p;
-    if(goal_y == 0) dist_arr_p = state->dist_array1;
-    else dist_arr_p = state->dist_array2;
 
     for(int i = 0;i < BOARD_LEN * BOARD_LEN;i++) dist_arr_p[i] = 0xFF;
 
@@ -597,7 +718,7 @@ void calc_dist_array(State* state, int goal_y) {
             y3 = y2 + dy;
 
             if(!(x3 < 0 || x3 >= BOARD_LEN || y3 < 0 || y3 >= BOARD_LEN) && 
-            get_bit(state->cross_bitarrs[i], x2, y2) && (dist_arr_p[x3 + y3 * BOARD_LEN] > dist_arr_p[x2 + y2 * BOARD_LEN] + 1)) {
+            get_bit(cross_bitarrs[i], x2, y2) && (dist_arr_p[x3 + y3 * BOARD_LEN] > dist_arr_p[x2 + y2 * BOARD_LEN] + 1)) {
                 max_dist = dist_arr_p[x3 + y3 * BOARD_LEN] = dist_arr_p[x2 + y2 * BOARD_LEN] + 1;
                 point_queue[q_e].x = x3;
                 point_queue[q_e].y = y3;
@@ -611,6 +732,15 @@ void calc_dist_array(State* state, int goal_y) {
     for(int i = 0;i < BOARD_LEN * BOARD_LEN;i++) {
         if(dist_arr_p[i] == 0xFF) dist_arr_p[i] = max_dist;
     }
+}
+
+void calc_dist_array(State* state, int goal_y) {
+    // goal_yの値から判断して結果をstateのdist_arrayに格納
+    uint8_t* dist_arr_p;
+    if(goal_y == 0) dist_arr_p = state->dist_array1;
+    else dist_arr_p = state->dist_array2;
+
+    calc_dist_array_inner(dist_arr_p, goal_y, state->cross_bitarrs);
 }
 
 int arrivable_(State* state, int pawn_x, int pawn_y, int goal_y) {

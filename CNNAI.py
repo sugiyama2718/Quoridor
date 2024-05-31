@@ -5,7 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
-from State import CHANNEL, color_p, movable_array
+from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal, placable_array, display_cui, feature_CNN
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -435,7 +435,7 @@ class CNNAI(BasicAI):
         if self.v_is_dist:
             y = np.zeros((len(states),))
             for i, s in enumerate(states):
-                B_dist, W_dist = s.get_player_dist_from_goal()
+                B_dist, W_dist = get_player_dist_from_goal(s)
                 y[i] = np.tanh((W_dist - B_dist) * 0.15)
         else:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
@@ -443,7 +443,7 @@ class CNNAI(BasicAI):
                 xflip = False
                 if random_flip and random.random() < 0.5:
                     xflip = True
-                feature[i, :] = s.feature_CNN(xflip=xflip)
+                feature[i, :] = feature_CNN(s, xflip=xflip)
             y = self.sess.run(self.y, feed_dict={self.x:feature})
 
         for i, s in enumerate(states):
@@ -464,7 +464,7 @@ class CNNAI(BasicAI):
         mask = np.zeros((len(states), self.action_num))
         if self.p_is_almost_flat:
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
+                r, c = placable_array(s, s.turn % 2)
                 x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
@@ -475,13 +475,13 @@ class CNNAI(BasicAI):
         else:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
+                r, c = placable_array(s, s.turn % 2)
                 x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
                         [r.flatten(), c.flatten(), movable_array(s, x, y, shortest_only=False).flatten()])
-                feature[i, :] = s.feature_CNN()
+                feature[i, :] = feature_CNN(s)
                 #if s.terminate:
                 #    mask[i, :] = np.zeros((self.action_num,))
             p = self.sess.run(self.p_tf, feed_dict={self.x:feature})
@@ -507,7 +507,7 @@ class CNNAI(BasicAI):
             print(mask)
             print(feature)
             for state in states:
-                state.display_cui()
+                display_cui(state)
             exit()
 
         return p
@@ -523,26 +523,26 @@ class CNNAI(BasicAI):
         if self.p_is_almost_flat:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
+                r, c = placable_array(s, s.turn % 2)
                 x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
                         [r.flatten(), c.flatten(), movable_array(s, x, y, shortest_only=False).flatten()])
-                feature[i, :] = s.feature_CNN()
+                feature[i, :] = feature_CNN(s)
             p = np.ones((len(states), self.action_num)) + np.random.rand(len(states), self.action_num) / 1000  # 1000は適当
             p = p / np.sum(p, axis=1).reshape((-1, 1))
             y_pred = self.sess.run(self.y, feed_dict={self.x:feature})
         else:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
+                r, c = placable_array(s, s.turn % 2)
                 x, y = color_p(s, s.turn % 2)
                 mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
                         [r.flatten(), c.flatten(), movable_array(s, x, y, shortest_only=False).flatten()])
-                feature[i, :] = s.feature_CNN()
+                feature[i, :] = feature_CNN(s)
                 #if s.terminate:
                 #    mask[i, :] = np.zeros((self.action_num,))
             p, y_pred = self.sess.run([self.p_tf, self.y], feed_dict={self.x:feature})
@@ -575,7 +575,7 @@ class CNNAI(BasicAI):
             print(mask)
             print(feature)
             for state in states:
-                state.display_cui()
+                display_cui(state)
             exit()
 
         return p, y_pred

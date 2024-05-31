@@ -123,14 +123,30 @@ uint128ToBoolArray = lib.uint128ToBoolArray
 uint128ToBoolArray.argtypes = [ctypes.c_uint64, ctypes.c_uint64]
 uint128ToBoolArray.restype = ctypes.POINTER(ctypes.c_bool)
 
+get_player1_dist_from_goal = lib.get_player1_dist_from_goal
+get_player1_dist_from_goal.argtypes = [ctypes.POINTER(State_c)]
+get_player1_dist_from_goal.restype = ctypes.c_int
+
+get_player2_dist_from_goal = lib.get_player2_dist_from_goal
+get_player2_dist_from_goal.argtypes = [ctypes.POINTER(State_c)]
+get_player2_dist_from_goal.restype = ctypes.c_int
+
+is_certain_path_terminate_c = lib.is_certain_path_terminate
+is_certain_path_terminate_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+is_certain_path_terminate_c.restype = ctypes.c_bool
+
+placable_array_c = lib.placable_array
+placable_array_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+placable_array_c.restype = BitArrayPair
+
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
 def State_init(state):
-    pass  # pythonではコンストラクタで初期化されるから何もしない
+    State_init_(state.state_c)
 
 def eq_state(state1, state2):
-    f = np.all(state1.row_wall == state2.row_wall) and np.all(state1.column_wall == state2.column_wall)
+    f = True
     f = f and state1.Bx == state2.Bx and state1.By == state2.By and state1.Wx == state2.Wx and state1.Wy == state2.Wy
     f = f and state1.black_walls == state2.black_walls and state1.white_walls == state2.white_walls
     f = f and eq_state_c(state1.state_c, state2.state_c)
@@ -151,24 +167,25 @@ def movable_array(state, x, y, shortest_only=False):
 
     return mv
 
-def set_state_by_wall(state):
-    # row_wallなどを直接指定して状態を作るときに用いる
-    # 差分計算している部分を計算する
-
+def set_wall(state, row_wall, column_wall):
     for x in range(BOARD_LEN - 1):
         for y in range(BOARD_LEN - 1):
-            if state.row_wall[x, y]:
+            if row_wall[x, y]:
                 set_row_wall_1(state.state_c, x, y)
             else:
                 set_row_wall_0(state.state_c, x, y)
-            if state.column_wall[x, y]:
+            if column_wall[x, y]:
                 set_column_wall_1(state.state_c, x, y)
             else:
                 set_column_wall_0(state.state_c, x, y)
 
-    cross_movable_arr = state.cross_movable_array2(state.row_wall, state.column_wall)
-    dist_array1 = state.dist_array(0, cross_movable_arr)
-    dist_array2 = state.dist_array(BOARD_LEN - 1, cross_movable_arr)
+def set_state_by_wall(state, row_wall, column_wall):
+    # 差分計算している部分を計算する
+
+    set_wall(state, row_wall, column_wall)
+
+    dist_array1 = calc_dist_array(state, 0)
+    dist_array2 = calc_dist_array(state, BOARD_LEN - 1)
     for x in range(BOARD_LEN):
         for y in range(BOARD_LEN):
             state.state_c.dist_array1[x + y * BOARD_LEN] = dist_array1[x, y]
@@ -181,8 +198,6 @@ def get_dist_array_from_c_arr(c_dist_arr):
 
 def accept_action_str(state, s, check_placable=True, calc_placable_array=True, check_movable=True):
     # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
-
-    old_wall_num = state.black_walls + state.white_walls
     
     ret = accept_action_str_c(state.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
 
@@ -200,12 +215,195 @@ def accept_action_str(state, s, check_placable=True, calc_placable_array=True, c
     state.pseudo_terminate = state.state_c.pseudo_terminate
     state.pseudo_reward = state.state_c.pseudo_reward
 
-    # 壁置きなら
-    if old_wall_num != state.black_walls + state.white_walls:
-        state.row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
-        state.column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
-
     return ret
+
+def get_player_dist_from_goal(state):
+    return get_player1_dist_from_goal(state.state_c), get_player2_dist_from_goal(state.state_c)
+
+def is_certain_path_terminate(state, color=-1):
+    return is_certain_path_terminate_c(state.state_c, color)
+
+def placable_array(state, color):
+    ret = placable_array_c(state.state_c, color)
+    return get_numpy_arr(ret.bitarr1, BOARD_LEN - 1), get_numpy_arr(ret.bitarr2, BOARD_LEN - 1)
+
+def calc_dist_array(state, goal_y):
+    calc_dist_array_c(state.state_c, goal_y)
+    if goal_y == 0:
+        array_ptr = state.state_c.dist_array1
+    else:
+        array_ptr = state.state_c.dist_array2
+    return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+
+def display_cui(state, check_algo=True, official=True, p1_atmark=False, ret_str=False):
+    row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    
+    ret = " "
+    for c in ["a", "b", "c", "d", "e", "f", "g", "h", "i"]:
+        ret += " " + c
+    ret += os.linesep
+    ret += " +"
+    for x in range(BOARD_LEN):
+        ret += "-+"
+    ret += os.linesep
+
+    for y in range(BOARD_LEN):
+        if official:
+            ret += (str(BOARD_LEN - y) + "|")
+        else:
+            ret += (str(y + 1) + "|")
+        for x in range(BOARD_LEN):
+            if x == state.Bx and y == state.By:
+                if p1_atmark:
+                    ret += "@"
+                else:
+                    ret += "O"
+            elif x == state.Wx and y == state.Wy:
+                if p1_atmark:
+                    ret += "O"
+                else:
+                    ret += "@"
+            else:
+                ret += " "
+
+            if x == BOARD_LEN - 1:
+                break
+
+            if column_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or column_wall[min(x, BOARD_LEN - 2), max(y - 1, 0)]:
+                ret += "#"
+            else:
+                ret += "|"
+        ret += "|" + os.linesep
+
+        if y == BOARD_LEN - 1:
+            break
+
+        ret += " +"
+        for x in range(BOARD_LEN):
+            if row_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or row_wall[max(x - 1, 0), min(y, BOARD_LEN - 2)]:
+                ret += "="
+            else:
+                ret += "-"
+
+            if x == BOARD_LEN - 1:
+                break
+
+            if row_wall[x, y] or column_wall[x, y]:
+                ret += "+"
+            else:
+                ret += " "
+        ret += "+" + os.linesep
+
+    ret += " +"
+    for x in range(BOARD_LEN):
+        ret += "-+"
+    ret += os.linesep
+
+    ret += "1p walls:" + str(state.black_walls) + os.linesep
+    ret += "2p walls:" + str(state.white_walls) + os.linesep
+
+    if state.turn % 2 == 0:
+        ret += "{}:1p turn".format(state.turn) + os.linesep
+    else:
+        ret += "{}:2p turn".format(state.turn) + os.linesep
+    if ret_str:
+        return ret
+    else:
+        sys.stdout.write(ret)
+
+def feature_int(state):
+    row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    feature = np.zeros((135,), dtype=int)
+    feature[0] = state.Bx
+    feature[1] = state.By
+    feature[2] = state.Wx
+    feature[3] = state.Wy
+    feature[4] = state.black_walls
+    feature[5] = state.white_walls
+    feature[6] = state.turn % 2
+    feature[7:7 + 64] = row_wall.flatten()
+    feature[7 + 64:] = column_wall.flatten()
+    return feature
+
+def feature_CNN(state, xflip=False, yflip=False):
+    feature = np.zeros((9, 9, CHANNEL))
+
+    cross_arr = np.zeros((9, 9, 4))
+    for i in range(4):
+        cross_arr[:, :, i] = get_numpy_arr(state.state_c.cross_bitarrs, BOARD_LEN, i * 2)
+        
+    Bx = state.Bx
+    By = state.By
+    Wx = state.Wx
+    Wy = state.Wy
+    black_walls = state.black_walls
+    white_walls = state.white_walls
+    turn = state.turn
+    row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    dist1, dist2 = get_player_dist_from_goal(state)
+    placable_r = get_numpy_arr(state.state_c.placable_r_bitarr, BOARD_LEN - 1)
+    placable_c = get_numpy_arr(state.state_c.placable_c_bitarr, BOARD_LEN - 1)
+    if xflip:
+        Bx = 8 - Bx
+        Wx = 8 - Wx
+        row_wall = np.flip(row_wall, 0)
+        column_wall = np.flip(column_wall, 0)
+        placable_r = np.flip(placable_r, 0)
+        placable_c = np.flip(placable_c, 0)
+        cross_arr = np.flip(cross_arr, 0)
+        temp = np.copy(cross_arr[:, :, RIGHT])
+        cross_arr[:, :, RIGHT] = cross_arr[:, :, LEFT]
+        cross_arr[:, :, LEFT] = temp
+    if yflip:
+        # goalが異なるから色を取り替える
+        temp = Bx
+        Bx = Wx
+        Wx = temp
+        By = 8 - state.Wy
+        Wy = 8 - state.By
+        black_walls = state.white_walls
+        white_walls = state.black_walls
+        turn += 1
+        row_wall = np.flip(row_wall, 1)
+        column_wall = np.flip(column_wall, 1)
+        placable_r = np.flip(placable_r, 1)
+        placable_c = np.flip(placable_c, 1)
+        cross_arr = np.flip(cross_arr, 1)
+        temp = np.copy(cross_arr[:, :, UP])
+        cross_arr[:, :, UP] = cross_arr[:, :, DOWN]
+        cross_arr[:, :, DOWN] = temp
+        temp = dist1
+        dist1 = dist2
+        dist2 = temp
+
+    feature[Bx, By, 0] = 1.
+    feature[Wx, Wy, 1] = 1.
+
+    feature[:, :, 2] = black_walls / 10
+    feature[:, :, 3] = white_walls / 10
+    feature[:, :, 4] = turn % 2
+    feature[:, :, 5:9] = cross_arr
+
+    feature[:, :, 9] = dist1 / 20
+    feature[:, :, 10] = dist2 / 20
+
+    # 以下8*8の特徴量
+    feature[:-1, :-1, 11] = row_wall
+    feature[:-1, :-1, 12] = column_wall
+
+    feature[:-1, :-1, 13] = placable_r  # 盤面外にはおけないことを考えると、反転しないほうが0paddingと相性は良いと思われる
+    feature[:-1, :-1, 14] = placable_c
+
+    return feature
+
+def get_row_wall(state):
+    return get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+
+def get_column_wall(state):
+    return get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
 
 # -----------------------------------------
 
@@ -229,13 +427,9 @@ def print_bitarr(bitarr):
 
 cdef class State:
     draw_turn = DRAW_TURN
-    cdef public np.ndarray row_wall, column_wall
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
-    cdef public np.ndarray prev
     cdef public state_c
     def __init__(self):
-        self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
-        self.column_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
         self.Bx = BOARD_LEN // 2
         self.By = BOARD_LEN - 1
         self.Wx = BOARD_LEN // 2
@@ -254,350 +448,4 @@ cdef class State:
         State_init_(self.state_c)
         # print_state(self.state_c)
 
-    def __eq__(self, state):
-        assert False
-
-    def get_player_dist_from_goal(self):
-        dist_array1 = get_dist_array_from_c_arr(self.state_c.dist_array1)
-        dist_array2 = get_dist_array_from_c_arr(self.state_c.dist_array2)
-        return dist_array1[self.Bx, self.By], dist_array2[self.Wx, self.Wy]
-
-    def color_p(self, color):
-        assert False
-
-    def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
-        assert False
-
-    def is_certain_path_terminate(self, color=None):
-        dist_array1 = get_dist_array_from_c_arr(self.state_c.dist_array1)
-        dist_array2 = get_dist_array_from_c_arr(self.state_c.dist_array2)
-        B_dist = dist_array1[self.Bx, self.By]
-        W_dist = dist_array2[self.Wx, self.Wy]
-
-        # 先手後手それぞれで確定路があるか調べる
-        if (color is None or color == 0) and B_dist + self.turn % 2 <= W_dist - 1:  #  B_dist <= B_certain_distなのでこれを満たさないときは判定不要
-            placable_r, placable_c = self.calc_oneside_placable_cand_from_color(0)
-            certain_cross_movable_arr = self.cross_movable_array2(self.row_wall | placable_r, self.column_wall | placable_c)
-            B_certain_dist = self.shortest_path_len(self.Bx, self.By, 0, certain_cross_movable_arr)
-            if B_certain_dist + self.turn % 2 <= W_dist - 1:
-                return True
-
-        if (color is None or color == 1) and W_dist + (1 - self.turn % 2) <= B_dist - 1:
-            placable_r, placable_c = self.calc_oneside_placable_cand_from_color(1)
-            certain_cross_movable_arr = self.cross_movable_array2(self.row_wall | placable_r, self.column_wall | placable_c)
-            W_certain_dist = self.shortest_path_len(self.Wx, self.Wy, BOARD_LEN - 1, certain_cross_movable_arr)
-            if W_certain_dist + (1 - self.turn % 2) <= B_dist - 1:
-                return True
-
-        return False
-
-    def set_state_by_wall(self):
-        assert False
-
-    def cross_movable_array2(self, row_wall, column_wall):
-        cdef int x, y
-        #cdef np.ndarray[DTYPE_t, ndim = 3] ret = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
-        cdef DTYPE_t[:, :, :] ret = np.zeros((BOARD_LEN, BOARD_LEN, 4), dtype=DTYPE)
-
-        for x in range(BOARD_LEN):
-            for y in range(BOARD_LEN):
-                ret[x, y, 0] = (not (y == 0 or row_wall[min(x, BOARD_LEN - 2), y - 1] or row_wall[max(x - 1, 0), y - 1]))
-                ret[x, y, 1] = (not (x == BOARD_LEN - 1 or column_wall[x, min(y, BOARD_LEN - 2)] or column_wall[x, max(y - 1, 0)]))
-                ret[x, y, 2] = (not (y == BOARD_LEN - 1 or row_wall[min(x, BOARD_LEN - 2), y] or row_wall[max(x - 1, 0), y]))
-                ret[x, y, 3] = (not (x == 0 or column_wall[x - 1, min(y, BOARD_LEN - 2)] or column_wall[x - 1, max(y - 1, 0)]))
-
-        return ret
-
-    # shortest_onely=Trueの場合ゴールからの距離を縮める方向のみに1を立てる
-    def movable_array(self, x, y, shortest_only=False):
-        assert False
-
-    def inboard(self, x, y, size):
-        if x < 0 or y < 0 or x >= size or y >= size:
-            return False
-        return True
-
-    def placable_array(self, color):
-        placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
-        placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
-        if color == 0:
-            return placable_r * int(self.black_walls >= 1), placable_c * int(self.black_walls >= 1)
-        else:
-            return placable_r * int(self.white_walls >= 1), placable_c * int(self.white_walls >= 1)
-
-    cdef (int, int) placable_with_color(self, x, y, color):
-        # すべてarrivableで確かめる。
-        if self.row_wall[x, y] or self.column_wall[x, y]:
-            return False, False
-        row_f = True
-        column_f = True
-
-        if self.row_wall[max(x - 1, 0), y] or self.row_wall[min(x + 1, BOARD_LEN - 2), y]:
-            row_f = False
-        if self.column_wall[x, max(y - 1, 0)] or self.column_wall[x, min(y + 1, BOARD_LEN - 2)]:
-            column_f = False
-        if row_f:
-            self.row_wall[x, y] = 1
-            set_row_wall_1(self.state_c, x, y)
-            if color == 0:
-                f = self.arrivable(self.Bx, self.By, 0) 
-            else:
-                f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.row_wall[x, y] = 0
-            set_row_wall_0(self.state_c, x, y)
-            row_f = row_f and f
-        if column_f:
-            self.column_wall[x, y] = 1
-            set_column_wall_1(self.state_c, x, y)
-            if color == 0:
-                f = self.arrivable(self.Bx, self.By, 0)
-            else:
-                f = self.arrivable(self.Wx, self.Wy, BOARD_LEN - 1)
-            self.column_wall[x, y] = 0
-            set_column_wall_0(self.state_c, x, y)
-            column_f = column_f and f
-        return row_f, column_f
-
-    def shortest_path_len(self, x, y, goal_y, cross_arr):
-        dist = np.ones((BOARD_LEN, BOARD_LEN)) * BOARD_LEN * BOARD_LEN * 2
-        prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int8")
-        seen = np.zeros((BOARD_LEN, BOARD_LEN))
-        dist[x, y] = 0
-        while np.sum(seen) < BOARD_LEN * BOARD_LEN:
-            x2, y2 = np.unravel_index(np.argmin(dist + seen * BOARD_LEN * BOARD_LEN * 3, axis=None), dist.shape)
-            seen[x2, y2] = 1
-            for i, p in enumerate([(0, -1), (1, 0), (0, 1), (-1, 0)]):
-                x3 = x2 + p[0]
-                y3 = y2 + p[1]
-                if cross_arr[x2, y2, i]:
-                    if dist[x3, y3] > dist[x2, y2] + 1:
-                        dist[x3, y3] = dist[x2, y2] + 1
-                        prev[x3, y3, 0] = x2
-                        prev[x3, y3, 1] = y2
-        return np.min(dist[:, goal_y])
-
-    def dist_array(self, int goal_y, DTYPE_t[:, :, :] cross_arr):
-        cdef int x, x2, y2, x3, y3, i, dx, dy
-        cdef np.ndarray[DTYPE_t, ndim = 2] dist = np.ones((BOARD_LEN, BOARD_LEN), dtype=DTYPE) * BOARD_LEN * BOARD_LEN * 2
-
-        queue = []
-        for x in range(BOARD_LEN):
-            dist[x, goal_y] = 0
-            queue.append((x, goal_y))
-        while len(queue) > 0:
-            x2, y2 = queue.pop(0)
-            for i, dx, dy in [(0, 0, -1), (1, 1, 0), (2, 0, 1), (3, -1, 0)]:
-                x3 = x2 + dx
-                y3 = y2 + dy
-                if cross_arr[x2, y2, i] and dist[x3, y3] > dist[x2, y2] + 1:
-                    dist[x3, y3] = dist[x2, y2] + 1
-                    queue.append((x3, y3))
-        dist[dist == BOARD_LEN * BOARD_LEN * 2] = -1
-        dist[dist == -1] = np.max(dist) + 1
-        return dist
-
-    def calc_dist_array(self, int goal_y):
-        calc_dist_array_c(self.state_c, goal_y)
-        if goal_y == 0:
-            array_ptr = self.state_c.dist_array1
-        else:
-            array_ptr = self.state_c.dist_array2
-        return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-    
-    def calc_oneside_placable_cand_from_color(self, color):
-        # どちらかのプレイヤー（colorで指定）の路だけで壁置きの可能性を判定する。勝利の確定判定などに用いる。各種内部変数は計算済みと仮定する。
-
-        cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.ones((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                f1, f2 = self.placable_with_color(x, y, color)
-                row_array[x, y] = f1
-                column_array[x, y] = f2
-        return row_array, column_array
-    
-    def calc_placable_array(self, skip_calc_graph=False):
-        cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef int x, y
-
-        ret = calc_placable_array_(self.state_c)
-
-        row_placable_bitarr = bitarray(128)
-        column_placable_bitarr = bitarray(128)
-        row_placable_bitarr[:64] = int2ba(ret.bitarr1[1], length=64)
-        row_placable_bitarr[64:] = int2ba(ret.bitarr1[0], length=64)
-        column_placable_bitarr[:64] = int2ba(ret.bitarr2[1], length=64)
-        column_placable_bitarr[64:] = int2ba(ret.bitarr2[0], length=64)
-        # print_bitarr(row_placable_bitarr)
-        # print_bitarr(column_placable_bitarr)
-
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                row_array[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
-                column_array[x, y] = column_placable_bitarr[x + y * BIT_BOARD_LEN]
-
-        return row_array, column_array
-
-    def arrivable(self, int x, int y, int goal_y):
-        return arrivable_(self.state_c, x, y, goal_y)
-
-    def display_cui(self, check_algo=True, official=True, p1_atmark=False, ret_str=False):
-        ret = " "
-        for c in ["a", "b", "c", "d", "e", "f", "g", "h", "i"]:
-            ret += " " + c
-        ret += os.linesep
-        ret += " +"
-        for x in range(BOARD_LEN):
-            ret += "-+"
-        ret += os.linesep
-
-        for y in range(BOARD_LEN):
-            if official:
-                ret += (str(BOARD_LEN - y) + "|")
-            else:
-                ret += (str(y + 1) + "|")
-            for x in range(BOARD_LEN):
-                if x == self.Bx and y == self.By:
-                    if p1_atmark:
-                        ret += "@"
-                    else:
-                        ret += "O"
-                elif x == self.Wx and y == self.Wy:
-                    if p1_atmark:
-                        ret += "O"
-                    else:
-                        ret += "@"
-                else:
-                    ret += " "
-
-                if x == BOARD_LEN - 1:
-                    break
-
-                if self.column_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or self.column_wall[min(x, BOARD_LEN - 2), max(y - 1, 0)]:
-                    ret += "#"
-                else:
-                    ret += "|"
-            ret += "|" + os.linesep
-
-            if y == BOARD_LEN - 1:
-                break
-
-            ret += " +"
-            for x in range(BOARD_LEN):
-                if self.row_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or self.row_wall[max(x - 1, 0), min(y, BOARD_LEN - 2)]:
-                    ret += "="
-                else:
-                    ret += "-"
-
-                if x == BOARD_LEN - 1:
-                    break
-
-                if self.row_wall[x, y] or self.column_wall[x, y]:
-                    ret += "+"
-                else:
-                    ret += " "
-            ret += "+" + os.linesep
-
-        ret += " +"
-        for x in range(BOARD_LEN):
-            ret += "-+"
-        ret += os.linesep
-
-        ret += "1p walls:" + str(self.black_walls) + os.linesep
-        ret += "2p walls:" + str(self.white_walls) + os.linesep
-
-        if self.turn % 2 == 0:
-            ret += "{}:1p turn".format(self.turn) + os.linesep
-        else:
-            ret += "{}:2p turn".format(self.turn) + os.linesep
-        if ret_str:
-            return ret
-        else:
-            sys.stdout.write(ret)
-
-    def feature_int(self):
-        feature = np.zeros((135,), dtype=int)
-        feature[0] = self.Bx
-        feature[1] = self.By
-        feature[2] = self.Wx
-        feature[3] = self.Wy
-        feature[4] = self.black_walls
-        feature[5] = self.white_walls
-        feature[6] = self.turn % 2
-        feature[7:7 + 64] = self.row_wall.flatten()
-        feature[7 + 64:] = self.column_wall.flatten()
-        return feature
-
-    def feature_CNN(self, xflip=False, yflip=False):
-        feature = np.zeros((9, 9, CHANNEL))
-
-        cross_arr = np.zeros((9, 9, 4))
-        for i in range(4):
-            cross_arr[:, :, i] = get_numpy_arr(self.state_c.cross_bitarrs, BOARD_LEN, i * 2)
-            
-        Bx = self.Bx
-        By = self.By
-        Wx = self.Wx
-        Wy = self.Wy
-        black_walls = self.black_walls
-        white_walls = self.white_walls
-        turn = self.turn
-        row_wall = self.row_wall
-        column_wall = self.column_wall
-        dist1, dist2 = self.get_player_dist_from_goal()
-        placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
-        placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
-        if xflip:
-            Bx = 8 - Bx
-            Wx = 8 - Wx
-            row_wall = np.flip(row_wall, 0)
-            column_wall = np.flip(column_wall, 0)
-            placable_r = np.flip(placable_r, 0)
-            placable_c = np.flip(placable_c, 0)
-            cross_arr = np.flip(cross_arr, 0)
-            temp = np.copy(cross_arr[:, :, RIGHT])
-            cross_arr[:, :, RIGHT] = cross_arr[:, :, LEFT]
-            cross_arr[:, :, LEFT] = temp
-        if yflip:
-            # goalが異なるから色を取り替える
-            temp = Bx
-            Bx = Wx
-            Wx = temp
-            By = 8 - self.Wy
-            Wy = 8 - self.By
-            black_walls = self.white_walls
-            white_walls = self.black_walls
-            turn += 1
-            row_wall = np.flip(row_wall, 1)
-            column_wall = np.flip(column_wall, 1)
-            placable_r = np.flip(placable_r, 1)
-            placable_c = np.flip(placable_c, 1)
-            cross_arr = np.flip(cross_arr, 1)
-            temp = np.copy(cross_arr[:, :, UP])
-            cross_arr[:, :, UP] = cross_arr[:, :, DOWN]
-            cross_arr[:, :, DOWN] = temp
-            temp = dist1
-            dist1 = dist2
-            dist2 = temp
-
-        feature[Bx, By, 0] = 1.
-        feature[Wx, Wy, 1] = 1.
-
-        feature[:, :, 2] = black_walls / 10
-        feature[:, :, 3] = white_walls / 10
-        feature[:, :, 4] = turn % 2
-        feature[:, :, 5:9] = cross_arr
-
-        feature[:, :, 9] = dist1 / 20
-        feature[:, :, 10] = dist2 / 20
-
-        # 以下8*8の特徴量
-        feature[:-1, :-1, 11] = row_wall
-        feature[:-1, :-1, 12] = column_wall
-
-        feature[:-1, :-1, 13] = placable_r  # 盤面外にはおけないことを考えると、反転しないほうが0paddingと相性は良いと思われる
-        feature[:-1, :-1, 14] = placable_c
-
-        return feature
 

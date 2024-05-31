@@ -1,7 +1,7 @@
 import os
 from Tree import OpeningTree
 from tqdm import tqdm
-from State import State, State_init, accept_action_str
+from State import State, State_init, accept_action_str, feature_int
 
 def Glendenning2Official(s):
     """
@@ -51,7 +51,7 @@ os.makedirs(RECORDS_PATH, exist_ok=True)
 
 def get_opening_node_from_state(state, statevec2node):
     # 既に登録済みの場合はstate_vecを返す
-    state_vec = tuple(state.feature_int().flatten())  # MCTSのときと違いターン数を区別しない。
+    state_vec = tuple(feature_int(state).flatten())  # MCTSのときと違いターン数を区別しない。
     if state_vec in statevec2node.keys():
         ret = state_vec
     else:
@@ -86,8 +86,8 @@ def get_normalized_state(action_list):
     state = get_state_from_action_list(action_list)
     mirror_state = get_state_from_action_list(mirror_action_list)
 
-    state_vec = tuple(state.feature_int().flatten())
-    mirror_state_vec = tuple(mirror_state.feature_int().flatten())
+    state_vec = tuple(feature_int(state).flatten())
+    mirror_state_vec = tuple(feature_int(mirror_state).flatten())
 
     if state_vec <= mirror_state_vec:
         return state, state_vec, False
@@ -123,8 +123,8 @@ def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
             accept_action_str(state, action_str, check_placable=False, calc_placable_array=False, check_movable=False)
             accept_action_str(mirror_state, mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
 
-            state_vec = tuple(state.feature_int().flatten())
-            mirror_state_vec = tuple(mirror_state.feature_int().flatten())
+            state_vec = tuple(feature_int(state).flatten())
+            mirror_state_vec = tuple(feature_int(mirror_state).flatten())
 
             if state_vec <= mirror_state_vec:
                 normalized_state = state

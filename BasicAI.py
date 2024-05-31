@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN
+from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array, calc_dist_array, display_cui, feature_int
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -36,7 +36,7 @@ copy_state_c.restype = None
 
 def get_state_vec(state):
     # stateを固定長タプルにしてdictのkeyにするために使う。state.turnを入れているのは、turnの異なる状態を区別して無限ループを避けるため
-    return tuple([state.turn] + list(state.feature_int().flatten()))
+    return tuple([state.turn] + list(feature_int(state).flatten()))
 
 
 def display_parameter(x):
@@ -167,8 +167,6 @@ def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
 
 def state_copy(s):
     ret = State.State()
-    ret.row_wall = copy.copy(s.row_wall)
-    ret.column_wall = copy.copy(s.column_wall)
     ret.Bx = s.Bx
     ret.By = s.By
     ret.Wx = s.Wx
@@ -187,8 +185,8 @@ def calc_optimal_move_by_DP(s):
     s = state_copy(s)
     boards = list(product(range(9), range(9), range(9), range(9), range(2)))  # 壁0なので、(Bx, By, Wx, Wy, 手番)で盤面が一意に定まる。のでそれで盤面を表現。
 
-    dist_array1 = s.calc_dist_array(0)
-    dist_array2 = s.calc_dist_array(BOARD_LEN - 1)
+    dist_array1 = calc_dist_array(s, 0)
+    dist_array2 = calc_dist_array(s, BOARD_LEN - 1)
 
     # 合法手のみに絞る
     def is_legal(board):
@@ -397,7 +395,7 @@ class BasicAI(Agent):
     def action_array(self, s):
         if s.terminate:
             return np.zeros((2 * (State.BOARD_LEN - 1) * (State.BOARD_LEN - 1) + 9,), dtype="bool")
-        r, c = s.placable_array(s.turn % 2)
+        r, c = placable_array(s, s.turn % 2)
         x, y = color_p(s, s.turn % 2)
         v = np.concatenate([r.flatten(), c.flatten(), movable_array(s, x, y).flatten()])
         return np.asarray(v, dtype="bool")
@@ -465,8 +463,8 @@ class BasicAI(Agent):
             except:
                 print("{} error action={}".format(i, action))
                 print(actions)
-                root_state.display_cui()
-                state.display_cui()
+                display_cui(root_state)
+                display_cui(state)
                 print("!"*30)
             if action < 128:
                 leaf_discovery_arr = np.zeros((2, 9, 9), dtype=bool)
@@ -506,10 +504,10 @@ class BasicAI(Agent):
 
         wall_num = state.black_walls + state.white_walls
 
-        B_dist, W_dist = state.get_player_dist_from_goal()
+        B_dist, W_dist = get_player_dist_from_goal(state)
 
         # 自分の道が確定していて相手よりも早く着くなら最短路を進むだけ
-        if state.is_certain_path_terminate():
+        if is_certain_path_terminate(state):
             self.tree_for_visualize = self.prev_tree = None  # 読みが入らなくなるので、prev_treeが参照されないようにNoneを入れておく
             x, y = color_p(state, state.turn % 2)
             movable_arr = movable_array(state, x, y, shortest_only=True)
@@ -735,8 +733,8 @@ class BasicAI(Agent):
                         # t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
                         # t.children[a].V = np.array(v_arr[count], dtype=np.float32)
                         if s.turn != t.children[a].s.turn or t.s.turn + 1 != t.children[a].s.turn:
-                            t.s.display_cui()
-                            s.display_cui()
+                            display_cui(t.s)
+                            display_cui(s)
                             t.children[a].s
                             assert False, "!" * 100
 
@@ -765,10 +763,6 @@ class BasicAI(Agent):
                 if not s.pseudo_terminate:
                     continue
 
-                # print("~"*50)
-                # print(s.pseudo_reward)
-                # s.display_cui()
-
                 # 葉ノード側からたどる
                 for node, action in zip(nodes[::-1], actions[::-1]):
                     # 過去の探索で既に勝敗が決まっているときは飛ばす(optimal_actionなどが書き換えられないよう)
@@ -780,7 +774,7 @@ class BasicAI(Agent):
                     lose_reward = -1 if node.s.turn % 2 == 0 else 1
 
                     if action not in node.children.keys():  # 葉ノードを子に持つ
-                        s_B_dist, s_W_dist = s.get_player_dist_from_goal()
+                        s_B_dist, s_W_dist = get_player_dist_from_goal(s)
                         node.dist_diff_arr[action] = max(s_W_dist - s_B_dist + (1 - s.turn % 2), s_B_dist - s_W_dist + s.turn % 2)
                     elif  node.children[action].result != 0:  # 勝敗が決定した子ノードを持つ
                         node.dist_diff_arr[action] = int(np.min(node.children[action].dist_diff_arr))
@@ -793,8 +787,8 @@ class BasicAI(Agent):
                             
                             if node_illegal[action]:
                                 print("!"*100)
-                                state.display_cui()
-                                node.s.display_cui()
+                                display_cui(state)
+                                display_cui(node.s)
                                 print(node.P)
                                 print(node_illegal)
                                 print(actionid2str(node.s, action))
@@ -804,27 +798,17 @@ class BasicAI(Agent):
                     else:  # 負け側はすべての行動が相手の勝ちになるときに限り負けノード
                         if action not in node.children.keys() or node.children[action].result == lose_reward:
                             node.set_is_lose_child_arr(action, True)
-                            #node.is_lose_child_arr[action] = True
 
                             if not node.already_certain_path_confirmed: # 壁置きで負けになる場合、一度確定路判定をする。移動の場合も判定するとだいぶ遅くなるので壁おきに制限。
                                 node.already_certain_path_confirmed = True
-                                if node.s.is_certain_path_terminate((node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
+                                if is_certain_path_terminate(node.s, (node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
                                     node.set_is_lose_child_arr_True(np.arange(128))
-                                    # print("!!!certain path !!!")
-                                    # print(actions)
-                                    # print(node.P)
-                                    # print(node.P_without_loss)
                             node_illegal = (node.P == 0.)
                             if np.all(node_illegal | node.is_lose_child_arr):
-                                # print("~"*50)
-                                # node.s.display_cui()
-                                # print(node.dist_diff_arr)
                                 node.result = s.pseudo_reward
                                 node.optimal_action = int(np.argmin(node.dist_diff_arr))
                             else:
                                 break
-
-                    # print(node.s.turn, is_win_node, node.result)
                 
             # root_treeの勝敗が決まったら探索を打ち切る
             if root_tree.result != 0:

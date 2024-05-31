@@ -10,7 +10,7 @@ from config import *
 from collections import Counter
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from State import RIGHT, DOWN, State, BOARD_LEN, State_init
+from State import RIGHT, DOWN, State, BOARD_LEN, State_init, display_cui, get_row_wall, get_column_wall, set_wall
 import pickle
 import argparse
 from BasicAI import display_parameter
@@ -200,8 +200,7 @@ def get_state_from_feature(feature, turn):
     state.By = state.state_c.By = By
     state.Wx = state.state_c.Wx = Wx
     state.Wy = state.state_c.Wy = Wy
-    state.column_wall = column_wall
-    state.row_wall = row_wall
+    set_wall(state, row_wall, column_wall)
     return state
 
 
@@ -216,8 +215,8 @@ def get_kifu_from_features(features):
         is_placewall = (state.Bx == prev_state.Bx) and (state.Wx == prev_state.Wx) and (state.By == prev_state.By) and (state.Wy == prev_state.Wy)
 
         if is_placewall:
-            row_wall_diff = state.row_wall & ~prev_state.row_wall
-            column_wall_diff = state.column_wall & ~prev_state.column_wall
+            row_wall_diff = get_row_wall(state) & ~get_row_wall(prev_state)
+            column_wall_diff = get_column_wall(state) & ~get_column_wall(prev_state)
             
             if np.max(row_wall_diff) > 0.5:
                 wall_str = "h"
@@ -230,11 +229,6 @@ def get_kifu_from_features(features):
 
             wall_x = argmax // 8
             wall_y = argmax % 8
-
-            # print(wall_str)
-            # print(wall_diff)
-            # print(argmax)
-            # print(wall_x, wall_y)
             
             action_str = chr(wall_x + 97) + str(wall_y + 1) + wall_str
         else:
@@ -268,15 +262,15 @@ def save_all_kifu(arr_per_game_list_dict, each_data_dir, div_i):
 
 def display_state_from_feature(feature, turn, output_array=False):
     state = get_state_from_feature(feature, turn)
-    state.display_cui(check_algo=False)
+    display_cui(state, check_algo=False)
 
     if output_array:
         output_dir = "DP_testcase/1"
         os.makedirs(output_dir, exist_ok=True)
         #pickle.dump(state, open(os.path.join(output_dir, f"{turn}_state.pkl"), "wb"))
         np.savetxt(os.path.join(output_dir, f"{turn}_pos.txt"), np.array([state.Bx, state.By, state.Wx, state.Wy], dtype=int))
-        np.savetxt(os.path.join(output_dir, f"{turn}_row.txt"), np.array(state.row_wall, dtype=int))
-        np.savetxt(os.path.join(output_dir, f"{turn}_column.txt"), np.array(state.column_wall, dtype=int))
+        np.savetxt(os.path.join(output_dir, f"{turn}_row.txt"), np.array(get_row_wall(state), dtype=int))
+        np.savetxt(os.path.join(output_dir, f"{turn}_column.txt"), np.array(get_column_wall(state), dtype=int))
 
 
 def check_DP(feature_arr_list):

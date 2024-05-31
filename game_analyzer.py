@@ -23,8 +23,7 @@ from kivy.uix.popup import Popup
 from kivy.uix.filechooser import FileChooserListView
 
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, accept_action_str
-from State import DRAW_TURN
+from State import State, CHANNEL, State_init, accept_action_str, display_cui, get_row_wall, get_column_wall
 from CNNAI import CNNAI
 from BasicAI import state_copy, get_state_vec
 import time
@@ -413,7 +412,7 @@ class Quoridor(Widget):
                 State_init(state)
                 for a in all_actions:
                     accept_action_str(state, Official2Glendenning(a))
-                ptag_string = state.display_cui(ret_str=True) + os.linesep
+                ptag_string = display_cui(state, ret_str=True) + os.linesep
             else:
                 next_depth = depth
                 next_actions_diff = actions_diff
@@ -591,7 +590,7 @@ class Quoridor(Widget):
         print("board_as_text")
         history_text = self.get_record_text(self.action_history[1:self.turn + 1])
         self.main_text.text += history_text
-        self.main_text.text += self.state.display_cui(ret_str=True)
+        self.main_text.text += display_cui(self.state, ret_str=True)
 
     def clear_text(self):
         print("clear_text")
@@ -793,15 +792,12 @@ class Quoridor(Widget):
             return
         print(Glendenning2Official(a))
         self.agents[1 - color].prev_action = s
-        #self.state.display_cui()
 
         self.turn += 1
         self.add_history(self.state, a)
 
         # 盤面を動かしたときに、OpeningTreeの対応するノードがあれば情報を表示
         action_list, _ = get_normalized_action_list(self.action_history[1:self.turn + 1])
-        # action_list = self.action_history[1:self.turn + 1]
-        # is_mirror = False
 
         node = self.opening_tree
         for a in action_list:
@@ -820,14 +816,13 @@ class Quoridor(Widget):
 
         array_save_path = os.path.join(DEBUG_DIR, "wall_array")
         os.makedirs(array_save_path, exist_ok=True)
-        np.savetxt(os.path.join(array_save_path, "{}_r.txt".format(self.turn)), self.state.row_wall, fmt='%d')
-        np.savetxt(os.path.join(array_save_path, "{}_c.txt".format(self.turn)), self.state.column_wall, fmt='%d')
+        np.savetxt(os.path.join(array_save_path, "{}_r.txt".format(self.turn)), get_row_wall(self.state), fmt='%d')
+        np.savetxt(os.path.join(array_save_path, "{}_c.txt".format(self.turn)), get_column_wall(self.state), fmt='%d')
         np.savetxt(os.path.join(array_save_path, "{}_w.txt".format(self.turn)), np.array([self.state.black_walls, self.state.white_walls]), fmt='%d')
         np.savetxt(os.path.join(array_save_path, "{}_pos.txt".format(self.turn)), np.array([self.state.Bx, self.state.By, self.state.Wx, self.state.Wy]), fmt='%d')
 
         self.prev_act_time = time.time()
         self.ai_wait_time = AI_WAIT_TIME
-        #print(self.state.get_player_dist_from_goal())
         touched = False
 
     def turn0(self):
@@ -968,6 +963,8 @@ class Quoridor(Widget):
                     self.row_wall_colors[y * 8 + x].a = 0
                     self.column_wall_colors[y * 8 + x].a = 0
 
+        row_wall = get_row_wall(self.state)
+        column_wall = get_column_wall(self.state)
         for x in range(8):
             for y in range(8):
                 if self.upside_down:
@@ -977,9 +974,9 @@ class Quoridor(Widget):
                     disp_x = x
                     disp_y = y
 
-                if self.state.row_wall[x, y]:
+                if row_wall[x, y]:
                     self.row_wall_colors[(7 - disp_y) * 8 + disp_x].a = 1
-                if self.state.column_wall[x, y]:
+                if column_wall[x, y]:
                     self.column_wall_colors[(7 - disp_y) * 8 + disp_x].a = 1
 
         self.search_nodes_label.text = f"search nodes = {self.search_nodes}"
