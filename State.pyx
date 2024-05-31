@@ -143,7 +143,7 @@ placable_array_c.restype = BitArrayPair
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
 def State_init(state):
-    pass  # pythonではコンストラクタで初期化されるから何もしない
+    State_init_(state.state_c)
 
 def eq_state(state1, state2):
     f = np.all(state1.row_wall == state2.row_wall) and np.all(state1.column_wall == state2.column_wall)
@@ -317,6 +317,21 @@ def display_cui(state, check_algo=True, official=True, p1_atmark=False, ret_str=
     else:
         sys.stdout.write(ret)
 
+def feature_int(state):
+    row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    feature = np.zeros((135,), dtype=int)
+    feature[0] = state.Bx
+    feature[1] = state.By
+    feature[2] = state.Wx
+    feature[3] = state.Wy
+    feature[4] = state.black_walls
+    feature[5] = state.white_walls
+    feature[6] = state.turn % 2
+    feature[7:7 + 64] = row_wall.flatten()
+    feature[7 + 64:] = column_wall.flatten()
+    return feature
+
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
@@ -362,19 +377,6 @@ cdef class State:
         self.state_c = State_c()
         State_init_(self.state_c)
         # print_state(self.state_c)
-
-    def feature_int(self):
-        feature = np.zeros((135,), dtype=int)
-        feature[0] = self.Bx
-        feature[1] = self.By
-        feature[2] = self.Wx
-        feature[3] = self.Wy
-        feature[4] = self.black_walls
-        feature[5] = self.white_walls
-        feature[6] = self.turn % 2
-        feature[7:7 + 64] = self.row_wall.flatten()
-        feature[7 + 64:] = self.column_wall.flatten()
-        return feature
 
     def feature_CNN(self, xflip=False, yflip=False):
         feature = np.zeros((9, 9, CHANNEL))

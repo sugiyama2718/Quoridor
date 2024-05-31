@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array, calc_dist_array, display_cui
+from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array, calc_dist_array, display_cui, feature_int
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -36,7 +36,7 @@ copy_state_c.restype = None
 
 def get_state_vec(state):
     # stateを固定長タプルにしてdictのkeyにするために使う。state.turnを入れているのは、turnの異なる状態を区別して無限ループを避けるため
-    return tuple([state.turn] + list(state.feature_int().flatten()))
+    return tuple([state.turn] + list(feature_int(state).flatten()))
 
 
 def display_parameter(x):
