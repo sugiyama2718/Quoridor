@@ -1,4 +1,4 @@
-from State import State, State_init, State_c, set_state_by_wall
+from State import State, State_init, State_c, set_state_by_wall, display_cui
 import numpy as np
 import os
 from config import *
@@ -44,7 +44,7 @@ for dir in dirs:
     state.white_walls = state.state_c.white_walls = p2_walls
     set_state_by_wall(state)
 
-    state.display_cui()
+    display_cui(state)
     print(is_mirror_match(state.state_c))
     
     results.append(is_mirror_match(state.state_c))

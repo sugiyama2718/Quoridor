@@ -23,8 +23,7 @@ from kivy.uix.popup import Popup
 from kivy.uix.filechooser import FileChooserListView
 
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, accept_action_str
-from State import DRAW_TURN
+from State import State, CHANNEL, State_init, accept_action_str, display_cui
 from CNNAI import CNNAI
 from BasicAI import state_copy, get_state_vec
 import time
@@ -413,7 +412,7 @@ class Quoridor(Widget):
                 State_init(state)
                 for a in all_actions:
                     accept_action_str(state, Official2Glendenning(a))
-                ptag_string = state.display_cui(ret_str=True) + os.linesep
+                ptag_string = display_cui(state, ret_str=True) + os.linesep
             else:
                 next_depth = depth
                 next_actions_diff = actions_diff
@@ -591,7 +590,7 @@ class Quoridor(Widget):
         print("board_as_text")
         history_text = self.get_record_text(self.action_history[1:self.turn + 1])
         self.main_text.text += history_text
-        self.main_text.text += self.state.display_cui(ret_str=True)
+        self.main_text.text += display_cui(self.state, ret_str=True)
 
     def clear_text(self):
         print("clear_text")
@@ -793,15 +792,12 @@ class Quoridor(Widget):
             return
         print(Glendenning2Official(a))
         self.agents[1 - color].prev_action = s
-        #self.state.display_cui()
 
         self.turn += 1
         self.add_history(self.state, a)
 
         # 盤面を動かしたときに、OpeningTreeの対応するノードがあれば情報を表示
         action_list, _ = get_normalized_action_list(self.action_history[1:self.turn + 1])
-        # action_list = self.action_history[1:self.turn + 1]
-        # is_mirror = False
 
         node = self.opening_tree
         for a in action_list:

@@ -1,5 +1,5 @@
 # coding:utf-8
-from State import State, BIT_BOARD_LEN, State_c, State_init, set_state_by_wall, movable_array, accept_action_str, calc_dist_array, placable_array
+from State import State, BIT_BOARD_LEN, State_c, State_init, set_state_by_wall, movable_array, accept_action_str, calc_dist_array, placable_array, display_cui
 import numpy as np
 import os, sys
 import ctypes
@@ -36,13 +36,6 @@ eq_state = lib.eq_state
 eq_state.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
 eq_state.restype = ctypes.c_bool
 
-# action_list = ["e8", "e2", "a1h"]
-# state = State()
-# for action_str in action_list:
-#     accept_action_str(state, action_str)
-#     state.display_cui()
-# exit()
-
 results = []
 for i in test_case_list:
     state = State()
@@ -59,7 +52,7 @@ for i in test_case_list:
         state.Wy = state.state_c.Wy = p[3]
     set_state_by_wall(state)
     print_state(state.state_c)
-    state.display_cui()
+    display_cui(state)
 
     movable_array_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/movable_array.csv"), delimiter=","), dtype=bool)
     movable_array_pred = movable_array(state, state.Bx, state.By)

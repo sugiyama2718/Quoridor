@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array, calc_dist_array
+from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array, calc_dist_array, display_cui
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -465,8 +465,8 @@ class BasicAI(Agent):
             except:
                 print("{} error action={}".format(i, action))
                 print(actions)
-                root_state.display_cui()
-                state.display_cui()
+                display_cui(root_state)
+                display_cui(state)
                 print("!"*30)
             if action < 128:
                 leaf_discovery_arr = np.zeros((2, 9, 9), dtype=bool)
@@ -735,8 +735,8 @@ class BasicAI(Agent):
                         # t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
                         # t.children[a].V = np.array(v_arr[count], dtype=np.float32)
                         if s.turn != t.children[a].s.turn or t.s.turn + 1 != t.children[a].s.turn:
-                            t.s.display_cui()
-                            s.display_cui()
+                            display_cui(t.s)
+                            display_cui(s)
                             t.children[a].s
                             assert False, "!" * 100
 
@@ -765,10 +765,6 @@ class BasicAI(Agent):
                 if not s.pseudo_terminate:
                     continue
 
-                # print("~"*50)
-                # print(s.pseudo_reward)
-                # s.display_cui()
-
                 # 葉ノード側からたどる
                 for node, action in zip(nodes[::-1], actions[::-1]):
                     # 過去の探索で既に勝敗が決まっているときは飛ばす(optimal_actionなどが書き換えられないよう)
@@ -793,8 +789,8 @@ class BasicAI(Agent):
                             
                             if node_illegal[action]:
                                 print("!"*100)
-                                state.display_cui()
-                                node.s.display_cui()
+                                display_cui(state)
+                                display_cui(node.s)
                                 print(node.P)
                                 print(node_illegal)
                                 print(actionid2str(node.s, action))
@@ -804,27 +800,17 @@ class BasicAI(Agent):
                     else:  # 負け側はすべての行動が相手の勝ちになるときに限り負けノード
                         if action not in node.children.keys() or node.children[action].result == lose_reward:
                             node.set_is_lose_child_arr(action, True)
-                            #node.is_lose_child_arr[action] = True
 
                             if not node.already_certain_path_confirmed: # 壁置きで負けになる場合、一度確定路判定をする。移動の場合も判定するとだいぶ遅くなるので壁おきに制限。
                                 node.already_certain_path_confirmed = True
                                 if is_certain_path_terminate(node.s, (node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
                                     node.set_is_lose_child_arr_True(np.arange(128))
-                                    # print("!!!certain path !!!")
-                                    # print(actions)
-                                    # print(node.P)
-                                    # print(node.P_without_loss)
                             node_illegal = (node.P == 0.)
                             if np.all(node_illegal | node.is_lose_child_arr):
-                                # print("~"*50)
-                                # node.s.display_cui()
-                                # print(node.dist_diff_arr)
                                 node.result = s.pseudo_reward
                                 node.optimal_action = int(np.argmin(node.dist_diff_arr))
                             else:
                                 break
-
-                    # print(node.s.turn, is_win_node, node.result)
                 
             # root_treeの勝敗が決まったら探索を打ち切る
             if root_tree.result != 0:

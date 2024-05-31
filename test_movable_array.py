@@ -1,4 +1,4 @@
-from State import State, State_init, State_c, movable_array, set_state_by_wall
+from State import State, State_init, State_c, movable_array, set_state_by_wall, display_cui
 import numpy as np
 import os
 from config import *
@@ -44,7 +44,7 @@ for dir in dirs:
     state.white_walls = state.state_c.white_walls = p2_walls
     set_state_by_wall(state)
 
-    state.display_cui()
+    display_cui(state)
     pred_B = movable_array(state, state.Bx, state.By)
     pred_W = movable_array(state, state.Wx, state.Wy)
     pred_shortest_B = movable_array(state, state.Bx, state.By, shortest_only=True)

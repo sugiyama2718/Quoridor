@@ -48,8 +48,6 @@ for dir in dirs:
     state.black_walls = p1_walls
     state.white_walls = p2_walls
     state.set_state_by_wall()
-    
-    #state.display_cui(check_algo=False)
 
     # 最初のターンによって手番が違うことを考慮
     if turn % 2 == 0:

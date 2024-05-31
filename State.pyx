@@ -240,6 +240,83 @@ def calc_dist_array(state, goal_y):
         array_ptr = state.state_c.dist_array2
     return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
+def display_cui(state, check_algo=True, official=True, p1_atmark=False, ret_str=False):
+    row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    
+    ret = " "
+    for c in ["a", "b", "c", "d", "e", "f", "g", "h", "i"]:
+        ret += " " + c
+    ret += os.linesep
+    ret += " +"
+    for x in range(BOARD_LEN):
+        ret += "-+"
+    ret += os.linesep
+
+    for y in range(BOARD_LEN):
+        if official:
+            ret += (str(BOARD_LEN - y) + "|")
+        else:
+            ret += (str(y + 1) + "|")
+        for x in range(BOARD_LEN):
+            if x == state.Bx and y == state.By:
+                if p1_atmark:
+                    ret += "@"
+                else:
+                    ret += "O"
+            elif x == state.Wx and y == state.Wy:
+                if p1_atmark:
+                    ret += "O"
+                else:
+                    ret += "@"
+            else:
+                ret += " "
+
+            if x == BOARD_LEN - 1:
+                break
+
+            if column_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or column_wall[min(x, BOARD_LEN - 2), max(y - 1, 0)]:
+                ret += "#"
+            else:
+                ret += "|"
+        ret += "|" + os.linesep
+
+        if y == BOARD_LEN - 1:
+            break
+
+        ret += " +"
+        for x in range(BOARD_LEN):
+            if row_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or row_wall[max(x - 1, 0), min(y, BOARD_LEN - 2)]:
+                ret += "="
+            else:
+                ret += "-"
+
+            if x == BOARD_LEN - 1:
+                break
+
+            if row_wall[x, y] or column_wall[x, y]:
+                ret += "+"
+            else:
+                ret += " "
+        ret += "+" + os.linesep
+
+    ret += " +"
+    for x in range(BOARD_LEN):
+        ret += "-+"
+    ret += os.linesep
+
+    ret += "1p walls:" + str(state.black_walls) + os.linesep
+    ret += "2p walls:" + str(state.white_walls) + os.linesep
+
+    if state.turn % 2 == 0:
+        ret += "{}:1p turn".format(state.turn) + os.linesep
+    else:
+        ret += "{}:2p turn".format(state.turn) + os.linesep
+    if ret_str:
+        return ret
+    else:
+        sys.stdout.write(ret)
+
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
@@ -285,80 +362,6 @@ cdef class State:
         self.state_c = State_c()
         State_init_(self.state_c)
         # print_state(self.state_c)
-
-    def display_cui(self, check_algo=True, official=True, p1_atmark=False, ret_str=False):
-        ret = " "
-        for c in ["a", "b", "c", "d", "e", "f", "g", "h", "i"]:
-            ret += " " + c
-        ret += os.linesep
-        ret += " +"
-        for x in range(BOARD_LEN):
-            ret += "-+"
-        ret += os.linesep
-
-        for y in range(BOARD_LEN):
-            if official:
-                ret += (str(BOARD_LEN - y) + "|")
-            else:
-                ret += (str(y + 1) + "|")
-            for x in range(BOARD_LEN):
-                if x == self.Bx and y == self.By:
-                    if p1_atmark:
-                        ret += "@"
-                    else:
-                        ret += "O"
-                elif x == self.Wx and y == self.Wy:
-                    if p1_atmark:
-                        ret += "O"
-                    else:
-                        ret += "@"
-                else:
-                    ret += " "
-
-                if x == BOARD_LEN - 1:
-                    break
-
-                if self.column_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or self.column_wall[min(x, BOARD_LEN - 2), max(y - 1, 0)]:
-                    ret += "#"
-                else:
-                    ret += "|"
-            ret += "|" + os.linesep
-
-            if y == BOARD_LEN - 1:
-                break
-
-            ret += " +"
-            for x in range(BOARD_LEN):
-                if self.row_wall[min(x, BOARD_LEN - 2), min(y, BOARD_LEN - 2)] or self.row_wall[max(x - 1, 0), min(y, BOARD_LEN - 2)]:
-                    ret += "="
-                else:
-                    ret += "-"
-
-                if x == BOARD_LEN - 1:
-                    break
-
-                if self.row_wall[x, y] or self.column_wall[x, y]:
-                    ret += "+"
-                else:
-                    ret += " "
-            ret += "+" + os.linesep
-
-        ret += " +"
-        for x in range(BOARD_LEN):
-            ret += "-+"
-        ret += os.linesep
-
-        ret += "1p walls:" + str(self.black_walls) + os.linesep
-        ret += "2p walls:" + str(self.white_walls) + os.linesep
-
-        if self.turn % 2 == 0:
-            ret += "{}:1p turn".format(self.turn) + os.linesep
-        else:
-            ret += "{}:2p turn".format(self.turn) + os.linesep
-        if ret_str:
-            return ret
-        else:
-            sys.stdout.write(ret)
 
     def feature_int(self):
         feature = np.zeros((135,), dtype=int)

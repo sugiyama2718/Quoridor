@@ -5,7 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
-from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal, placable_array
+from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal, placable_array, display_cui
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -507,7 +507,7 @@ class CNNAI(BasicAI):
             print(mask)
             print(feature)
             for state in states:
-                state.display_cui()
+                display_cui(state)
             exit()
 
         return p
@@ -575,7 +575,7 @@ class CNNAI(BasicAI):
             print(mask)
             print(feature)
             for state in states:
-                state.display_cui()
+                display_cui(state)
             exit()
 
         return p, y_pred

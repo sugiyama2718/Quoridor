@@ -10,7 +10,7 @@ from config import *
 from collections import Counter
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from State import RIGHT, DOWN, State, BOARD_LEN, State_init
+from State import RIGHT, DOWN, State, BOARD_LEN, State_init, display_cui
 import pickle
 import argparse
 from BasicAI import display_parameter
@@ -268,7 +268,7 @@ def save_all_kifu(arr_per_game_list_dict, each_data_dir, div_i):
 
 def display_state_from_feature(feature, turn, output_array=False):
     state = get_state_from_feature(feature, turn)
-    state.display_cui(check_algo=False)
+    display_cui(state, check_algo=False)
 
     if output_array:
         output_dir = "DP_testcase/1"

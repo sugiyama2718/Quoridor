@@ -1,4 +1,4 @@
-from State import State, State_init, State_c, movable_array, set_state_by_wall, is_certain_path_terminate
+from State import State, State_init, State_c, movable_array, set_state_by_wall, is_certain_path_terminate, display_cui
 import numpy as np
 import os
 from config import *
@@ -52,7 +52,7 @@ for dir in dirs:
     # state.white_walls = state.state_c.white_walls = p2_walls
     set_state_by_wall(state)
 
-    state.display_cui()
+    display_cui(state)
 
     calc_oneside_placable_r_cand_from_color(state.state_c, 0)
     calc_oneside_placable_c_cand_from_color(state.state_c, 0)

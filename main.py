@@ -1,7 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN, get_player_dist_from_goal, calc_dist_array
+from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN, get_player_dist_from_goal, calc_dist_array, display_cui
 from Human import Human
 from CNNAI import CNNAI
 from BasicAI import state_copy
@@ -36,7 +36,7 @@ def normal_play(agents, initial_state=None):
         state = initial_state
         
     while True:
-        state.display_cui()
+        display_cui(state)
         start = time.time()
         s = agents[0].act(state, showNQ=True)
         end = time.time()
@@ -61,7 +61,7 @@ def normal_play(agents, initial_state=None):
             break
         #time.sleep(0.1)
 
-        state.display_cui()
+        display_cui(state)
         s = agents[1].act(state, showNQ=True)
         if isinstance(s, int):
             a = actionid2str(state, s)
@@ -84,7 +84,7 @@ def normal_play(agents, initial_state=None):
         if state.terminate:
             break
 
-    state.display_cui()
+    display_cui(state)
     print("The game finished. reward=({}, {})".format(state.reward, -state.reward))
     return state.reward
 
@@ -122,7 +122,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
-                state.display_cui()
+                display_cui(state)
                 exit()
             AIs[1].prev_action = s
 
@@ -138,7 +138,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
             if display:
                 print("generate id=", id_)
-                state.display_cui()
+                display_cui(state)
             end = False
             for state2 in states:
                 if equal_draw and eq_state(state, state2):
@@ -156,7 +156,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
-                state.display_cui()
+                display_cui(state)
                 exit()
             AIs[0].prev_action = s
 
@@ -172,7 +172,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
             if display:
                 print("generate id=", id_)
-                state.display_cui()
+                display_cui(state)
             end = False
             for state2 in states:
                 if equal_draw and eq_state(state, state2):
@@ -293,7 +293,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         AIs[1 - i % 2].color = 1
         while True:
             if display:
-                state.display_cui()
+                display_cui(state)
             s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
@@ -311,7 +311,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
                 break
 
             if display:
-                state.display_cui()
+                display_cui(state)
 
             s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)

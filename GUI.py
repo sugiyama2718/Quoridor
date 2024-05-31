@@ -22,7 +22,7 @@ from kivy.core.window import Window
 from kivy.lang import Builder
 
 from Agent import actionid2str, str2actionid
-from State import State, CHANNEL, State_init, accept_action_str
+from State import State, CHANNEL, State_init, accept_action_str, display_cui
 from State import DRAW_TURN
 from CNNAI import CNNAI
 from BasicAI import state_copy
@@ -290,7 +290,7 @@ class Quoridor(Widget):
             return
         print(Glendenning2Official(a))
 
-        self.state.display_cui()
+        display_cui(self.state)
         self.turn += 1
         self.add_history(self.state, a, is_record=False)
 
@@ -335,8 +335,7 @@ class Quoridor(Widget):
             return
         print(Glendenning2Official(a))
 
-
-        self.state.display_cui()
+        display_cui(self.state)
         self.turn += 1
         self.add_history(self.state, a)
 
