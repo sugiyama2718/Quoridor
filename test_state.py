@@ -1,5 +1,5 @@
 # coding:utf-8
-from State import State, BIT_BOARD_LEN, State_c, State_init, set_state_by_wall, movable_array, accept_action_str
+from State import State, BIT_BOARD_LEN, State_c, State_init, set_state_by_wall, movable_array, accept_action_str, calc_dist_array, placable_array
 import numpy as np
 import os, sys
 import ctypes
@@ -73,7 +73,7 @@ for i in test_case_list:
     placabler_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/placabler.csv"), delimiter=","), dtype=int)
     placablec_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/placablec.csv"), delimiter=","), dtype=int)
 
-    placabler_pred, placablec_pred = state.calc_placable_array()
+    placabler_pred, placablec_pred = placable_array(state, 0)
 
     if not np.all(placabler_pred == placabler_ans) or not np.all(placablec_pred == placablec_ans):
         print("placable array failed")
@@ -90,8 +90,8 @@ for i in test_case_list:
     if os.path.exists(os.path.join(TEST_DIR, f"{i}/dist_0.csv")):
         dist_0 = np.loadtxt(os.path.join(TEST_DIR, f"{i}/dist_0.csv"), delimiter=",")
         dist_8 = np.loadtxt(os.path.join(TEST_DIR, f"{i}/dist_8.csv"), delimiter=",")
-        dist_0_pred = state.calc_dist_array(0)
-        dist_8_pred = state.calc_dist_array(8)
+        dist_0_pred = calc_dist_array(state, 0)
+        dist_8_pred = calc_dist_array(state, 8)
         if not np.all(dist_0_pred == dist_0):
             print("dist_0")
             print(dist_0)

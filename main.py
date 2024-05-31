@@ -1,7 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN, get_player_dist_from_goal
+from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN, get_player_dist_from_goal, calc_dist_array
 from Human import Human
 from CNNAI import CNNAI
 from BasicAI import state_copy
@@ -198,8 +198,8 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
         move_count[0] += B_dist
         move_count[1] += W_dist
 
-        dist_array1 = state.calc_dist_array(0)
-        dist_array2 = state.calc_dist_array(BOARD_LEN - 1)
+        dist_array1 = calc_dist_array(state, 0)
+        dist_array2 = calc_dist_array(state, BOARD_LEN - 1)
 
         def calc_traversed_arr_list(xy_list):
             traversed_arr = np.zeros((9, 9))

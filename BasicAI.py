@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array
+from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array, calc_dist_array
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -187,8 +187,8 @@ def calc_optimal_move_by_DP(s):
     s = state_copy(s)
     boards = list(product(range(9), range(9), range(9), range(9), range(2)))  # 壁0なので、(Bx, By, Wx, Wy, 手番)で盤面が一意に定まる。のでそれで盤面を表現。
 
-    dist_array1 = s.calc_dist_array(0)
-    dist_array2 = s.calc_dist_array(BOARD_LEN - 1)
+    dist_array1 = calc_dist_array(s, 0)
+    dist_array2 = calc_dist_array(s, BOARD_LEN - 1)
 
     # 合法手のみに絞る
     def is_legal(board):

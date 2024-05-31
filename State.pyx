@@ -182,8 +182,8 @@ def set_state_by_wall(state):
             else:
                 set_column_wall_0(state.state_c, x, y)
 
-    dist_array1 = state.calc_dist_array(0)
-    dist_array2 = state.calc_dist_array(BOARD_LEN - 1)
+    dist_array1 = calc_dist_array(state, 0)
+    dist_array2 = calc_dist_array(state, BOARD_LEN - 1)
     for x in range(BOARD_LEN):
         for y in range(BOARD_LEN):
             state.state_c.dist_array1[x + y * BOARD_LEN] = dist_array1[x, y]
@@ -232,6 +232,14 @@ def placable_array(state, color):
     ret = placable_array_c(state.state_c, color)
     return get_numpy_arr(ret.bitarr1, BOARD_LEN - 1), get_numpy_arr(ret.bitarr2, BOARD_LEN - 1)
 
+def calc_dist_array(state, goal_y):
+    calc_dist_array_c(state.state_c, goal_y)
+    if goal_y == 0:
+        array_ptr = state.state_c.dist_array1
+    else:
+        array_ptr = state.state_c.dist_array2
+    return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
@@ -256,7 +264,6 @@ cdef class State:
     draw_turn = DRAW_TURN
     cdef public np.ndarray row_wall, column_wall
     cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
-    cdef public np.ndarray prev
     cdef public state_c
     def __init__(self):
         self.row_wall = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype="bool")
@@ -278,88 +285,6 @@ cdef class State:
         self.state_c = State_c()
         State_init_(self.state_c)
         # print_state(self.state_c)
-
-    def __eq__(self, state):
-        assert False
-
-    def get_player_dist_from_goal(self):
-        assert False
-
-    def color_p(self, color):
-        assert False
-
-    def accept_action_str(self, s, check_placable=True, calc_placable_array=True, check_movable=True):
-        assert False
-
-    def is_certain_path_terminate(self, color=-1):
-        assert False
-
-    def set_state_by_wall(self):
-        assert False
-
-    # shortest_onely=Trueの場合ゴールからの距離を縮める方向のみに1を立てる
-    def movable_array(self, x, y, shortest_only=False):
-        assert False
-
-    def inboard(self, x, y, size):
-        if x < 0 or y < 0 or x >= size or y >= size:
-            return False
-        return True
-
-    def placable_array(self, color):
-        assert False
-
-    def shortest_path_len(self, x, y, goal_y, cross_arr):
-        dist = np.ones((BOARD_LEN, BOARD_LEN)) * BOARD_LEN * BOARD_LEN * 2
-        prev = np.zeros((BOARD_LEN, BOARD_LEN, 2), dtype="int8")
-        seen = np.zeros((BOARD_LEN, BOARD_LEN))
-        dist[x, y] = 0
-        while np.sum(seen) < BOARD_LEN * BOARD_LEN:
-            x2, y2 = np.unravel_index(np.argmin(dist + seen * BOARD_LEN * BOARD_LEN * 3, axis=None), dist.shape)
-            seen[x2, y2] = 1
-            for i, p in enumerate([(0, -1), (1, 0), (0, 1), (-1, 0)]):
-                x3 = x2 + p[0]
-                y3 = y2 + p[1]
-                if cross_arr[x2, y2, i]:
-                    if dist[x3, y3] > dist[x2, y2] + 1:
-                        dist[x3, y3] = dist[x2, y2] + 1
-                        prev[x3, y3, 0] = x2
-                        prev[x3, y3, 1] = y2
-        return np.min(dist[:, goal_y])
-
-    def calc_dist_array(self, int goal_y):
-        calc_dist_array_c(self.state_c, goal_y)
-        if goal_y == 0:
-            array_ptr = self.state_c.dist_array1
-        else:
-            array_ptr = self.state_c.dist_array2
-        return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
-    
-    def calc_placable_array(self, skip_calc_graph=False):
-        cdef np.ndarray[DTYPE_t, ndim = 2] row_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef np.ndarray[DTYPE_t, ndim = 2] column_array = np.zeros((BOARD_LEN - 1, BOARD_LEN - 1), dtype=DTYPE)
-        cdef int x, y
-
-        ret = calc_placable_array_(self.state_c)
-
-        row_placable_bitarr = bitarray(128)
-        column_placable_bitarr = bitarray(128)
-        row_placable_bitarr[:64] = int2ba(ret.bitarr1[1], length=64)
-        row_placable_bitarr[64:] = int2ba(ret.bitarr1[0], length=64)
-        column_placable_bitarr[:64] = int2ba(ret.bitarr2[1], length=64)
-        column_placable_bitarr[64:] = int2ba(ret.bitarr2[0], length=64)
-        # print_bitarr(row_placable_bitarr)
-        # print_bitarr(column_placable_bitarr)
-
-        for x in range(BOARD_LEN - 1):
-            for y in range(BOARD_LEN - 1):
-                row_array[x, y] = row_placable_bitarr[x + y * BIT_BOARD_LEN]
-                column_array[x, y] = column_placable_bitarr[x + y * BIT_BOARD_LEN]
-
-        return row_array, column_array
-
-    def arrivable(self, int x, int y, int goal_y):
-        return arrivable_(self.state_c, x, y, goal_y)
 
     def display_cui(self, check_algo=True, official=True, p1_atmark=False, ret_str=False):
         ret = " "
