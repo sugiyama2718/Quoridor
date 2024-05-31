@@ -1,7 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN, get_player_dist_from_goal, calc_dist_array, display_cui
+from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN, get_player_dist_from_goal, calc_dist_array, display_cui, feature_CNN
 from Human import Human
 from CNNAI import CNNAI
 from BasicAI import state_copy
@@ -99,7 +99,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
         AIs[1].init_prev()
         featuress = [[], [], [], []]
         for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
-            featuress[i].append(state.feature_CNN(b1, b2))
+            featuress[i].append(feature_CNN(state, b1, b2))
 
         pis = []
         states = [state_copy(state)]
@@ -150,7 +150,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             if state.terminate:
                 break
             for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
-                featuress[i].append(state.feature_CNN(b1, b2))
+                featuress[i].append(feature_CNN(state, b1, b2))
             s, pi, v_prev, v_post, searched_node_num = AIs[1].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[0].prev_tree)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
@@ -184,7 +184,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             if state.terminate:
                 break
             for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
-                featuress[i].append(state.feature_CNN(b1, b2))
+                featuress[i].append(feature_CNN(state, b1, b2))
         del states
 
         hash_ += state.turn

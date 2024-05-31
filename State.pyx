@@ -332,6 +332,78 @@ def feature_int(state):
     feature[7 + 64:] = column_wall.flatten()
     return feature
 
+def feature_CNN(state, xflip=False, yflip=False):
+    feature = np.zeros((9, 9, CHANNEL))
+
+    cross_arr = np.zeros((9, 9, 4))
+    for i in range(4):
+        cross_arr[:, :, i] = get_numpy_arr(state.state_c.cross_bitarrs, BOARD_LEN, i * 2)
+        
+    Bx = state.Bx
+    By = state.By
+    Wx = state.Wx
+    Wy = state.Wy
+    black_walls = state.black_walls
+    white_walls = state.white_walls
+    turn = state.turn
+    row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    dist1, dist2 = get_player_dist_from_goal(state)
+    placable_r = get_numpy_arr(state.state_c.placable_r_bitarr, BOARD_LEN - 1)
+    placable_c = get_numpy_arr(state.state_c.placable_c_bitarr, BOARD_LEN - 1)
+    if xflip:
+        Bx = 8 - Bx
+        Wx = 8 - Wx
+        row_wall = np.flip(row_wall, 0)
+        column_wall = np.flip(column_wall, 0)
+        placable_r = np.flip(placable_r, 0)
+        placable_c = np.flip(placable_c, 0)
+        cross_arr = np.flip(cross_arr, 0)
+        temp = np.copy(cross_arr[:, :, RIGHT])
+        cross_arr[:, :, RIGHT] = cross_arr[:, :, LEFT]
+        cross_arr[:, :, LEFT] = temp
+    if yflip:
+        # goalが異なるから色を取り替える
+        temp = Bx
+        Bx = Wx
+        Wx = temp
+        By = 8 - state.Wy
+        Wy = 8 - state.By
+        black_walls = state.white_walls
+        white_walls = state.black_walls
+        turn += 1
+        row_wall = np.flip(row_wall, 1)
+        column_wall = np.flip(column_wall, 1)
+        placable_r = np.flip(placable_r, 1)
+        placable_c = np.flip(placable_c, 1)
+        cross_arr = np.flip(cross_arr, 1)
+        temp = np.copy(cross_arr[:, :, UP])
+        cross_arr[:, :, UP] = cross_arr[:, :, DOWN]
+        cross_arr[:, :, DOWN] = temp
+        temp = dist1
+        dist1 = dist2
+        dist2 = temp
+
+    feature[Bx, By, 0] = 1.
+    feature[Wx, Wy, 1] = 1.
+
+    feature[:, :, 2] = black_walls / 10
+    feature[:, :, 3] = white_walls / 10
+    feature[:, :, 4] = turn % 2
+    feature[:, :, 5:9] = cross_arr
+
+    feature[:, :, 9] = dist1 / 20
+    feature[:, :, 10] = dist2 / 20
+
+    # 以下8*8の特徴量
+    feature[:-1, :-1, 11] = row_wall
+    feature[:-1, :-1, 12] = column_wall
+
+    feature[:-1, :-1, 13] = placable_r  # 盤面外にはおけないことを考えると、反転しないほうが0paddingと相性は良いと思われる
+    feature[:-1, :-1, 14] = placable_c
+
+    return feature
+
 # -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
@@ -378,75 +450,4 @@ cdef class State:
         State_init_(self.state_c)
         # print_state(self.state_c)
 
-    def feature_CNN(self, xflip=False, yflip=False):
-        feature = np.zeros((9, 9, CHANNEL))
-
-        cross_arr = np.zeros((9, 9, 4))
-        for i in range(4):
-            cross_arr[:, :, i] = get_numpy_arr(self.state_c.cross_bitarrs, BOARD_LEN, i * 2)
-            
-        Bx = self.Bx
-        By = self.By
-        Wx = self.Wx
-        Wy = self.Wy
-        black_walls = self.black_walls
-        white_walls = self.white_walls
-        turn = self.turn
-        row_wall = self.row_wall
-        column_wall = self.column_wall
-        dist1, dist2 = get_player_dist_from_goal(self)
-        placable_r = get_numpy_arr(self.state_c.placable_r_bitarr, BOARD_LEN - 1)
-        placable_c = get_numpy_arr(self.state_c.placable_c_bitarr, BOARD_LEN - 1)
-        if xflip:
-            Bx = 8 - Bx
-            Wx = 8 - Wx
-            row_wall = np.flip(row_wall, 0)
-            column_wall = np.flip(column_wall, 0)
-            placable_r = np.flip(placable_r, 0)
-            placable_c = np.flip(placable_c, 0)
-            cross_arr = np.flip(cross_arr, 0)
-            temp = np.copy(cross_arr[:, :, RIGHT])
-            cross_arr[:, :, RIGHT] = cross_arr[:, :, LEFT]
-            cross_arr[:, :, LEFT] = temp
-        if yflip:
-            # goalが異なるから色を取り替える
-            temp = Bx
-            Bx = Wx
-            Wx = temp
-            By = 8 - self.Wy
-            Wy = 8 - self.By
-            black_walls = self.white_walls
-            white_walls = self.black_walls
-            turn += 1
-            row_wall = np.flip(row_wall, 1)
-            column_wall = np.flip(column_wall, 1)
-            placable_r = np.flip(placable_r, 1)
-            placable_c = np.flip(placable_c, 1)
-            cross_arr = np.flip(cross_arr, 1)
-            temp = np.copy(cross_arr[:, :, UP])
-            cross_arr[:, :, UP] = cross_arr[:, :, DOWN]
-            cross_arr[:, :, DOWN] = temp
-            temp = dist1
-            dist1 = dist2
-            dist2 = temp
-
-        feature[Bx, By, 0] = 1.
-        feature[Wx, Wy, 1] = 1.
-
-        feature[:, :, 2] = black_walls / 10
-        feature[:, :, 3] = white_walls / 10
-        feature[:, :, 4] = turn % 2
-        feature[:, :, 5:9] = cross_arr
-
-        feature[:, :, 9] = dist1 / 20
-        feature[:, :, 10] = dist2 / 20
-
-        # 以下8*8の特徴量
-        feature[:-1, :-1, 11] = row_wall
-        feature[:-1, :-1, 12] = column_wall
-
-        feature[:-1, :-1, 13] = placable_r  # 盤面外にはおけないことを考えると、反転しないほうが0paddingと相性は良いと思われる
-        feature[:-1, :-1, 14] = placable_c
-
-        return feature
 

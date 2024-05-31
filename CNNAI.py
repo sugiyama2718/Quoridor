@@ -5,7 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
-from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal, placable_array, display_cui
+from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal, placable_array, display_cui, feature_CNN
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -443,7 +443,7 @@ class CNNAI(BasicAI):
                 xflip = False
                 if random_flip and random.random() < 0.5:
                     xflip = True
-                feature[i, :] = s.feature_CNN(xflip=xflip)
+                feature[i, :] = feature_CNN(s, xflip=xflip)
             y = self.sess.run(self.y, feed_dict={self.x:feature})
 
         for i, s in enumerate(states):
@@ -481,7 +481,7 @@ class CNNAI(BasicAI):
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
                         [r.flatten(), c.flatten(), movable_array(s, x, y, shortest_only=False).flatten()])
-                feature[i, :] = s.feature_CNN()
+                feature[i, :] = feature_CNN(s)
                 #if s.terminate:
                 #    mask[i, :] = np.zeros((self.action_num,))
             p = self.sess.run(self.p_tf, feed_dict={self.x:feature})
@@ -529,7 +529,7 @@ class CNNAI(BasicAI):
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
                         [r.flatten(), c.flatten(), movable_array(s, x, y, shortest_only=False).flatten()])
-                feature[i, :] = s.feature_CNN()
+                feature[i, :] = feature_CNN(s)
             p = np.ones((len(states), self.action_num)) + np.random.rand(len(states), self.action_num) / 1000  # 1000は適当
             p = p / np.sum(p, axis=1).reshape((-1, 1))
             y_pred = self.sess.run(self.y, feed_dict={self.x:feature})
@@ -542,7 +542,7 @@ class CNNAI(BasicAI):
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
                         [r.flatten(), c.flatten(), movable_array(s, x, y, shortest_only=False).flatten()])
-                feature[i, :] = s.feature_CNN()
+                feature[i, :] = feature_CNN(s)
                 #if s.terminate:
                 #    mask[i, :] = np.zeros((self.action_num,))
             p, y_pred = self.sess.run([self.p_tf, self.y], feed_dict={self.x:feature})
