@@ -60,9 +60,9 @@ class State(ctypes.Structure):
 class Point_c(ctypes.Structure):
     _fields_ = [("x", ctypes.c_int), ("y", ctypes.c_int)]
 
-State_init_ = lib.State_init
-State_init_.argtypes = [ctypes.POINTER(State)]
-State_init_.restype = None
+State_init = lib.State_init
+State_init.argtypes = [ctypes.POINTER(State)]
+State_init.restype = None
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
@@ -95,9 +95,9 @@ set_column_wall_0 = lib.set_column_wall_0
 set_column_wall_0.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_column_wall_0.restype = None
 
-eq_state_c = lib.eq_state
-eq_state_c.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
-eq_state_c.restype = ctypes.c_bool
+eq_state = lib.eq_state
+eq_state.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
+eq_state.restype = ctypes.c_bool
 
 color_p_c = lib.color_p
 color_p_c.argtypes = [ctypes.POINTER(State), ctypes.c_int]
@@ -139,29 +139,26 @@ placable_array_c = lib.placable_array
 placable_array_c.argtypes = [ctypes.POINTER(State), ctypes.c_int]
 placable_array_c.restype = BitArrayPair
 
-# -------------------------------------------
-# TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
+# -------------------
+# arrayで返す必要があるなどの理由でラップしている関数を以下に定義
 
-def State_init(state):
-    State_init_(state)
 
-def eq_state(state1, state2):
-    return eq_state_c(state1, state2)
-
-# c++で直接２つのintを返させてそのままpythonでも２つのintを返すのは難しそう。この関数はこのまま使う。
 def color_p(state, color):
     ret = color_p_c(state, color)
     return ret.x, ret.y
 
+
 def movable_array(state, x, y, shortest_only=False):
+    cdef np.ndarray[DTYPE_t, ndim = 2] mv
     mv_c = (ctypes.c_bool * 9)(*([False] * 9))
     movable_array_c(state, mv_c, x, y, shortest_only)
-    mv = np.zeros((3, 3), dtype="bool")
+    mv = np.zeros((3, 3), dtype=DTYPE)
     for dx in [-1, 0, 1]:
         for dy in [-1, 0, 1]:
             mv[dx, dy] = mv_c[(dx + 1) + (dy + 1) * 3]
 
     return mv
+
 
 def set_wall(state, row_wall, column_wall):
     for x in range(BOARD_LEN - 1):
@@ -174,6 +171,7 @@ def set_wall(state, row_wall, column_wall):
                 set_column_wall_1(state, x, y)
             else:
                 set_column_wall_0(state, x, y)
+
 
 def set_state_by_wall(state, row_wall, column_wall):
     # 差分計算している部分を計算する
@@ -189,25 +187,28 @@ def set_state_by_wall(state, row_wall, column_wall):
 
     calc_placable_array_and_set(state)
 
+
 def get_dist_array_from_c_arr(c_dist_arr):
     return np.array([c_dist_arr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
+
 def accept_action_str(state, s, check_placable=True, calc_placable_array=True, check_movable=True):
     # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
-    
-    ret = accept_action_str_c(state, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
+    return accept_action_str_c(state, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
 
-    return ret
 
 def get_player_dist_from_goal(state):
     return get_player1_dist_from_goal(state), get_player2_dist_from_goal(state)
 
+
 def is_certain_path_terminate(state, color=-1):
     return is_certain_path_terminate_c(state, color)
+
 
 def placable_array(state, color):
     ret = placable_array_c(state, color)
     return get_numpy_arr(ret.bitarr1, BOARD_LEN - 1), get_numpy_arr(ret.bitarr2, BOARD_LEN - 1)
+
 
 def calc_dist_array(state, goal_y):
     calc_dist_array_c(state, goal_y)
@@ -216,6 +217,7 @@ def calc_dist_array(state, goal_y):
     else:
         array_ptr = state.dist_array2
     return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
+
 
 def display_cui(state, check_algo=True, official=True, p1_atmark=False, ret_str=False):
     row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
@@ -294,6 +296,7 @@ def display_cui(state, check_algo=True, official=True, p1_atmark=False, ret_str=
     else:
         sys.stdout.write(ret)
 
+
 def feature_int(state):
     row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
     column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
@@ -308,6 +311,7 @@ def feature_int(state):
     feature[7:7 + 64] = row_wall.flatten()
     feature[7 + 64:] = column_wall.flatten()
     return feature
+
 
 def feature_CNN(state, xflip=False, yflip=False):
     feature = np.zeros((9, 9, CHANNEL))
@@ -381,13 +385,14 @@ def feature_CNN(state, xflip=False, yflip=False):
 
     return feature
 
+
 def get_row_wall(state):
     return get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
+
 
 def get_column_wall(state):
     return get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
 
-# -----------------------------------------
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
     cdef np.ndarray[DTYPE_t, ndim = 2] ret
