@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State_c, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array, calc_dist_array, display_cui, feature_int
+from State import State, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_array, calc_dist_array, display_cui, feature_int
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -30,7 +30,7 @@ select_action.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.
 select_action.restype = ctypes.c_int
 
 copy_state_c = lib.copy_state
-copy_state_c.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
+copy_state_c.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
 copy_state_c.restype = None
 
 
@@ -166,19 +166,8 @@ def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
 
 
 def state_copy(s):
-    ret = State.State()
-    ret.Bx = s.Bx
-    ret.By = s.By
-    ret.Wx = s.Wx
-    ret.Wy = s.Wy
-    ret.turn = s.turn
-    ret.black_walls = s.black_walls
-    ret.white_walls = s.white_walls
-    ret.terminate = s.terminate
-    ret.reward = s.reward
-    ret.pseudo_terminate = s.pseudo_terminate
-    ret.pseudo_reward = s.pseudo_reward
-    copy_state_c(ret.state_c, s.state_c)
+    ret = State()
+    copy_state_c(ret, s)
     return ret
 
 def calc_optimal_move_by_DP(s):
@@ -202,11 +191,11 @@ def calc_optimal_move_by_DP(s):
             if is_black:
                 x = Bx
                 y = By
-                s.turn = s.state_c.turn = 0
+                s.turn = 0
             else:
                 x = Wx
                 y = Wy
-                s.turn = s.state_c.turn = 1
+                s.turn = 1
             movable_arr = movable_array(s, x, y, shortest_only=False)
             if not np.any(movable_arr):
                 return False
@@ -235,16 +224,16 @@ def calc_optimal_move_by_DP(s):
             x = Bx
             y = By
             d = Bd
-            s.turn = s.state_c.turn = 0
+            s.turn = 0
         else:
             x = Wx
             y = Wy
             d = Wd
-            s.turn = s.state_c.turn = 1
-        s.Bx = s.state_c.Bx = Bx
-        s.By = s.state_c.By = By
-        s.Wx = s.state_c.Wx = Wx
-        s.Wy = s.state_c.Wy = Wy
+            s.turn = 1
+        s.Bx = Bx
+        s.By = By
+        s.Wx = Wx
+        s.Wy = Wy
         movable_arr = movable_array(s, x, y, shortest_only=True)
         if not np.any(movable_arr):
             movable_arr = movable_array(s, x, y, shortest_only=False)
@@ -332,7 +321,7 @@ class BasicAI(Agent):
     def init_prev(self, state=None):
         # 試合前に毎回実行
         if state is None:
-            state = State.State()
+            state = State()
             State_init(state)
         # p = np.ones((137,)) / 137.
         # p = np.asarray(p, dtype=np.float32)

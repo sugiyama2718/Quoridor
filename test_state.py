@@ -1,5 +1,5 @@
 # coding:utf-8
-from State import State, BIT_BOARD_LEN, State_c, State_init, set_state_by_wall, movable_array, accept_action_str, calc_dist_array, placable_array, display_cui
+from State import State, BIT_BOARD_LEN, State, State_init, set_state_by_wall, movable_array, accept_action_str, calc_dist_array, placable_array, display_cui
 import numpy as np
 import os, sys
 import ctypes
@@ -15,25 +15,25 @@ else:
 
 
 set_row_wall_1 = lib.set_row_wall_1
-set_row_wall_1.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_row_wall_1.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_row_wall_1.restype = None
 set_row_wall_0 = lib.set_row_wall_0
-set_row_wall_0.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_row_wall_0.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_row_wall_0.restype = None
 
 set_column_wall_1 = lib.set_column_wall_1
-set_column_wall_1.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_column_wall_1.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_column_wall_1.restype = None
 set_column_wall_0 = lib.set_column_wall_0
-set_column_wall_0.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_column_wall_0.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_column_wall_0.restype = None
 
 print_state = lib.print_state
-print_state.argtypes = [ctypes.POINTER(State_c)]
+print_state.argtypes = [ctypes.POINTER(State)]
 print_state.restype = None
 
 eq_state = lib.eq_state
-eq_state.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
+eq_state.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
 eq_state.restype = ctypes.c_bool
 
 results = []
@@ -46,12 +46,12 @@ for i in test_case_list:
     if os.path.exists(os.path.join(TEST_DIR, "{}/p.txt".format(i))):
         p = np.loadtxt(os.path.join(TEST_DIR, "{}/p.txt".format(i)), delimiter=",")
         p = np.asarray(p, dtype=int)
-        state.Bx = state.state_c.Bx = p[0]
-        state.By = state.state_c.By = p[1]
-        state.Wx = state.state_c.Wx = p[2]
-        state.Wy = state.state_c.Wy = p[3]
+        state.Bx = p[0]
+        state.By = p[1]
+        state.Wx = p[2]
+        state.Wy = p[3]
     set_state_by_wall(state, row_wall, column_wall)
-    print_state(state.state_c)
+    print_state(state)
     display_cui(state)
 
     movable_array_ans = np.array(np.loadtxt(os.path.join(TEST_DIR, f"{i}/movable_array.csv"), delimiter=","), dtype=bool)

@@ -1,4 +1,4 @@
-from State import State, State_init, State_c, set_state_by_wall, display_cui
+from State import State, State_init, State, set_state_by_wall, display_cui
 import numpy as np
 import os
 from config import *
@@ -19,7 +19,7 @@ if os.name == "nt":
 else:
     lib = ctypes.CDLL('./State_util.so')
 is_mirror_match = lib.is_mirror_match
-is_mirror_match.argtypes = [ctypes.POINTER(State_c)]
+is_mirror_match.argtypes = [ctypes.POINTER(State)]
 is_mirror_match.restype = ctypes.c_bool
 
 results = []
@@ -33,19 +33,19 @@ for dir in dirs:
 
     state = State()
     State_init(state)
-    state.turn = state.state_c.turn = turn
-    state.Bx = state.state_c.Bx = int(pos_arr[0])
-    state.By = state.state_c.By = int(pos_arr[1])
-    state.Wx = state.state_c.Wx = int(pos_arr[2])
-    state.Wy = state.state_c.Wy = int(pos_arr[3])
-    state.black_walls = state.state_c.black_walls = p1_walls
-    state.white_walls = state.state_c.white_walls = p2_walls
+    state.turn = turn
+    state.Bx = int(pos_arr[0])
+    state.By = int(pos_arr[1])
+    state.Wx = int(pos_arr[2])
+    state.Wy = int(pos_arr[3])
+    state.black_walls = p1_walls
+    state.white_walls = p2_walls
     set_state_by_wall(state, row_wall, column_wall)
 
     display_cui(state)
-    print(is_mirror_match(state.state_c))
+    print(is_mirror_match(state))
     
-    results.append(is_mirror_match(state.state_c))
+    results.append(is_mirror_match(state))
 
 answer_df = pd.read_csv(os.path.join(TEST_DIR, "answer.csv"))
 print(answer_df)

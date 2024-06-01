@@ -1,4 +1,4 @@
-from State import State, State_init, State_c, movable_array, set_state_by_wall, is_certain_path_terminate, display_cui
+from State import State, State_init, State, movable_array, set_state_by_wall, is_certain_path_terminate, display_cui
 import numpy as np
 import os
 from config import *
@@ -19,16 +19,16 @@ if os.name == "nt":
 else:
     lib = ctypes.CDLL('./State_util.so')
 calc_oneside_placable_r_cand_from_color = lib.calc_oneside_placable_r_cand_from_color
-calc_oneside_placable_r_cand_from_color.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+calc_oneside_placable_r_cand_from_color.argtypes = [ctypes.POINTER(State), ctypes.c_int]
 calc_oneside_placable_r_cand_from_color.restype = (ctypes.c_uint64) * 2
 calc_oneside_placable_c_cand_from_color = lib.calc_oneside_placable_c_cand_from_color
-calc_oneside_placable_c_cand_from_color.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+calc_oneside_placable_c_cand_from_color.argtypes = [ctypes.POINTER(State), ctypes.c_int]
 calc_oneside_placable_c_cand_from_color.restype = (ctypes.c_uint64) * 2
 
 state = State()
 State_init(state)
-calc_oneside_placable_r_cand_from_color(state.state_c, 0)
-calc_oneside_placable_c_cand_from_color(state.state_c, 0)
+calc_oneside_placable_r_cand_from_color(state, 0)
+calc_oneside_placable_c_cand_from_color(state, 0)
 
 results = []
 for dir in dirs:
@@ -41,19 +41,17 @@ for dir in dirs:
 
     state = State()
     State_init(state)
-    state.turn = state.state_c.turn = turn
-    state.Bx = state.state_c.Bx = int(pos_arr[0])
-    state.By = state.state_c.By = int(pos_arr[1])
-    state.Wx = state.state_c.Wx = int(pos_arr[2])
-    state.Wy = state.state_c.Wy = int(pos_arr[3])
-    # state.black_walls = state.state_c.black_walls = p1_walls
-    # state.white_walls = state.state_c.white_walls = p2_walls
+    state.turn = turn
+    state.Bx = int(pos_arr[0])
+    state.By = int(pos_arr[1])
+    state.Wx = int(pos_arr[2])
+    state.Wy = int(pos_arr[3])
     set_state_by_wall(state, row_wall, column_wall)
 
     display_cui(state)
 
-    calc_oneside_placable_r_cand_from_color(state.state_c, 0)
-    calc_oneside_placable_c_cand_from_color(state.state_c, 0)
+    calc_oneside_placable_r_cand_from_color(state, 0)
+    calc_oneside_placable_c_cand_from_color(state, 0)
 
     B_ans, W_ans = np.array(np.loadtxt(os.path.join(path, f"ans.txt")), dtype=bool)
     B_pred = is_certain_path_terminate(state, 0)

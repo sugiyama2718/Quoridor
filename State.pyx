@@ -44,7 +44,7 @@ class BitArrayPair(ctypes.Structure):
     _fields_ = [("bitarr1", ctypes.c_uint64 * 2),  # __uint128_tを2つのuint64として扱う。bitarr1[0]に右側の64bit、bitarr1[1]に左側の64bitが格納されることに注意する
                 ("bitarr2", ctypes.c_uint64 * 2)]
     
-class State_c(ctypes.Structure):
+class State(ctypes.Structure):
     _fields_ = [("row_wall_bitarr", ctypes.c_uint64 * 2),
                 ("column_wall_bitarr", ctypes.c_uint64 * 2),
                 ("cross_bitarrs", ctypes.c_uint64 * 8),
@@ -61,62 +61,62 @@ class Point_c(ctypes.Structure):
     _fields_ = [("x", ctypes.c_int), ("y", ctypes.c_int)]
 
 State_init_ = lib.State_init
-State_init_.argtypes = [ctypes.POINTER(State_c)]
+State_init_.argtypes = [ctypes.POINTER(State)]
 State_init_.restype = None
 
 # dll中の関数の引数と戻り値の型を指定
 arrivable_ = lib.arrivable_
-arrivable_.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
+arrivable_.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int, ctypes.c_int]
 arrivable_.restype = ctypes.c_bool
 
 calc_placable_array_ = lib.calc_placable_array_
-calc_placable_array_.argtypes = [ctypes.POINTER(State_c)]
+calc_placable_array_.argtypes = [ctypes.POINTER(State)]
 calc_placable_array_.restype = BitArrayPair
 
 calc_dist_array_c = lib.calc_dist_array
-calc_dist_array_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+calc_dist_array_c.argtypes = [ctypes.POINTER(State), ctypes.c_int]
 calc_dist_array_c.restype = None
 
 print_state = lib.print_state
-print_state.argtypes = [ctypes.POINTER(State_c)]
+print_state.argtypes = [ctypes.POINTER(State)]
 print_state.restype = None
 
 set_row_wall_1 = lib.set_row_wall_1
-set_row_wall_1.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_row_wall_1.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_row_wall_1.restype = None
 set_row_wall_0 = lib.set_row_wall_0
-set_row_wall_0.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_row_wall_0.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_row_wall_0.restype = None
 
 set_column_wall_1 = lib.set_column_wall_1
-set_column_wall_1.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_column_wall_1.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_column_wall_1.restype = None
 set_column_wall_0 = lib.set_column_wall_0
-set_column_wall_0.argtypes = [ctypes.POINTER(State_c), ctypes.c_int, ctypes.c_int]
+set_column_wall_0.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_column_wall_0.restype = None
 
 eq_state_c = lib.eq_state
-eq_state_c.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(State_c)]
+eq_state_c.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
 eq_state_c.restype = ctypes.c_bool
 
 color_p_c = lib.color_p
-color_p_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+color_p_c.argtypes = [ctypes.POINTER(State), ctypes.c_int]
 color_p_c.restype = Point_c
 
 movable_array_c = lib.movable_array
-movable_array_c.argtypes = [ctypes.POINTER(State_c), ctypes.POINTER(ctypes.c_bool), ctypes.c_int, ctypes.c_int, ctypes.c_bool]
+movable_array_c.argtypes = [ctypes.POINTER(State), ctypes.POINTER(ctypes.c_bool), ctypes.c_int, ctypes.c_int, ctypes.c_bool]
 movable_array_c.restype = None
 
 accept_action_str_c = lib.accept_action_str
-accept_action_str_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_char_p, ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
+accept_action_str_c.argtypes = [ctypes.POINTER(State), ctypes.c_char_p, ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
 accept_action_str_c.restype = ctypes.c_bool
 
 is_mirror_match = lib.is_mirror_match
-is_mirror_match.argtypes = [ctypes.POINTER(State_c)]
+is_mirror_match.argtypes = [ctypes.POINTER(State)]
 is_mirror_match.restype = ctypes.c_bool
 
 calc_placable_array_and_set = lib.calc_placable_array_and_set
-calc_placable_array_and_set.argtypes = [ctypes.POINTER(State_c)]
+calc_placable_array_and_set.argtypes = [ctypes.POINTER(State)]
 calc_placable_array_and_set.restype = None
 
 uint128ToBoolArray = lib.uint128ToBoolArray
@@ -124,42 +124,38 @@ uint128ToBoolArray.argtypes = [ctypes.c_uint64, ctypes.c_uint64]
 uint128ToBoolArray.restype = ctypes.POINTER(ctypes.c_bool)
 
 get_player1_dist_from_goal = lib.get_player1_dist_from_goal
-get_player1_dist_from_goal.argtypes = [ctypes.POINTER(State_c)]
+get_player1_dist_from_goal.argtypes = [ctypes.POINTER(State)]
 get_player1_dist_from_goal.restype = ctypes.c_int
 
 get_player2_dist_from_goal = lib.get_player2_dist_from_goal
-get_player2_dist_from_goal.argtypes = [ctypes.POINTER(State_c)]
+get_player2_dist_from_goal.argtypes = [ctypes.POINTER(State)]
 get_player2_dist_from_goal.restype = ctypes.c_int
 
 is_certain_path_terminate_c = lib.is_certain_path_terminate
-is_certain_path_terminate_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+is_certain_path_terminate_c.argtypes = [ctypes.POINTER(State), ctypes.c_int]
 is_certain_path_terminate_c.restype = ctypes.c_bool
 
 placable_array_c = lib.placable_array
-placable_array_c.argtypes = [ctypes.POINTER(State_c), ctypes.c_int]
+placable_array_c.argtypes = [ctypes.POINTER(State), ctypes.c_int]
 placable_array_c.restype = BitArrayPair
 
 # -------------------------------------------
 # TODO: 以下、State_util.cppの実装が完了したらすべてそれに置き換える。一時的な関数。
 
 def State_init(state):
-    State_init_(state.state_c)
+    State_init_(state)
 
 def eq_state(state1, state2):
-    f = True
-    f = f and state1.Bx == state2.Bx and state1.By == state2.By and state1.Wx == state2.Wx and state1.Wy == state2.Wy
-    f = f and state1.black_walls == state2.black_walls and state1.white_walls == state2.white_walls
-    f = f and eq_state_c(state1.state_c, state2.state_c)
-    return f
+    return eq_state_c(state1, state2)
 
 # c++で直接２つのintを返させてそのままpythonでも２つのintを返すのは難しそう。この関数はこのまま使う。
 def color_p(state, color):
-    ret = color_p_c(state.state_c, color)
+    ret = color_p_c(state, color)
     return ret.x, ret.y
 
 def movable_array(state, x, y, shortest_only=False):
     mv_c = (ctypes.c_bool * 9)(*([False] * 9))
-    movable_array_c(state.state_c, mv_c, x, y, shortest_only)
+    movable_array_c(state, mv_c, x, y, shortest_only)
     mv = np.zeros((3, 3), dtype="bool")
     for dx in [-1, 0, 1]:
         for dy in [-1, 0, 1]:
@@ -171,13 +167,13 @@ def set_wall(state, row_wall, column_wall):
     for x in range(BOARD_LEN - 1):
         for y in range(BOARD_LEN - 1):
             if row_wall[x, y]:
-                set_row_wall_1(state.state_c, x, y)
+                set_row_wall_1(state, x, y)
             else:
-                set_row_wall_0(state.state_c, x, y)
+                set_row_wall_0(state, x, y)
             if column_wall[x, y]:
-                set_column_wall_1(state.state_c, x, y)
+                set_column_wall_1(state, x, y)
             else:
-                set_column_wall_0(state.state_c, x, y)
+                set_column_wall_0(state, x, y)
 
 def set_state_by_wall(state, row_wall, column_wall):
     # 差分計算している部分を計算する
@@ -188,10 +184,10 @@ def set_state_by_wall(state, row_wall, column_wall):
     dist_array2 = calc_dist_array(state, BOARD_LEN - 1)
     for x in range(BOARD_LEN):
         for y in range(BOARD_LEN):
-            state.state_c.dist_array1[x + y * BOARD_LEN] = dist_array1[x, y]
-            state.state_c.dist_array2[x + y * BOARD_LEN] = dist_array2[x, y]
+            state.dist_array1[x + y * BOARD_LEN] = dist_array1[x, y]
+            state.dist_array2[x + y * BOARD_LEN] = dist_array2[x, y]
 
-    calc_placable_array_and_set(state.state_c)
+    calc_placable_array_and_set(state)
 
 def get_dist_array_from_c_arr(c_dist_arr):
     return np.array([c_dist_arr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
@@ -199,45 +195,31 @@ def get_dist_array_from_c_arr(c_dist_arr):
 def accept_action_str(state, s, check_placable=True, calc_placable_array=True, check_movable=True):
     # calc_placable_array=Falseにした場合は、以降正しく壁のおける場所を求められないことに注意
     
-    ret = accept_action_str_c(state.state_c, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
-
-    state.Bx = state.state_c.Bx
-    state.By = state.state_c.By
-    state.Wx = state.state_c.Wx
-    state.Wy = state.state_c.Wy
-    state.turn = state.state_c.turn
-    state.black_walls = state.state_c.black_walls
-    state.white_walls = state.state_c.white_walls
-
-    state.terminate = state.state_c.terminate
-    state.reward = state.state_c.reward
-    state.wall0_terminate = state.state_c.wall0_terminate
-    state.pseudo_terminate = state.state_c.pseudo_terminate
-    state.pseudo_reward = state.state_c.pseudo_reward
+    ret = accept_action_str_c(state, s.encode('utf-8'), check_placable, calc_placable_array, check_movable)
 
     return ret
 
 def get_player_dist_from_goal(state):
-    return get_player1_dist_from_goal(state.state_c), get_player2_dist_from_goal(state.state_c)
+    return get_player1_dist_from_goal(state), get_player2_dist_from_goal(state)
 
 def is_certain_path_terminate(state, color=-1):
-    return is_certain_path_terminate_c(state.state_c, color)
+    return is_certain_path_terminate_c(state, color)
 
 def placable_array(state, color):
-    ret = placable_array_c(state.state_c, color)
+    ret = placable_array_c(state, color)
     return get_numpy_arr(ret.bitarr1, BOARD_LEN - 1), get_numpy_arr(ret.bitarr2, BOARD_LEN - 1)
 
 def calc_dist_array(state, goal_y):
-    calc_dist_array_c(state.state_c, goal_y)
+    calc_dist_array_c(state, goal_y)
     if goal_y == 0:
-        array_ptr = state.state_c.dist_array1
+        array_ptr = state.dist_array1
     else:
-        array_ptr = state.state_c.dist_array2
+        array_ptr = state.dist_array2
     return np.array([array_ptr[i] for i in range(BOARD_LEN * BOARD_LEN)], dtype=DTYPE).reshape(BOARD_LEN, BOARD_LEN).T
 
 def display_cui(state, check_algo=True, official=True, p1_atmark=False, ret_str=False):
-    row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
-    column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
     
     ret = " "
     for c in ["a", "b", "c", "d", "e", "f", "g", "h", "i"]:
@@ -313,8 +295,8 @@ def display_cui(state, check_algo=True, official=True, p1_atmark=False, ret_str=
         sys.stdout.write(ret)
 
 def feature_int(state):
-    row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
-    column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
     feature = np.zeros((135,), dtype=int)
     feature[0] = state.Bx
     feature[1] = state.By
@@ -332,7 +314,7 @@ def feature_CNN(state, xflip=False, yflip=False):
 
     cross_arr = np.zeros((9, 9, 4))
     for i in range(4):
-        cross_arr[:, :, i] = get_numpy_arr(state.state_c.cross_bitarrs, BOARD_LEN, i * 2)
+        cross_arr[:, :, i] = get_numpy_arr(state.cross_bitarrs, BOARD_LEN, i * 2)
         
     Bx = state.Bx
     By = state.By
@@ -341,11 +323,11 @@ def feature_CNN(state, xflip=False, yflip=False):
     black_walls = state.black_walls
     white_walls = state.white_walls
     turn = state.turn
-    row_wall = get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
-    column_wall = get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
     dist1, dist2 = get_player_dist_from_goal(state)
-    placable_r = get_numpy_arr(state.state_c.placable_r_bitarr, BOARD_LEN - 1)
-    placable_c = get_numpy_arr(state.state_c.placable_c_bitarr, BOARD_LEN - 1)
+    placable_r = get_numpy_arr(state.placable_r_bitarr, BOARD_LEN - 1)
+    placable_c = get_numpy_arr(state.placable_c_bitarr, BOARD_LEN - 1)
     if xflip:
         Bx = 8 - Bx
         Wx = 8 - Wx
@@ -400,10 +382,10 @@ def feature_CNN(state, xflip=False, yflip=False):
     return feature
 
 def get_row_wall(state):
-    return get_numpy_arr(state.state_c.row_wall_bitarr, BOARD_LEN - 1)
+    return get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
 
 def get_column_wall(state):
-    return get_numpy_arr(state.state_c.column_wall_bitarr, BOARD_LEN - 1)
+    return get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
 
 # -----------------------------------------
 
@@ -424,28 +406,4 @@ def print_bitarr(bitarr):
         for x in range(BOARD_LEN):
             print(bitarr[x + y * BIT_BOARD_LEN], end="")
         print()
-
-cdef class State:
-    draw_turn = DRAW_TURN
-    cdef public int Bx, By, Wx, Wy, turn, black_walls, white_walls, terminate, reward, wall0_terminate, pseudo_terminate, pseudo_reward
-    cdef public state_c
-    def __init__(self):
-        self.Bx = BOARD_LEN // 2
-        self.By = BOARD_LEN - 1
-        self.Wx = BOARD_LEN // 2
-        self.Wy = 0
-        self.turn = 0
-        self.black_walls = 10
-        self.white_walls = 10
-
-        self.terminate = False
-        self.wall0_terminate = False  # 壁0を葉ノード扱いするときに使用 こちらは壁0で自動でTrueになる
-        self.reward = 0  # blackから見たreward
-        self.pseudo_terminate = False  # 相手の壁が0でこちらの方が2近い等、勝敗が確定しているときにTrue
-        self.pseudo_reward = 0
-
-        self.state_c = State_c()
-        State_init_(self.state_c)
-        # print_state(self.state_c)
-
 
