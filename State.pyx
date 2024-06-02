@@ -303,8 +303,6 @@ def display_cui(state, check_algo=True, official=True, p1_atmark=False, ret_str=
 
 
 def feature_int(state):
-    row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
-    column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
     feature = np.zeros((135,), dtype=int)
     feature[0] = state.Bx
     feature[1] = state.By
@@ -313,8 +311,8 @@ def feature_int(state):
     feature[4] = state.black_walls
     feature[5] = state.white_walls
     feature[6] = state.turn % 2
-    feature[7:7 + 64] = row_wall.flatten()
-    feature[7 + 64:] = column_wall.flatten()
+    feature[7:7 + 64] = get_flatten_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
+    feature[7 + 64:] = get_flatten_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
     return feature
 
 
