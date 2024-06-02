@@ -210,6 +210,11 @@ def placable_array(state, color):
     return get_numpy_arr(ret.bitarr1, BOARD_LEN - 1), get_numpy_arr(ret.bitarr2, BOARD_LEN - 1)
 
 
+def placable_flatten_array(state, color):
+    ret = placable_array_c(state, color)
+    return get_flatten_numpy_arr(ret.bitarr1, BOARD_LEN - 1), get_flatten_numpy_arr(ret.bitarr2, BOARD_LEN - 1)
+    
+
 def calc_dist_array(state, goal_y):
     calc_dist_array_c(state, goal_y)
     if goal_y == 0:
@@ -402,6 +407,19 @@ def get_numpy_arr(bitarr, int len_, int offset=0):
     for x in range(len_):
         for y in range(len_):
             ret[x, y] = bool_p[x + y * BIT_BOARD_LEN]
+    return ret
+
+
+def get_flatten_numpy_arr(bitarr, int len_, int offset=0):
+    cdef np.ndarray[DTYPE_t, ndim = 1] ret
+    cdef int i, x, y
+    ret = np.zeros(len_ * len_, dtype=DTYPE)
+    bool_p = uint128ToBoolArray(bitarr[1 + offset], bitarr[0 + offset])
+    i = 0
+    for x in range(len_):
+        for y in range(len_):
+            ret[i] = bool_p[x + y * BIT_BOARD_LEN]
+            i += 1
     return ret
 
 
