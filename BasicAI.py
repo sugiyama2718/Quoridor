@@ -718,12 +718,14 @@ class BasicAI(Agent):
             # expand
             for count, s, nodes, actions in zip(range(len(states)), states, nodess, actionss):
                 if not s.pseudo_terminate:
+                    # sはtでaを実行したときのstate
                     t = nodes[-1]
                     a = actions[-1]
-                    state_vec, is_searched = self.get_state_vec_and_is_state_searched(t)
-
-                    if a in t.children.keys():
+                    if a in t.children.keys():  # 過去に探索済み
                         continue
+
+                    new_tree = Tree(s, None)
+                    state_vec, is_searched = self.get_state_vec_and_is_state_searched(new_tree)
                     if is_searched:  # 過去に探索していた状態と一致したとき  
                         t.children[a] = self.state2node_per_turn[s.turn][state_vec]
                         # t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
@@ -735,7 +737,7 @@ class BasicAI(Agent):
                             assert False, "!" * 100
 
                     else:  # 初めて探索されたとき
-                        t.children[a] = Tree(s, None)
+                        t.children[a] = new_tree
                         t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
                         t.children[a].V = np.array(v_arr[count], dtype=np.float32)
                         self.add_state2node_per_turn_item(s.turn, state_vec, t.children[a])
