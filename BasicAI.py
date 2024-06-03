@@ -39,6 +39,13 @@ def get_state_vec(state):
     return tuple([state.turn] + list(feature_int(state).flatten()))
 
 
+def get_state_vec_from_tree(tree):
+    # state_vecをまだ計算していないときだけ計算して格納することで高速化
+    if tree.state_vec is None:
+        tree.state_vec = get_state_vec(tree.s)
+    return tree.state_vec
+
+
 def display_parameter(x):
     a = x[:64].reshape((8, 8))
     b = x[64:128].reshape((8, 8))
@@ -339,9 +346,9 @@ class BasicAI(Agent):
         #         del v
         self.state2node_per_turn = {}  # turn -> (state.vec -> node)
 
-    def get_state_vec_and_is_state_searched(self, state):
-        turn = state.turn
-        state_vec = get_state_vec(state)
+    def get_state_vec_and_is_state_searched(self, tree):
+        turn = tree.s.turn
+        state_vec = get_state_vec_from_tree(tree)
 
         if turn not in self.state2node_per_turn.keys():
             return state_vec, False
@@ -567,7 +574,7 @@ class BasicAI(Agent):
         visited = set([])
 
         def negate_tree(tree, count=0):
-            state_vec = get_state_vec(tree.s)
+            state_vec = get_state_vec_from_tree(tree)
             if state_vec in visited:
                 return tree
             
@@ -713,7 +720,7 @@ class BasicAI(Agent):
                 if not s.pseudo_terminate:
                     t = nodes[-1]
                     a = actions[-1]
-                    state_vec, is_searched = self.get_state_vec_and_is_state_searched(s)
+                    state_vec, is_searched = self.get_state_vec_and_is_state_searched(t)
 
                     if a in t.children.keys():
                         continue
