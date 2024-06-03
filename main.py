@@ -578,6 +578,7 @@ def train_AIs_process(arg):
         ret = AI.learn(epoch, learn_rep_num, loss_dict, valid_loss)
     
     if save_epoch and (epoch % SAVE_CYCLE == 0 or epoch <= POOL_EPOCH_NUM + SAVE_FIRST_EPOCH_NUM):
+        os.makedirs(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch)), exist_ok=True)
         AI.save(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
     AI.save(os.path.join(PARAMETER_DIR, "post.ckpt"))
 

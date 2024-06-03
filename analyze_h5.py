@@ -15,6 +15,7 @@ import pickle
 import argparse
 from BasicAI import display_parameter
 import pandas as pd
+from util import get_epoch_dir_name
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制？
 LOAD_GAME_LIMIT = 10
@@ -254,7 +255,8 @@ def save_all_kifu(arr_per_game_list_dict, each_data_dir, div_i):
     for features in features_list:
         kifu = get_kifu_from_features(features)
         save_str += ",".join(kifu) + os.linesep
-    save_dir = os.path.join(KIFU_DIR, str(each_data_dir))
+    os.makedirs(os.path.join(KIFU_DIR, get_epoch_dir_name(each_data_dir)), exist_ok=True)
+    save_dir = os.path.join(KIFU_DIR, get_epoch_dir_name(each_data_dir), str(each_data_dir))
     os.makedirs(save_dir, exist_ok=True)
     with open(os.path.join(save_dir, f"{div_i}.txt"), "w") as fout:
         fout.write(save_str)
