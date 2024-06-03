@@ -61,7 +61,7 @@ DEEP_SEARCH_P = 0.15  # 深い探索を実施する確率
 DEEP_TH = 0.5  # prev_v, post_vにどれだけ差があれば深い探索にするか
 EVALUATION_SEARCHNODES = 1000
 
-PROCESS_NUM = 12
+PROCESS_NUM = 15
 
 RATE_TH = 0.1  # レートがいくつ以上あがったら新AIとして採用するか
 RATE_TH2 = 0.5  # レートがいくつ以上あがったらAI listを更新するか
@@ -72,8 +72,9 @@ PARAMETER_DIR = "train_results/parameter"
 KIFU_DIR = "train_results/kifu"
 JOSEKI_DIR = "train_results/joseki"
 
-for dir in [DATA_DIR, TRAIN_LOG_DIR, PARAMETER_DIR, KIFU_DIR, JOSEKI_DIR]:
-    os.makedirs(dir, exist_ok=True)
+EPOCH_DIR_UNIT = 1000  # 何epochごとにディレクトリを作成するか
+SAVE_CYCLE = 5  # 何epochごとに保存するか
+SAVE_FIRST_EPOCH_NUM = 100  # 
 
 # DEFAULT_FILTERS = 96
 # DEFAULT_LAYER_NUM = 41

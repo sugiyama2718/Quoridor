@@ -2,6 +2,7 @@ import os
 from Tree import OpeningTree
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
+from config import *
 
 def Glendenning2Official(s):
     """
@@ -155,3 +156,17 @@ def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
                 node.p2_win_num += 1
                 
     return opening_tree, statevec2node
+
+
+def get_epoch_dir_name(epoch):
+    floor_epoch = (epoch // EPOCH_DIR_UNIT) * EPOCH_DIR_UNIT
+    return "{}_{}".format(floor_epoch, floor_epoch + EPOCH_DIR_UNIT)
+
+if __name__ == "__main__":
+    print(get_epoch_dir_name(0))
+    print(get_epoch_dir_name(1))
+    print(get_epoch_dir_name(999))
+    print(get_epoch_dir_name(1000))
+    print(get_epoch_dir_name(1001))
+
+

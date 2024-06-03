@@ -14,6 +14,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import argparse
 import logging
+from util import get_epoch_dir_name
 tf.get_logger().setLevel(logging.ERROR)
 
 SIGMA = 1.5
@@ -109,13 +110,13 @@ def evaluate_2game_process_2id(arg_tuple):
         AI1 = CNNAI(0, search_nodes=search_nodes1, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
     else:
         AI1 = CNNAI(0, search_nodes=search_nodes1, seed=seed)
-        AI1.load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id1)))
+        AI1.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id1), "epoch{}.ckpt".format(AI_id1)))
 
     if AI_id2 == -1:
         AI2 = CNNAI(1, search_nodes=search_nodes2, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
     else:
         AI2 = CNNAI(1, search_nodes=search_nodes2, seed=seed)
-        AI2.load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id2)))
+        AI2.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id2), "epoch{}.ckpt".format(AI_id2)))
 
     AIs = [AI1, AI2]
     AIs[0].tau = EVALUATION_TAU

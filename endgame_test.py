@@ -7,6 +7,7 @@ from CNNAI import CNNAI
 from config import *
 import pandas as pd
 import time
+from util import get_epoch_dir_name
 
 #TEST_DIR = "endgame_testcase/240119"  # 確定路のテスト
 TEST_DIR = "endgame_testcase/240128"  # 勝敗を
@@ -19,8 +20,8 @@ TARGET_EPOCH = 2910
 SEARCH_NODES = 1000
 
 AIs = [CNNAI(0, search_nodes=SEARCH_NODES, tau=0.0, seed=100), CNNAI(1, search_nodes=SEARCH_NODES, tau=0.0, seed=200)]
-AIs[0].load(os.path.join(PARAMETER_DIR, f"epoch{TARGET_EPOCH}.ckpt"))
-AIs[1].load(os.path.join(PARAMETER_DIR, f"epoch{TARGET_EPOCH}.ckpt"))
+AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(TARGET_EPOCH), f"epoch{TARGET_EPOCH}.ckpt"))
+AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(TARGET_EPOCH), f"epoch{TARGET_EPOCH}.ckpt"))
 
 start_time = time.time()
 

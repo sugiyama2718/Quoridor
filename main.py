@@ -26,6 +26,7 @@ from collections import OrderedDict
 from analyze_h5 import analyze_h5_main
 import shutil
 import random
+from util import get_epoch_dir_name
 
 # agentsは初期化されてるとする
 def normal_play(agents, initial_state=None):
@@ -356,21 +357,6 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         return wins
 
 
-def debug_learn(AIs):
-    AIs[1].learn(H5_NUM - 1, H5_NUM, LEARN_REP_NUM, TRAIN_ARRAY_SIZE)
-    # ----------evaluation--------
-    AIs[0].tau = TAU_MIN
-    AIs[1].tau = TAU_MIN
-    AIs[0].search_nodes = search_nodes
-    AIs[1].search_nodes = search_nodes
-
-    play_num = 100
-    white_win_num = evaluate(AIs, play_num)
-    win_rate = (play_num - white_win_num) / play_num
-    print("new AI win rate={}".format(win_rate))
-    AIs[1].save(os.path.join(PARAMETER_DIR, "debug.ckpt"))
-
-
 def train_from_random_parameter_process(x):
     # filters = 32
     # layer_num = 9
@@ -497,8 +483,8 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
     else:
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True),
                CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True)]
-        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
-        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
+        AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id), "epoch{}.ckpt".format(AI_id)))
+        AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id), "epoch{}.ckpt".format(AI_id)))
 
     b_win = 0
     w_win = 0
@@ -581,10 +567,8 @@ def train_AIs_process(arg):
 
     if epoch <= long_warmup_epoch_num:
         pass
-        #AI.save(os.path.join(PARAMETER_DIR, "epoch0.ckpt"))
     else:
         AI.load(os.path.join(PARAMETER_DIR, "post.ckpt"))
-
 
     if epoch <= long_warmup_epoch_num:
         learn_rep_num = LEARN_REP_NUM * 10  # warmup用
@@ -593,8 +577,8 @@ def train_AIs_process(arg):
         learn_rep_num = LEARN_REP_NUM
         ret = AI.learn(epoch, learn_rep_num, loss_dict, valid_loss)
     
-    if save_epoch:
-        AI.save(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(epoch)))
+    if save_epoch and (epoch % SAVE_CYCLE == 0 or epoch <= POOL_EPOCH_NUM + SAVE_FIRST_EPOCH_NUM):
+        AI.save(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
     AI.save(os.path.join(PARAMETER_DIR, "post.ckpt"))
 
     del AI
@@ -609,12 +593,14 @@ def evaluate_2game_process(arg_tuple):
         AI1 = CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
     else:
         AI1 = CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, seed=seed)
-        AI1.load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
+        AI1.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id), "epoch{}.ckpt".format(AI_id)))
 
     AIs = [AI1, CNNAI(1, search_nodes=EVALUATION_SEARCHNODES, seed=seed)]
     AIs[0].tau = EVALUATION_TAU
     AIs[1].tau = EVALUATION_TAU
 
+    if AI_load_name.startswith("epoch"):
+        AI_load_name = os.path.join(get_epoch_dir_name(AI_id), AI_load_name)  # epoch500~などの場合だけ、0_1000/epoch500~にアクセスする必要がある
     AIs[1].load(os.path.join(PARAMETER_DIR, AI_load_name.format(AI_id)))
 
     ret = evaluate(AIs, 2, multiprocess=True)
@@ -876,9 +862,8 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
 
 
 if __name__ == '__main__':
-    os.makedirs(DATA_DIR, exist_ok=True)
-    os.makedirs(PARAMETER_DIR, exist_ok=True)
-    os.makedirs(TRAIN_LOG_DIR, exist_ok=True)
+    for dir in [DATA_DIR, TRAIN_LOG_DIR, PARAMETER_DIR, KIFU_DIR, JOSEKI_DIR]:
+        os.makedirs(dir, exist_ok=True)
 
     np.seterr(divide='raise', invalid='raise')
     search_nodes = SELFPLAY_SEARCHNODES_MIN
@@ -892,16 +877,13 @@ if __name__ == '__main__':
     elif sys.argv[1] == "train_without_selfplay":
         # 既にあるselfplayデータを使って過学習などについて解析をする
         train_without_selfplay()
-    elif sys.argv[1] == "debug_learn":
-        # １つ目のAIを距離だけで考えるものとして、そこからどれだけ学習の結果強くなれるかを検証する
-        debug_learn([CNNAI(0, search_nodes=search_nodes, v_is_dist=True, p_is_almost_flat=True), CNNAI(1, search_nodes=search_nodes, v_is_dist=True)])
     elif sys.argv[1] == "view":
         AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.25, seed=100)]
         #AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=100, is_mimic_AI=True)]
         # AIs[0].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
         # AIs[1].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
-        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch3090.ckpt"))
-        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch3090.ckpt"))
+        AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(3090), "epoch3090.ckpt"))
+        AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(3090), "epoch3090.ckpt"))
 
         # AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, all_parameter_zero=True, v_is_dist=True, p_is_almost_flat=True), 
         #        CNNAI(1, search_nodes=search_nodes, tau=0.25, all_parameter_zero=True, v_is_dist=True, p_is_almost_flat=True)]
@@ -938,8 +920,8 @@ if __name__ == '__main__':
             # 先後で２試合して勝利数を返す
             AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=seed), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=seed, use_average_Q=True)]
             #AIs[0].load(os.path.join("backup/221219/train_results/parameter/", "epoch680.ckpt"))
-            AIs[0].load(os.path.join(PARAMETER_DIR, "epoch120.ckpt"))
-            AIs[1].load(os.path.join(PARAMETER_DIR, "epoch120.ckpt"))
+            AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(120), "epoch120.ckpt"))
+            AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(120), "epoch120.ckpt"))
             ret = evaluate(AIs, 2, multiprocess=True, display=True)
             del AIs
             return ret
@@ -957,7 +939,7 @@ if __name__ == '__main__':
         def generate_data_single(seed):
             AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, tau=0.5),
                 CNNAI(1, search_nodes=search_nodes, seed=seed, tau=0.5)]
-            path = os.path.join(PARAMETER_DIR, "epoch290.ckpt")
+            path = os.path.join(PARAMETER_DIR, get_epoch_dir_name(290), "epoch290.ckpt")
             AIs[0].load(path)
             AIs[1].load(path)
             temp_data = generate_data(AIs, game_num, noise=NOISE)
@@ -983,17 +965,11 @@ if __name__ == '__main__':
         seed = 0
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, random_playouts=True), CNNAI(1, search_nodes=search_nodes, seed=seed, random_playouts=True)]
         path = PARAMETER_DIR
-        AIs[0].load(os.path.join(path, "epoch240.ckpt"))
-        AIs[1].load(os.path.join(path, "epoch240.ckpt"))
-        # AIs[0].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
-        # AIs[1].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
+        AIs[0].load(os.path.join(path, get_epoch_dir_name(240), "epoch240.ckpt"))
+        AIs[1].load(os.path.join(path, get_epoch_dir_name(240), "epoch240.ckpt"))
 
         start_time = time.time()
         temp_data = generate_data(AIs, game_num, noise=NOISE, display=True, info=True)
-        # with open("measure.log", "a") as f:
-        #     f.write("{},{},{}".format(datetime.datetime.today(),
-        #                               #check_output(["git", "show", '--format="%H"', "-s"]).rstrip(),
-        #                               time.time() - start_time, game_num) + os.linesep)
         print()
         print("{:.2f}s".format(time.time() - start_time))
 
@@ -1008,8 +984,8 @@ if __name__ == '__main__':
         path = PARAMETER_DIR
         epoch = 240
 
-        AIs[0].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
-        AIs[1].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
+        AIs[0].load(os.path.join("application_data/parameter", get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
+        AIs[1].load(os.path.join("application_data/parameter", get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
 
         start_time = time.time()
         temp_data = evaluate(AIs, game_num, display=True)
