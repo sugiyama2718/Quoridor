@@ -589,6 +589,7 @@ class BasicAI(Agent):
             ret.P_without_loss = tree.P_without_loss
             ret.dist_diff_arr = tree.dist_diff_arr
             ret.already_certain_path_confirmed = tree.already_certain_path_confirmed
+            ret.state_vec = tree.state_vec
 
             # if tree.P is None:
             #     ret = Tree(state_copy(tree.s), tree.P)
