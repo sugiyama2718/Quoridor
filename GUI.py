@@ -22,7 +22,7 @@ from kivy.core.window import Window
 from kivy.lang import Builder
 
 from Agent import actionid2str, str2actionid
-from State import State, CHANNEL
+from State import State, CHANNEL, State_init, accept_action_str, display_cui, get_row_wall, get_column_wall
 from State import DRAW_TURN
 from CNNAI import CNNAI
 from BasicAI import state_copy
@@ -73,9 +73,9 @@ param_files = os.listdir(PARAMETER_PATH)
 epoch_list = [0] + sorted(list(set([int(s.split(".")[0][5:]) for s in param_files])))
 LEVEL_NUM = len(epoch_list)
 
-#TRAINING_LIST = [(0, 500), (60, 500), (62, 500), (71, 500), (91, 500), (96, 500), (155, 500), (220, 500), (465, 500), (620, 500), (620, 500), (634, 1000)]
 TRAINING_LIST = [(0, 500), (1, 500), (2, 500), (3, 500), (4, 500), (5, 500), (6, 500), (7, 500), (8, 500), (9, 500), 
                  (10, 500), (11, 500), (12, 500), (13, 200), (13, 500), (14, 500), (15, 500), (16, 500), (17, 500), (18, 500), (19, 500), (20, 500), (21, 500)]
+#TRAINING_LIST = [(0, 500), (1, 500)]
 TRAINING_LEVEL_NUM = len(TRAINING_LIST)
 
 # 対戦モードid
@@ -157,6 +157,7 @@ class Quoridor(Widget):
     def __init__(self, **kwargs):
         super(Quoridor, self).__init__(**kwargs)
         self.state = State()
+        State_init(self.state)
         self.agents = [GUIHuman(0), CNNAI(1, search_nodes=self.search_nodes, tau=0.5)]
         self.playing_game = False
 
@@ -282,13 +283,13 @@ class Quoridor(Widget):
         else:
             a = s
 
-        if not self.state.accept_action_str(a):
+        if not accept_action_str(self.state, a):
             print(a)
             print("this action is impossible")
             return
         print(Glendenning2Official(a))
 
-        self.state.display_cui()
+        display_cui(self.state)
         self.turn += 1
         self.add_history(self.state, a, is_record=False)
 
@@ -327,20 +328,18 @@ class Quoridor(Widget):
             a = s
             self.agents[1 - color].prev_action = str2actionid(self.state, s)
 
-        if not self.state.accept_action_str(a):
+        if not accept_action_str(self.state, a):
             print(a)
             print("this action is impossible")
             return
         print(Glendenning2Official(a))
 
-
-        self.state.display_cui()
+        display_cui(self.state)
         self.turn += 1
         self.add_history(self.state, a)
 
         self.prev_act_time = time.time()
         self.ai_wait_time = AI_WAIT_TIME
-        #print(self.state.get_player_dist_from_goal())
         touched = False
 
         if self.mode == TRAINING_MODE and isinstance(self.agents[color], CNNAI) and self.turn >= len(self.training_joseki) and self.remaining_time >= 0.0:
@@ -482,6 +481,7 @@ class Quoridor(Widget):
 
         if self.mode == TRAINING_MODE or self.state.terminate:
             self.state = State()
+            State_init(self.state)
             self.turn = 0
             self.state_history = None
             self.add_history(self.state, None)
@@ -636,6 +636,8 @@ class Quoridor(Widget):
                     self.row_wall_colors[y * 8 + x].a = 0
                     self.column_wall_colors[y * 8 + x].a = 0
 
+        row_wall = get_row_wall(self.state)
+        column_wall = get_column_wall(self.state)
         for x in range(8):
             for y in range(8):
                 if self.upside_down:
@@ -645,9 +647,9 @@ class Quoridor(Widget):
                     disp_x = x
                     disp_y = y
 
-                if self.state.row_wall[x, y]:
+                if row_wall[x, y]:
                     self.row_wall_colors[(7 - disp_y) * 8 + disp_x].a = 1
-                if self.state.column_wall[x, y]:
+                if column_wall[x, y]:
                     self.column_wall_colors[(7 - disp_y) * 8 + disp_x].a = 1
 
         self.search_nodes_label.text = f"search nodes = {self.search_nodes}"

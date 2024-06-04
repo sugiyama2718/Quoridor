@@ -5,7 +5,7 @@ import json
 # 学習設定 large 学習本番
 POOL_SIZE = 60000  # 学習のときにサンプルする対象となる試合数
 TRAIN_CYCLE = 1000  # 何試合おきに学習を行うか
-EVALUATION_CYCLE = 20000  # 何試合おきに評価を行うか
+EVALUATION_CYCLE = 60000  # 何試合おきに評価を行うか
 GAME_NUM_IN_H5 = 10  # 一つのh5ファイルに何試合含めるか。AI初期化のオーバーヘッド対策。
 SEE_DATA_NUM = 2  # 一つのデータを何度学習に使うか（見込み）
 TRAIN_ARRAY_SIZE = 1000  # 学習時にメモリに乗せる試合数。増やすとメモリを圧迫する
@@ -59,10 +59,9 @@ SELFPLAY_SEARCHNODES_MIN = 300
 SELFPLAY_SEARCHNODES_MAX = 1500
 DEEP_SEARCH_P = 0.15  # 深い探索を実施する確率
 DEEP_TH = 0.5  # prev_v, post_vにどれだけ差があれば深い探索にするか
-EVALUATION_SEARCHNODES = 800
+EVALUATION_SEARCHNODES = 1000
 
-PROCESS_NUM = 4
-#THREAD_NUM = 2
+PROCESS_NUM = 15
 
 RATE_TH = 0.1  # レートがいくつ以上あがったら新AIとして採用するか
 RATE_TH2 = 0.5  # レートがいくつ以上あがったらAI listを更新するか
@@ -73,8 +72,9 @@ PARAMETER_DIR = "train_results/parameter"
 KIFU_DIR = "train_results/kifu"
 JOSEKI_DIR = "train_results/joseki"
 
-for dir in [DATA_DIR, TRAIN_LOG_DIR, PARAMETER_DIR, KIFU_DIR, JOSEKI_DIR]:
-    os.makedirs(dir, exist_ok=True)
+EPOCH_DIR_UNIT = 1000  # 何epochごとにディレクトリを作成するか
+SAVE_CYCLE = 5  # 何epochごとに保存するか
+SAVE_FIRST_EPOCH_NUM = 100  # 
 
 # DEFAULT_FILTERS = 96
 # DEFAULT_LAYER_NUM = 41
@@ -111,10 +111,10 @@ WEIGHT_DECAY = 1e-4
 EPSILON = 1e-7
 EMA_DECAY = 3e-4
 VALID_EMA_DECAY = EMA_DECAY
-BATCH_SIZE = 256
+BATCH_SIZE = 512
 PER_PROCESS_GPU_MEMORY_FRACTION = 0.07
 WARMUP_STEPS = 0.1
-N_PARALLEL = 16
+N_PARALLEL = 32
 NOISE = 0.25
 
 # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる。そのときの十分探索のNの比率と、勝ちに近いとする閾値

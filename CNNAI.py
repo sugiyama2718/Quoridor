@@ -1,9 +1,11 @@
 # coding:utf-8
 #from memory_profiler import profile
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
-from State import CHANNEL
+from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal, placable_flatten_array, display_cui, feature_CNN
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -14,7 +16,6 @@ import h5py
 from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 from config import *
-import os
 from tqdm import tqdm
 import math
 import json
@@ -44,7 +45,7 @@ class CNNAI(BasicAI):
     def __init__(self, color, search_nodes=1, C_puct=2, tau=1, all_parameter_zero=False, v_is_dist=False, p_is_almost_flat=False, 
     seed=0, use_estimated_V=True, V_ema_w=0.01, shortest_only=False, per_process_gpu_memory_fraction=PER_PROCESS_GPU_MEMORY_FRACTION, use_average_Q=False, random_playouts=False,
     filters=DEFAULT_FILTERS, layer_num=DEFAULT_LAYER_NUM, use_global_pooling=USE_GLOBAL_POOLING, use_self_attention=USE_SELF_ATTENTION, use_slim_head=USE_SLIM_HEAD, opponent_AI=None,
-    is_mimic_AI=False, force_opening=None):
+    is_mimic_AI=False, force_opening=None, use_mix_precision=True):
         super(CNNAI, self).__init__(color, search_nodes, C_puct, tau, use_estimated_V=use_estimated_V, V_ema_w=V_ema_w, shortest_only=shortest_only, use_average_Q=use_average_Q, random_playouts=random_playouts, is_mimic_AI=is_mimic_AI, force_opening=force_opening)
 
         np.random.seed(seed)
@@ -64,6 +65,7 @@ class CNNAI(BasicAI):
         self.use_self_attention = use_self_attention
         self.use_slim_head = use_slim_head
         self.opponent_AI = opponent_AI  # tensorflowを自己対戦の２AIで共有するための変数。TODO: 非合法手がまだ出るので修正は必要。ただしGPUメモリが節約できなかったので着手していない。
+        self.use_mix_precision = use_mix_precision
 
         if self.opponent_AI is None:
             self.init_tensorflow()
@@ -112,6 +114,24 @@ class CNNAI(BasicAI):
             # for i in range(6):
             #     print(position_arr[:, :, i])
 
+        # Headの分割
+        def split_heads(x, num_heads):
+            batch_size = tf.shape(x)[0]
+            length = tf.shape(x)[1]
+            depth = tf.shape(x)[2] // num_heads
+            x = tf.reshape(x, [batch_size, length, num_heads, depth])
+            return tf.transpose(x, [0, 2, 1, 3])  # [batch_size, num_heads, length, depth]
+
+        # 元の形に戻す
+        def combine_heads(x):
+            batch_size = tf.shape(x)[0]
+            num_heads = tf.shape(x)[1]
+            length = tf.shape(x)[2]
+            depth = tf.shape(x)[3]
+            x = tf.transpose(x, [0, 2, 1, 3])  # [batch_size, length, num_heads, depth]
+            x = tf.reshape(x, [batch_size, length, num_heads * depth])
+            return x
+
         old_h_conv = h_conv
 
         for i in range(1, self.layer_num):
@@ -141,21 +161,24 @@ class CNNAI(BasicAI):
                     position_num = h_shape1 * h_shape2
                     h_conv = tf.reshape(h_conv, [-1, position_num, self.filters])
 
-                    h_query = tf.reshape(tf.matmul(h_conv, self.WQs[i]), [-1, position_num, head_num, ATTENTION_VEC_LEN])
-                    h_key = tf.reshape(tf.matmul(h_conv, self.WKs[i]), [-1, position_num, head_num, ATTENTION_VEC_LEN])
-                    h_value = tf.reshape(tf.matmul(h_conv, self.WVs[i]), [-1, position_num, head_num, ATTENTION_VEC_LEN])
-                    
-                    # 得られるh_convのshape=[-1, head_num, 81, 81]
-                    h_conv = tf.nn.softmax(1 / math.sqrt(ATTENTION_VEC_LEN) * tf.matmul(tf.transpose(h_query, perm=[0, 2, 1, 3]), tf.transpose(h_key, perm=[0, 2, 3, 1])), axis=3)
+                    h_query = tf.matmul(h_conv, self.WQs[i])
+                    h_key = tf.matmul(h_conv, self.WKs[i])
+                    h_value = tf.matmul(h_conv, self.WVs[i])
 
-                    # 得られるh_convのshape=[-1, head_num, 81, ATTENTION_VEC_LEN]
-                    h_conv = tf.matmul(h_conv, tf.transpose(h_value, perm=[0, 2, 1, 3]))
+                    h_query = split_heads(h_query, head_num)
+                    h_key = split_heads(h_key, head_num)
+                    h_value = split_heads(h_value, head_num)
 
-                    h_conv = tf.transpose(h_conv, perm=[0, 2, 1, 3])
+                    # Attention Scoresの計算
+                    scores = tf.matmul(h_query, h_key, transpose_b=True)
+                    scores = scores / tf.sqrt(float(ATTENTION_VEC_LEN))
+                    attention_weights = tf.nn.softmax(scores, axis=-1)
+
+                    # Weighted sum of values
+                    h_conv = tf.matmul(attention_weights, h_value)  # [batch_size, num_heads, length, depth]
+
+                    h_conv = combine_heads(h_conv)
                     h_conv = tf.reshape(h_conv, [-1, h_shape1, h_shape2, self.filters])
-
-                # 連続するconvの中ではskip connectionしない
-                # if i % 3 == 0 or i % 3 == 2:
 
                 h_conv += old_h_conv
                 old_h_conv = h_conv
@@ -371,7 +394,12 @@ class CNNAI(BasicAI):
             self.loss += WEIGHT_DECAY * tf.nn.l2_loss(parameter)
         self.loss = self.warmup_coef * self.loss
 
-        self.train_step = tf.train.AdagradOptimizer(LEARNING_RATE).minimize(self.loss)  # 学習の関数で定義しようとするとエラー出る
+        if self.use_mix_precision:
+            self.train_step = tf.train.AdagradOptimizer(LEARNING_RATE)  # 学習の関数で定義しようとするとエラー出る
+            self.train_step = tf.train.experimental.enable_mixed_precision_graph_rewrite(self.train_step)
+            self.train_step = self.train_step.minimize(self.loss)
+        else:
+            self.train_step = tf.train.AdagradOptimizer(LEARNING_RATE).minimize(self.loss)
 
         init = tf.initialize_all_variables()
         config = tf.ConfigProto(
@@ -407,7 +435,7 @@ class CNNAI(BasicAI):
         if self.v_is_dist:
             y = np.zeros((len(states),))
             for i, s in enumerate(states):
-                B_dist, W_dist = s.get_player_dist_from_goal()
+                B_dist, W_dist = get_player_dist_from_goal(s)
                 y[i] = np.tanh((W_dist - B_dist) * 0.15)
         else:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
@@ -415,18 +443,12 @@ class CNNAI(BasicAI):
                 xflip = False
                 if random_flip and random.random() < 0.5:
                     xflip = True
-                feature[i, :] = s.feature_CNN(xflip=xflip)
+                feature[i, :] = feature_CNN(s, xflip=xflip)
             y = self.sess.run(self.y, feed_dict={self.x:feature})
 
         for i, s in enumerate(states):
             if s.pseudo_terminate:
                 y[i] = s.pseudo_reward
-            # _, y1 = s.color_p(0)
-            # _, y2 = s.color_p(1)
-            # if y1 == 0:
-            #     y[i] = 1.
-            # elif y2 == State.BOARD_LEN - 1:
-            #     y[i] = -1.
         if self.color == 0:
             return y
         else:
@@ -442,24 +464,24 @@ class CNNAI(BasicAI):
         mask = np.zeros((len(states), self.action_num))
         if self.p_is_almost_flat:
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
-                x, y = s.color_p(s.turn % 2)
-                mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
+                r, c = placable_flatten_array(s, s.turn % 2)
+                x, y = color_p(s, s.turn % 2)
+                mask[i, :] = np.concatenate([r, c, movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
-                        [r.flatten(), c.flatten(), s.movable_array(x, y, shortest_only=False).flatten()])
+                        [r, c, movable_array(s, x, y, shortest_only=False).flatten()])
             p = np.ones((len(states), self.action_num)) + np.random.rand(len(states), self.action_num) / 1000  # 1000は適当
             p = p / np.sum(p, axis=1).reshape((-1, 1))
         else:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
-                x, y = s.color_p(s.turn % 2)
-                mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
+                r, c = placable_flatten_array(s, s.turn % 2)
+                x, y = color_p(s, s.turn % 2)
+                mask[i, :] = np.concatenate([r, c, movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
-                        [r.flatten(), c.flatten(), s.movable_array(x, y, shortest_only=False).flatten()])
-                feature[i, :] = s.feature_CNN()
+                        [r, c, movable_array(s, x, y, shortest_only=False).flatten()])
+                feature[i, :] = feature_CNN(s)
                 #if s.terminate:
                 #    mask[i, :] = np.zeros((self.action_num,))
             p = self.sess.run(self.p_tf, feed_dict={self.x:feature})
@@ -470,8 +492,8 @@ class CNNAI(BasicAI):
 
         # 距離を縮める方向に事前確率を高める
         for i, s in enumerate(states):
-            x, y = s.color_p(s.turn % 2)
-            shortest_move = s.movable_array(x, y, shortest_only=True).flatten()
+            x, y = color_p(s, s.turn % 2)
+            shortest_move = movable_array(s, x, y, shortest_only=True).flatten()
             p_move = p[i, 128:]
             if np.sum(shortest_move) > 0:  # 相手がゴールにいるせいで距離を縮められない場合などにsumが0になる
                 p_assisted = (1 - SHORTEST_P_RATIO) * p_move + SHORTEST_P_RATIO * np.sum(p_move) * shortest_move / np.sum(shortest_move)
@@ -485,7 +507,7 @@ class CNNAI(BasicAI):
             print(mask)
             print(feature)
             for state in states:
-                state.display_cui()
+                display_cui(state)
             exit()
 
         return p
@@ -501,26 +523,26 @@ class CNNAI(BasicAI):
         if self.p_is_almost_flat:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
-                x, y = s.color_p(s.turn % 2)
-                mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
+                r, c = placable_flatten_array(s, s.turn % 2)
+                x, y = color_p(s, s.turn % 2)
+                mask[i, :] = np.concatenate([r, c, movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
-                        [r.flatten(), c.flatten(), s.movable_array(x, y, shortest_only=False).flatten()])
-                feature[i, :] = s.feature_CNN()
+                        [r, c, movable_array(s, x, y, shortest_only=False).flatten()])
+                feature[i, :] = feature_CNN(s)
             p = np.ones((len(states), self.action_num)) + np.random.rand(len(states), self.action_num) / 1000  # 1000は適当
             p = p / np.sum(p, axis=1).reshape((-1, 1))
             y_pred = self.sess.run(self.y, feed_dict={self.x:feature})
         else:
             feature = np.zeros((len(states), 9, 9, self.input_channels))
             for i, s, movable_arr in zip(range(len(states)), states, leaf_movable_arrs):
-                r, c = s.placable_array(s.turn % 2)
-                x, y = s.color_p(s.turn % 2)
-                mask[i, :] = np.concatenate([r.flatten(), c.flatten(), movable_arr])
+                r, c = placable_flatten_array(s, s.turn % 2)
+                x, y = color_p(s, s.turn % 2)
+                mask[i, :] = np.concatenate([r, c, movable_arr])
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
-                        [r.flatten(), c.flatten(), s.movable_array(x, y, shortest_only=False).flatten()])
-                feature[i, :] = s.feature_CNN()
+                        [r, c, movable_array(s, x, y, shortest_only=False).flatten()])
+                feature[i, :] = feature_CNN(s)
                 #if s.terminate:
                 #    mask[i, :] = np.zeros((self.action_num,))
             p, y_pred = self.sess.run([self.p_tf, self.y], feed_dict={self.x:feature})
@@ -538,8 +560,8 @@ class CNNAI(BasicAI):
 
         # 距離を縮める方向に事前確率を高める
         for i, s in enumerate(states):
-            x, y = s.color_p(s.turn % 2)
-            shortest_move = s.movable_array(x, y, shortest_only=True).flatten()
+            x, y = color_p(s, s.turn % 2)
+            shortest_move = movable_array(s, x, y, shortest_only=True).flatten()
             p_move = p[i, 128:]
             if np.sum(shortest_move) > 0:  # 相手がゴールにいるせいで距離を縮められない場合などにsumが0になる
                 p_assisted = (1 - SHORTEST_P_RATIO) * p_move + SHORTEST_P_RATIO * np.sum(p_move) * shortest_move / np.sum(shortest_move)
@@ -553,7 +575,7 @@ class CNNAI(BasicAI):
             print(mask)
             print(feature)
             for state in states:
-                state.display_cui()
+                display_cui(state)
             exit()
 
         return p, y_pred
@@ -705,7 +727,6 @@ class CNNAI(BasicAI):
 
             valid_size = len(x_arr_dict["feature"])
             valid_step_num = (valid_size - 1) // self.batch_size + 1
-            #print(valid_size, valid_step_num)
 
             for j in range(valid_step_num):
                 loss = self.sess.run(self.loss_without_regularizer, feed_dict={
@@ -714,10 +735,8 @@ class CNNAI(BasicAI):
                     self.y_:x_arr_dict["reward"][j * self.batch_size:(j + 1) * self.batch_size].reshape(-1, 1),
                     self.warmup_coef: 1.0, self.searched_node: x_arr_dict["searched_node_num"][j * self.batch_size:(j + 1) * self.batch_size]})
                 valid_ema = valid_ema * (1 - VALID_EMA_DECAY) + loss * VALID_EMA_DECAY
-                sys.stderr.write('\r\033[K' + str(step) + " "  + str(j * self.batch_size) + "/" + str(x_arr_dict["feature"].shape[0]) + " valid loss = {:.4f}".format(valid_ema) + f" warmup coef = {coef}")
-                sys.stderr.flush()
+                print('\r' + str(step) + " "  + str(j * self.batch_size) + "/" + str(x_arr_dict["feature"].shape[0]) + " valid loss = {:.4f}".format(valid_ema) + f" warmup coef = {coef}", end="")
             print()
-        #pprint(loss_dict)
         return loss_dict, valid_ema
 
     def save(self, path):
@@ -731,7 +750,8 @@ class CNNAI(BasicAI):
             "layer_num": self.layer_num, 
             "use_global_pooling": self.use_global_pooling,
             "use_self_attention": self.use_self_attention,
-            "use_slim_head": self.use_slim_head
+            "use_slim_head": self.use_slim_head,
+            "use_mix_precision": self.use_mix_precision
         }
         with open(os.path.join(dir, f"{name}.json"), "w") as fout:
             fout.write(json.dumps(params))
@@ -764,6 +784,11 @@ class CNNAI(BasicAI):
             self.use_slim_head = params["use_slim_head"]
         else:
             self.use_slim_head = False
+
+        if "use_mix_precision" in params.keys():
+            self.use_mix_precision = params["use_mix_precision"]
+        else:
+            self.use_mix_precision = False
 
         self.init_tensorflow()
         saver = tf.train.Saver()

@@ -1,7 +1,8 @@
 import os
 from Tree import OpeningTree
 from tqdm import tqdm
-from State import State
+from State import State, State_init, accept_action_str, feature_int
+from config import *
 
 def Glendenning2Official(s):
     """
@@ -51,7 +52,7 @@ os.makedirs(RECORDS_PATH, exist_ok=True)
 
 def get_opening_node_from_state(state, statevec2node):
     # 既に登録済みの場合はstate_vecを返す
-    state_vec = tuple(state.feature_int().flatten())  # MCTSのときと違いターン数を区別しない。
+    state_vec = tuple(feature_int(state).flatten())  # MCTSのときと違いターン数を区別しない。
     if state_vec in statevec2node.keys():
         ret = state_vec
     else:
@@ -73,8 +74,9 @@ def move_to_child(node, key, statevec2node):
 
 def get_state_from_action_list(action_list):
     state = State()
+    State_init(state)
     for a in action_list:
-        state.accept_action_str(a)
+        accept_action_str(state, a)
     return state
 
 
@@ -85,8 +87,8 @@ def get_normalized_state(action_list):
     state = get_state_from_action_list(action_list)
     mirror_state = get_state_from_action_list(mirror_action_list)
 
-    state_vec = tuple(state.feature_int().flatten())
-    mirror_state_vec = tuple(mirror_state.feature_int().flatten())
+    state_vec = tuple(feature_int(state).flatten())
+    mirror_state_vec = tuple(feature_int(mirror_state).flatten())
 
     if state_vec <= mirror_state_vec:
         return state, state_vec, False
@@ -96,7 +98,9 @@ def get_normalized_state(action_list):
 
 def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
     statevec2node = {}
-    opening_tree = get_opening_node_from_state(State(), statevec2node)
+    add_state = State()
+    State_init(add_state)
+    opening_tree = get_opening_node_from_state(add_state, statevec2node)
     opening_tree.visited_num = 0
     opening_tree.p1_win_num = 0
     opening_tree.p2_win_num = 0
@@ -106,7 +110,9 @@ def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
     # 定跡木の作成
     for action_list in tqdm(all_kifu_list):
         state = State()
+        State_init(state)
         mirror_state = State()
+        State_init(mirror_state)
 
         normalized_action_list, _ = get_normalized_action_list(action_list)
         mirror_action_list = list(map(mirror_action, action_list))
@@ -115,11 +121,11 @@ def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
         path = [node]
 
         for action_str, mirror_action_str, normalized_action_str, depth in zip(action_list, mirror_action_list, normalized_action_list, range(len(action_list))):
-            state.accept_action_str(action_str, check_placable=False, calc_placable_array=False, check_movable=False)
-            mirror_state.accept_action_str(mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
+            accept_action_str(state, action_str, check_placable=False, calc_placable_array=False, check_movable=False)
+            accept_action_str(mirror_state, mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
 
-            state_vec = tuple(state.feature_int().flatten())
-            mirror_state_vec = tuple(mirror_state.feature_int().flatten())
+            state_vec = tuple(feature_int(state).flatten())
+            mirror_state_vec = tuple(feature_int(mirror_state).flatten())
 
             if state_vec <= mirror_state_vec:
                 normalized_state = state
@@ -150,3 +156,17 @@ def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
                 node.p2_win_num += 1
                 
     return opening_tree, statevec2node
+
+
+def get_epoch_dir_name(epoch):
+    floor_epoch = (epoch // EPOCH_DIR_UNIT) * EPOCH_DIR_UNIT
+    return "{}_{}".format(floor_epoch, floor_epoch + EPOCH_DIR_UNIT)
+
+if __name__ == "__main__":
+    print(get_epoch_dir_name(0))
+    print(get_epoch_dir_name(1))
+    print(get_epoch_dir_name(999))
+    print(get_epoch_dir_name(1000))
+    print(get_epoch_dir_name(1001))
+
+

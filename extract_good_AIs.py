@@ -1,8 +1,10 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # warning抑制
 import tensorflow as tf
+# tf.disable_v2_behavior()
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-import os
 from config import *
 from calc_multi_rate import estimate_multi_rate
 from collections import Counter
@@ -10,14 +12,15 @@ import copy
 import pandas as pd
 from multiprocessing import Pool
 from tqdm import tqdm
+import argparse
+import logging
+from util import get_epoch_dir_name
+tf.get_logger().setLevel(logging.ERROR)
 
-SIGMA = 1.0
+SIGMA = 1.5
 RANDOM_EPSILON = 1e-5  # 同スコアのものにランダム性を加える目的
 EPSILON = 1e-10
-FIX_EPOCH_LIST = [60, 62, 71, 91, 96, 155, 220, 465, 620, 1050, 1284, 
-                  2020, 2520, 2780, 2910, 3090, 3350, 3360, 3400, 3460, 3545, 3560, 3700, 3850, 3985, 4175]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
-
-USE_PAST_RESULT = True
+FIX_EPOCH_LIST = [60]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
 
 # EVALUATE_GAME_NUM = 14000
 # SEARCHNODES_FOR_EXTRACT = 500
@@ -40,8 +43,8 @@ USE_PAST_RESULT = True
 # RATE_DIV = 0.5
 # ELIMINATE_STEP = 1500  # 何試合ごとにAI消去処理を実施するか
 
-# 240126AI選定の設定
-EVALUATE_GAME_NUM = 7000
+# 240603AI選定の設定
+EVALUATE_GAME_NUM = 10000
 SEARCHNODES_FOR_EXTRACT = 500
 START_CAND_NUM = 32
 START_DIFF_NUM = 16
@@ -94,22 +97,26 @@ def calc_match_score_arr(N_arr, r_arr):
 
 
 def evaluate_2game_process_2id(arg_tuple):
+    arg_i, arg_j, AI_id1, AI_id2, seed, search_nodes1, search_nodes2, wait_time = arg_tuple
+
+    import time
+    time.sleep(wait_time)
+    
     from main import evaluate
     from CNNAI import CNNAI
     # 先後で２試合して勝利数を返す
-    arg_i, arg_j, AI_id1, AI_id2, seed, search_nodes1, search_nodes2 = arg_tuple
-
+    
     if AI_id1 == -1:
         AI1 = CNNAI(0, search_nodes=search_nodes1, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
     else:
         AI1 = CNNAI(0, search_nodes=search_nodes1, seed=seed)
-        AI1.load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id1)))
+        AI1.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id1), "epoch{}.ckpt".format(AI_id1)))
 
     if AI_id2 == -1:
         AI2 = CNNAI(1, search_nodes=search_nodes2, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
     else:
         AI2 = CNNAI(1, search_nodes=search_nodes2, seed=seed)
-        AI2.load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id2)))
+        AI2.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id2), "epoch{}.ckpt".format(AI_id2)))
 
     AIs = [AI1, AI2]
     AIs[0].tau = EVALUATION_TAU
@@ -119,15 +126,28 @@ def evaluate_2game_process_2id(arg_tuple):
     del AIs
     return ret, arg_i, arg_j
 
+
+def list_all_files(directory):
+    file_list = []
+    for root, dirs, files in os.walk(directory):
+        file_list.extend(files)
+    return file_list
+
 if __name__ == "__main__":
     random.seed(0)
     np.random.seed(0)
 
-    param_files = os.listdir(PARAMETER_DIR)
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument('--use_past_result', action='store_true', help='Use past result if specified')
+    args = parser.parse_args()
+
+    use_past_result = args.use_past_result
+
+    param_files = list_all_files(PARAMETER_DIR)
     param_files = list(set([s.split(".")[0] for s in param_files]))
     param_files = [int(s[5:]) for s in param_files if s.startswith("epoch")]
     
-    if USE_PAST_RESULT:
+    if use_past_result:
         rate_df = pd.read_csv(os.path.join(TRAIN_LOG_DIR, "detail", "estimated_rate.csv"))
         past_AI_id_arr = rate_df["AI_id"].values
         past_search_nodes_arr = rate_df["search nodes"].values
@@ -173,9 +193,11 @@ if __name__ == "__main__":
         print(list(zip(AI_id_list, search_nodes_list)))
     else:
         AI_id_list = [-1] + list(sorted(param_files))
-        both_ends_num = 100  # AI_id_listの両端をいくつそのまま残すか
-        AI_id_list = AI_id_list[:both_ends_num] + [AI_id for AI_id in AI_id_list[both_ends_num:-both_ends_num] if AI_id % 5 == 0] + AI_id_list[-both_ends_num:]
-        search_nodes_list = [EVALUATION_SEARCHNODES] * len(AI_id_list)
+        # both_ends_num = 100  # AI_id_listの両端をいくつそのまま残すか
+        # AI_id_list = AI_id_list[:both_ends_num] + [AI_id for AI_id in AI_id_list[both_ends_num:-both_ends_num] if AI_id % 5 == 0] + AI_id_list[-both_ends_num:]
+        first_num = 50  # AI_id_listの最初をいくつそのまま残すか
+        AI_id_list = AI_id_list[:first_num] + [AI_id for AI_id in AI_id_list[first_num:] if AI_id % 5 == 0]
+        search_nodes_list = [SEARCHNODES_FOR_EXTRACT] * len(AI_id_list)
         print(AI_id_list)
 
     AI_num = len(AI_id_list)
@@ -226,8 +248,11 @@ if __name__ == "__main__":
 
     def apply_matches(matches, total_game_num):
         args = []
+        wait_time_list = [0] * len(matches)
+        for i in range(len(matches)):
+            wait_time_list[i] = i
         for k, (i, j) in enumerate(matches):
-            args.append((i, j, AI_id_list[i], AI_id_list[j], (k + total_game_num) * 10000, search_nodes_list[i], search_nodes_list[j]))
+            args.append((i, j, AI_id_list[i], AI_id_list[j], (k + total_game_num) * 10000, search_nodes_list[i], search_nodes_list[j], wait_time_list[k]))
 
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process_2id, iterable=args)

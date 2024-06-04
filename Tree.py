@@ -23,6 +23,7 @@ class Tree:
         self.dist_diff_arr = 82 * np.ones((action_n,), dtype=int)  # 負けノードについて、歩数差を記録。82は歩数差の上界（升目数+1）
         self.already_certain_path_confirmed = False  # 確定路判定を実行済みならTrue
         self.node_id = None  # graphviz向けの一時変数
+        self.state_vec = None
 
     def set_P(self, p):
         self.P = p

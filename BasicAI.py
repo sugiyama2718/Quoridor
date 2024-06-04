@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import select_action
+from State import State, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_flatten_array, calc_dist_array, display_cui, feature_int
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -13,16 +13,37 @@ import time
 from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
-import threading
-from concurrent.futures import ThreadPoolExecutor
 from config import *
 from util import Glendenning2Official, Official2Glendenning
+import ctypes
 
 num2str = {0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i"}
 
+if os.name == "nt":
+    lib = ctypes.CDLL('./State_util.dll')
+else:
+    lib = ctypes.CDLL('./State_util.so')
+
+select_action = lib.select_action
+select_action.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
+                              ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int)
+select_action.restype = ctypes.c_int
+
+copy_state_c = lib.copy_state
+copy_state_c.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
+copy_state_c.restype = None
+
+
 def get_state_vec(state):
     # stateを固定長タプルにしてdictのkeyにするために使う。state.turnを入れているのは、turnの異なる状態を区別して無限ループを避けるため
-    return tuple([state.turn] + list(state.feature_int().flatten()))
+    return tuple([state.turn] + list(feature_int(state).flatten()))
+
+
+def get_state_vec_from_tree(tree):
+    # state_vecをまだ計算していないときだけ計算して格納することで高速化
+    if tree.state_vec is None:
+        tree.state_vec = get_state_vec(tree.s)
+    return tree.state_vec
 
 
 def display_parameter(x):
@@ -99,7 +120,7 @@ def get_graphviz_tree_for_shared_tree(tree, g, threshold=5, root=True, color=Non
             if int(tree.N[key]) >= threshold:
                 g.edge(str(tree.node_id), str(node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
                 state = state_copy(tree.s)
-                state.accept_action_str(actionid2str(tree.s, key))
+                accept_action_str(state, actionid2str(tree.s, key))
                 if color == 0:
                     v = state.pseudo_reward
                 else:
@@ -142,7 +163,7 @@ def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
 
                     g.edge(str(parent_count), str(count), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
                     state = state_copy(tree.s)
-                    state.accept_action_str(actionid2str(tree.s, key))
+                    accept_action_str(state, actionid2str(tree.s, key))
                     if color == 0:
                         v = state.pseudo_reward
                     else:
@@ -152,59 +173,24 @@ def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
 
 
 def state_copy(s):
-    ret = State.State()
-    ret.seen = copy.copy(s.seen)
-    ret.row_wall = copy.copy(s.row_wall)
-    ret.column_wall = copy.copy(s.column_wall)
-    ret.row_wall_bit = copy.copy(s.row_wall_bit)
-    ret.column_wall_bit = copy.copy(s.column_wall_bit)
-    ret.must_be_checked_x = copy.copy(s.must_be_checked_x)
-    ret.must_be_checked_y = copy.copy(s.must_be_checked_y)
-    ret.placable_r_ = copy.copy(s.placable_r_)
-    ret.placable_c_ = copy.copy(s.placable_c_)
-    ret.placable_rb = copy.copy(s.placable_rb)
-    ret.placable_cb = copy.copy(s.placable_cb)
-    ret.placable_rw = copy.copy(s.placable_rw)
-    ret.placable_cw = copy.copy(s.placable_cw)
-    ret.Bx = s.Bx
-    ret.By = s.By
-    ret.Wx = s.Wx
-    ret.Wy = s.Wy
-    ret.turn = s.turn
-    ret.black_walls = s.black_walls
-    ret.white_walls = s.white_walls
-    ret.terminate = s.terminate
-    ret.reward = s.reward
-    ret.pseudo_terminate = s.pseudo_terminate
-    ret.pseudo_reward = s.pseudo_reward
-    ret.dist_array1 = np.copy(s.dist_array1)
-    ret.dist_array2 = np.copy(s.dist_array2)
-    ret.cross_movable_arr = np.copy(s.cross_movable_arr)
+    ret = State()
+    copy_state_c(ret, s)
     return ret
 
 def calc_optimal_move_by_DP(s):
-    s_ori = s
     s = state_copy(s)
-    start = time.time()
     boards = list(product(range(9), range(9), range(9), range(9), range(2)))  # 壁0なので、(Bx, By, Wx, Wy, 手番)で盤面が一意に定まる。のでそれで盤面を表現。
-    # print(boards[0])
-    # print(len(boards))
-    # print(s.dist_array1)
-    # print(s.dist_array2)
-    # unreachable1 = (s.dist_array1 == np.max(s.dist_array1))
-    # unreachable2 = (s.dist_array2 == np.max(s.dist_array2))
-    # print(unreachable1)
-    # print(unreachable2)
+
+    dist_array1 = calc_dist_array(s, 0)
+    dist_array2 = calc_dist_array(s, BOARD_LEN - 1)
 
     # 合法手のみに絞る
     def is_legal(board):
         Bx, By, Wx, Wy, _ = board
         if Bx == Wx and By == Wy:
             return False
-        # if unreachable1[Bx, By] or unreachable2[Wx, Wy]:
-        #     return False
-        Bd = s.dist_array1[Bx, By]
-        Wd = s.dist_array2[Wx, Wy]
+        Bd = dist_array1[Bx, By]
+        Wd = dist_array2[Wx, Wy]
         if Bd == 0 and Wd == 0:
             return False
 
@@ -217,26 +203,23 @@ def calc_optimal_move_by_DP(s):
                 x = Wx
                 y = Wy
                 s.turn = 1
-            movable_array = s.movable_array(x, y, shortest_only=False)
-            if not np.any(movable_array):
+            movable_arr = movable_array(s, x, y, shortest_only=False)
+            if not np.any(movable_arr):
                 return False
 
         return True
     boards = list(filter(is_legal, boards))
-    # print(len(boards))
-    # pprint(boards[:10])
 
     # ゴールからの距離を組にする
     boards_d = [(-1, -1, -1, -1, -1, -1, -1)] * len(boards)
     for i, board in enumerate(boards):
         Bx, By, Wx, Wy, is_black = board
-        Bd = s.dist_array1[Bx, By]
-        Wd = s.dist_array2[Wx, Wy]
+        Bd = dist_array1[Bx, By]
+        Wd = dist_array2[Wx, Wy]
         boards_d[i] = (Bx, By, Wx, Wy, is_black, Bd, Wd)
 
     # ゴールからの距離の和でソート
     boards_d = sorted(boards_d, key=lambda x: x[5] + x[6])
-    #pprint(boards_d[:250])
 
     optimal_dict = {}
     for Bx, By, Wx, Wy, is_black, Bd, Wd in boards_d:
@@ -258,15 +241,15 @@ def calc_optimal_move_by_DP(s):
         s.By = By
         s.Wx = Wx
         s.Wy = Wy
-        movable_array = s.movable_array(x, y, shortest_only=True)
-        if not np.any(movable_array):
-            movable_array = s.movable_array(x, y, shortest_only=False)
+        movable_arr = movable_array(s, x, y, shortest_only=True)
+        if not np.any(movable_arr):
+            movable_arr = movable_array(s, x, y, shortest_only=False)
 
         # 距離を縮める方向に動けているなら探索済みでoptimal_dictに要素が存在するはず
         cands = []
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
-                if not movable_array[dx, dy]:
+                if not movable_arr[dx, dy]:
                     continue
                 if is_black:
                     new_Bx = Bx + dx
@@ -276,7 +259,7 @@ def calc_optimal_move_by_DP(s):
                     if new_Bx == new_Wx and new_By == new_Wy:  # 相手のいる方向に進む場合、乗り越える
                         new_Bx = new_Bx + dx
                         new_By = new_By + dy
-                    new_d = s.dist_array1[new_Bx, new_By]
+                    new_d = dist_array1[new_Bx, new_By]
                 else:
                     new_Bx = Bx
                     new_By = By
@@ -285,16 +268,9 @@ def calc_optimal_move_by_DP(s):
                     if new_Bx == new_Wx and new_By == new_Wy:  # 相手のいる方向に進む場合、乗り越える
                         new_Wx = new_Wx + dx
                         new_Wy = new_Wy + dy
-                    new_d = s.dist_array2[new_Wx, new_Wy]
+                    new_d = dist_array2[new_Wx, new_Wy]
                 
-                #print(new_d, d)
                 if new_d < d and (new_Bx, new_By, new_Wx, new_Wy, not is_black) in optimal_dict.keys():
-                    # if new_By == 0 and new_Wy == 8:
-                    #     print(Bx, By, Wx, Wy, is_black, Bd, Wd)
-                    # if not (new_Bx, new_By, new_Wx, new_Wy, not is_black) in optimal_dict.keys():
-                    #     s.display_cui(check_algo=False)  # check_algo=Trueだと無限ループに入ってメモリ使い果たして壊れる！！
-                    #     print("DP failed")
-                    #     exit()
                     cands.append((new_Bx, new_By, new_Wx, new_Wy, not is_black, optimal_dict[(new_Bx, new_By, new_Wx, new_Wy, not is_black)][5], True))
                 else:
                     cands.append((new_Bx, new_By, new_Wx, new_Wy, not is_black, 0, False))  # 距離を縮められないのは有効でないとする
@@ -308,9 +284,6 @@ def calc_optimal_move_by_DP(s):
         else:
             cands = sorted(cands, key=lambda x: -x[5] - (not x[6]) * 100, reverse=True)  # Bd-Wd最小化
 
-        # if Bd + Wd <= 2:
-        #     print(cands)
-
         max_score = cands[0][5]
         for i, cand in enumerate(cands):
             if cand[5] < max_score:
@@ -318,33 +291,15 @@ def calc_optimal_move_by_DP(s):
                 break
             else:
                 max_score_index = i + 1
-        # if max_score_index != len(cands):
-        #     print(max_score_index, len(cands))
-
-        # if Bx == 7 and By == 4 and Wx == 5 and Wy == 4 and is_black:accept_action_str
-        #     print(cands)
-        #     print(max_score_index)
 
         optimal_dict[(Bx, By, Wx, Wy, is_black)] = cands[random.randrange(max_score_index)]  # 一番良い行動を記録
-
-    # 動作確認用
-    # s = s_ori
-    # Bx, By, Wx, Wy = s.Bx, s.By, s.Wx, s.Wy
-    # is_black = (s.turn % 2 == 0)
-    # print(Bx, By, Wx, Wy, is_black)
-    # for i in range(81):
-    #     Bx, By, Wx, Wy, is_black, d_diff, is_ok = optimal_dict[(Bx, By, Wx, Wy, is_black)]
-    #     print(Bx, By, Wx, Wy, is_black, d_diff, is_ok)
-    #     if Bx == -1:
-    #         break
-    # print(time.time() - start)
 
     return optimal_dict
 
 
 def calc_next_state(x):
     state, action = x
-    state.accept_action_str(actionid2str(state, action), check_placable=False)
+    accept_action_str(state, actionid2str(state, action), check_placable=False)
     return state
 
 
@@ -373,7 +328,8 @@ class BasicAI(Agent):
     def init_prev(self, state=None):
         # 試合前に毎回実行
         if state is None:
-            state = State.State()
+            state = State()
+            State_init(state)
         # p = np.ones((137,)) / 137.
         # p = np.asarray(p, dtype=np.float32)
         self.prev_tree = None
@@ -390,9 +346,9 @@ class BasicAI(Agent):
         #         del v
         self.state2node_per_turn = {}  # turn -> (state.vec -> node)
 
-    def get_state_vec_and_is_state_searched(self, state):
-        turn = state.turn
-        state_vec = get_state_vec(state)
+    def get_state_vec_and_is_state_searched(self, tree):
+        turn = tree.s.turn
+        state_vec = get_state_vec_from_tree(tree)
 
         if turn not in self.state2node_per_turn.keys():
             return state_vec, False
@@ -413,7 +369,7 @@ class BasicAI(Agent):
         # 探索済みマスをTrueにする配列、0にB, 1にWを割当て
         self.discovery_arr = np.zeros((2, 9, 9), dtype=bool)
         for color in range(2):
-            x, y = state.color_p(color)
+            x, y = color_p(state, color)
             self.discovery_arr[color, x, y] = True
 
     def act(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
@@ -435,22 +391,22 @@ class BasicAI(Agent):
     def action_array(self, s):
         if s.terminate:
             return np.zeros((2 * (State.BOARD_LEN - 1) * (State.BOARD_LEN - 1) + 9,), dtype="bool")
-        r, c = s.placable_array(s.turn % 2)
-        x, y = s.color_p(s.turn % 2)
-        v = np.concatenate([r.flatten(), c.flatten(), s.movable_array(x, y).flatten()])
+        r, c = placable_flatten_array(s, s.turn % 2)
+        x, y = color_p(s, s.turn % 2)
+        v = np.concatenate([r, c, movable_array(s, x, y).flatten()])
         return np.asarray(v, dtype="bool")
 
     def movable_array(self, x, y, s):
         if self.shortest_only:
-            return s.movable_array(x, y, shortest_only=True).flatten()
+            return movable_array(s, x, y, shortest_only=True).flatten()
 
         # 壁が両方0なら最短路以外の手はない。教師の質向上を目的とする
         if s.black_walls == 0 and s.white_walls == 0:
-            return s.movable_array(x, y, shortest_only=True).flatten()
+            return movable_array(s, x, y, shortest_only=True).flatten()
 
-        ret = s.movable_array(x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
+        ret = movable_array(s, x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
 
-        all_movable_arr = s.movable_array(x, y, shortest_only=False)
+        all_movable_arr = movable_array(s, x, y, shortest_only=False)
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
                 x2 = x + dx
@@ -481,7 +437,8 @@ class BasicAI(Agent):
 
             # 負けノードは探索しない
             #a = select_action(t.Q, t.N, t.P, C_puct, self.use_estimated_V, self.estimated_V, self.color, t.s.turn, self.use_average_Q)
-            a = select_action(t.Q, t.N, t.P_without_loss, C_puct, self.use_estimated_V, self.estimated_V, self.color, t.s.turn, self.use_average_Q)
+            a = select_action(t.Q.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), t.N.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                              C_puct, self.estimated_V, self.color, t.s.turn)
 
             nodes.append(t)
             actions.append(a)
@@ -497,24 +454,25 @@ class BasicAI(Agent):
         state = state_copy(root_state)
         for i, action in enumerate(actions):
             try:
-                state.accept_action_str(actionid2str(state, action), check_placable=False, calc_placable_array=False, check_movable=False)
+                # checkしないため、内部的には非合法手扱いされることがありFalseになることがある。ただし、actionsが合法手からなるので問題なし。
+                accept_action_str(state, actionid2str(state, action), check_placable=False, calc_placable_array=False, check_movable=False)
             except:
                 print("{} error action={}".format(i, action))
                 print(actions)
-                root_state.display_cui()
-                state.display_cui()
+                display_cui(root_state)
+                display_cui(state)
                 print("!"*30)
             if action < 128:
                 leaf_discovery_arr = np.zeros((2, 9, 9), dtype=bool)
             leaf_discovery_arr[0, state.Bx, state.By] = True
             leaf_discovery_arr[1, state.Wx, state.Wy] = True
 
-        x, y = state.color_p(state.turn % 2)
-        ret = state.movable_array(x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
+        x, y = color_p(state, state.turn % 2)
+        ret = movable_array(state, x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
         if self.shortest_only or (state.black_walls == 0 and state.white_walls == 0):
             return ret.flatten()
 
-        all_movable_arr = state.movable_array(x, y, shortest_only=False)
+        all_movable_arr = movable_array(state, x, y, shortest_only=False)
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
                 x2 = x + dx
@@ -530,13 +488,6 @@ class BasicAI(Agent):
         return ret
 
     def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False, use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
-        # 壁がお互いになく、分岐のない場合読みを入れない。ただし、それでもprev_treeとかの関係上振る舞いが変わるので保留中。
-        #search_node_num = max_node
-        #if state.black_walls == 0 and state.white_walls == 0:
-        #    x, y = state.color_p(state.turn % 2)
-        #    if int(np.sum(state.movable_array(x, y, shortest_only=True))) == 1:
-        #        search_node_num = 1
-
         if self.random_playouts:
             max_node = SELFPLAY_SEARCHNODES_MIN
             if random.random() < DEEP_SEARCH_P:
@@ -549,17 +500,15 @@ class BasicAI(Agent):
 
         wall_num = state.black_walls + state.white_walls
 
-        B_dist = state.dist_array1[state.Bx, state.By]
-        W_dist = state.dist_array2[state.Wx, state.Wy]
-        #print(B_dist, W_dist)
+        B_dist, W_dist = get_player_dist_from_goal(state)
 
         # 自分の道が確定していて相手よりも早く着くなら最短路を進むだけ
-        if state.is_certain_path_terminate():
+        if is_certain_path_terminate(state):
             self.tree_for_visualize = self.prev_tree = None  # 読みが入らなくなるので、prev_treeが参照されないようにNoneを入れておく
-            x, y = state.color_p(state.turn % 2)
-            movable_arr = state.movable_array(x, y, shortest_only=True)
+            x, y = color_p(state, state.turn % 2)
+            movable_arr = movable_array(state, x, y, shortest_only=True)
             if not np.any(movable_arr):
-                movable_arr = state.movable_array(x, y, shortest_only=False)
+                movable_arr = movable_array(state, x, y, shortest_only=False)
             cands = []
             for dx in [-1, 0, 1]:
                 for dy in [-1, 0, 1]:
@@ -611,10 +560,10 @@ class BasicAI(Agent):
         if wall_num != self.prev_wall_num:
             self.init_discovery(state)
         for color in range(2):
-            x, y = state.color_p(color)
+            x, y = color_p(state, color)
             self.discovery_arr[color, x, y] = True
 
-        x, y = state.color_p(state.turn % 2)
+        x, y = color_p(state, state.turn % 2)
         p = self.p(state, leaf_movable_arrs=[self.movable_array(x, y, state)])
         illegal = (p == 0.)
         p = (1. - noise) * p + noise * np.random.dirichlet([0.3] * len(p))  # ディリクレ分布はチェスと同じ設定
@@ -625,7 +574,7 @@ class BasicAI(Agent):
         visited = set([])
 
         def negate_tree(tree, count=0):
-            state_vec = get_state_vec(tree.s)
+            state_vec = get_state_vec_from_tree(tree)
             if state_vec in visited:
                 return tree
             
@@ -640,6 +589,7 @@ class BasicAI(Agent):
             ret.P_without_loss = tree.P_without_loss
             ret.dist_diff_arr = tree.dist_diff_arr
             ret.already_certain_path_confirmed = tree.already_certain_path_confirmed
+            ret.state_vec = tree.state_vec
 
             # if tree.P is None:
             #     ret = Tree(state_copy(tree.s), tree.P)
@@ -754,7 +704,7 @@ class BasicAI(Agent):
                 leaf_movable_arrs.append(self.calc_leaf_movable_arr(state, actions))
                 s = state_copy(nodes[-1].s)
                 #print([self.actionid2str(node.s, action) for node, action in zip(nodes, actions)])
-                s.accept_action_str(actionid2str(s, actions[-1]), check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
+                accept_action_str(s, actionid2str(s, actions[-1]), check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
                 states.append(s)
             node_num += len(states)
 
@@ -769,24 +719,26 @@ class BasicAI(Agent):
             # expand
             for count, s, nodes, actions in zip(range(len(states)), states, nodess, actionss):
                 if not s.pseudo_terminate:
+                    # sはtでaを実行したときのstate
                     t = nodes[-1]
                     a = actions[-1]
-                    state_vec, is_searched = self.get_state_vec_and_is_state_searched(s)
-
-                    if a in t.children.keys():
+                    if a in t.children.keys():  # 過去に探索済み
                         continue
+
+                    new_tree = Tree(s, None)
+                    state_vec, is_searched = self.get_state_vec_and_is_state_searched(new_tree)
                     if is_searched:  # 過去に探索していた状態と一致したとき  
                         t.children[a] = self.state2node_per_turn[s.turn][state_vec]
                         # t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
                         # t.children[a].V = np.array(v_arr[count], dtype=np.float32)
                         if s.turn != t.children[a].s.turn or t.s.turn + 1 != t.children[a].s.turn:
-                            t.s.display_cui()
-                            s.display_cui()
+                            display_cui(t.s)
+                            display_cui(s)
                             t.children[a].s
                             assert False, "!" * 100
 
                     else:  # 初めて探索されたとき
-                        t.children[a] = Tree(s, None)
+                        t.children[a] = new_tree
                         t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
                         t.children[a].V = np.array(v_arr[count], dtype=np.float32)
                         self.add_state2node_per_turn_item(s.turn, state_vec, t.children[a])
@@ -810,10 +762,6 @@ class BasicAI(Agent):
                 if not s.pseudo_terminate:
                     continue
 
-                # print("~"*50)
-                # print(s.pseudo_reward)
-                # s.display_cui()
-
                 # 葉ノード側からたどる
                 for node, action in zip(nodes[::-1], actions[::-1]):
                     # 過去の探索で既に勝敗が決まっているときは飛ばす(optimal_actionなどが書き換えられないよう)
@@ -825,8 +773,7 @@ class BasicAI(Agent):
                     lose_reward = -1 if node.s.turn % 2 == 0 else 1
 
                     if action not in node.children.keys():  # 葉ノードを子に持つ
-                        s_B_dist = s.dist_array1[s.Bx, s.By]
-                        s_W_dist = s.dist_array2[s.Wx, s.Wy]
+                        s_B_dist, s_W_dist = get_player_dist_from_goal(s)
                         node.dist_diff_arr[action] = max(s_W_dist - s_B_dist + (1 - s.turn % 2), s_B_dist - s_W_dist + s.turn % 2)
                     elif  node.children[action].result != 0:  # 勝敗が決定した子ノードを持つ
                         node.dist_diff_arr[action] = int(np.min(node.children[action].dist_diff_arr))
@@ -839,8 +786,8 @@ class BasicAI(Agent):
                             
                             if node_illegal[action]:
                                 print("!"*100)
-                                state.display_cui()
-                                node.s.display_cui()
+                                display_cui(state)
+                                display_cui(node.s)
                                 print(node.P)
                                 print(node_illegal)
                                 print(actionid2str(node.s, action))
@@ -850,27 +797,17 @@ class BasicAI(Agent):
                     else:  # 負け側はすべての行動が相手の勝ちになるときに限り負けノード
                         if action not in node.children.keys() or node.children[action].result == lose_reward:
                             node.set_is_lose_child_arr(action, True)
-                            #node.is_lose_child_arr[action] = True
 
                             if not node.already_certain_path_confirmed: # 壁置きで負けになる場合、一度確定路判定をする。移動の場合も判定するとだいぶ遅くなるので壁おきに制限。
                                 node.already_certain_path_confirmed = True
-                                if node.s.is_certain_path_terminate((node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
+                                if is_certain_path_terminate(node.s, (node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
                                     node.set_is_lose_child_arr_True(np.arange(128))
-                                    # print("!!!certain path !!!")
-                                    # print(actions)
-                                    # print(node.P)
-                                    # print(node.P_without_loss)
                             node_illegal = (node.P == 0.)
                             if np.all(node_illegal | node.is_lose_child_arr):
-                                # print("~"*50)
-                                # node.s.display_cui()
-                                # print(node.dist_diff_arr)
                                 node.result = s.pseudo_reward
                                 node.optimal_action = int(np.argmin(node.dist_diff_arr))
                             else:
                                 break
-
-                    # print(node.s.turn, is_win_node, node.result)
                 
             # root_treeの勝敗が決まったら探索を打ち切る
             if root_tree.result != 0:
@@ -891,8 +828,8 @@ class BasicAI(Agent):
             pi = np.zeros((137))
             pi[action] = 1.0
         else:
-            x, y = state.color_p(state.turn % 2)
-            shortest_move = state.movable_array(x, y, shortest_only=True).flatten()
+            x, y = color_p(state, state.turn % 2)
+            shortest_move = movable_array(state, x, y, shortest_only=True).flatten()
             move_N = root_tree.N[128:]
             move_Q = root_tree.Q[128:]
             use_shortest = (move_N >= int(np.sum(root_tree.N) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる

@@ -1,10 +1,8 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import actionid2str
-from State import State, CHANNEL
-from State import DRAW_TURN
+from State import State, CHANNEL, State_init, eq_state, accept_action_str, BOARD_LEN, get_player_dist_from_goal, calc_dist_array, display_cui, feature_CNN, get_row_wall, get_column_wall
 from Human import Human
-from LinearAI import LinearAI
 from CNNAI import CNNAI
 from BasicAI import state_copy
 import time
@@ -28,18 +26,18 @@ from collections import OrderedDict
 from analyze_h5 import analyze_h5_main
 import shutil
 import random
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制？
+from util import get_epoch_dir_name
 
 # agentsは初期化されてるとする
 def normal_play(agents, initial_state=None):
     if initial_state is None:
         state = State()
+        State_init(state)
     else:
         state = initial_state
         
     while True:
-        state.display_cui()
+        display_cui(state)
         start = time.time()
         s = agents[0].act(state, showNQ=True)
         end = time.time()
@@ -47,7 +45,7 @@ def normal_play(agents, initial_state=None):
             a = actionid2str(state, s)
         else:
             a = s
-        while not state.accept_action_str(a):
+        while not accept_action_str(state, a):
             print(a)
             print("this action is impossible")
             s = agents[0].act(state, showNQ=True)
@@ -64,13 +62,13 @@ def normal_play(agents, initial_state=None):
             break
         #time.sleep(0.1)
 
-        state.display_cui()
+        display_cui(state)
         s = agents[1].act(state, showNQ=True)
         if isinstance(s, int):
             a = actionid2str(state, s)
         else:
             a = s
-        while not state.accept_action_str(a):
+        while not accept_action_str(state, a):
             print(a)
             print("this action is impossible")
             s = agents[1].act(state, showNQ=True)
@@ -87,7 +85,7 @@ def normal_play(agents, initial_state=None):
         if state.terminate:
             break
 
-    state.display_cui()
+    display_cui(state)
     print("The game finished. reward=({}, {})".format(state.reward, -state.reward))
     return state.reward
 
@@ -97,11 +95,12 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
     hash_ = 0
     for j in range(play_num):
         state = State()
+        State_init(state)
         AIs[0].init_prev()
         AIs[1].init_prev()
         featuress = [[], [], [], []]
         for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
-            featuress[i].append(state.feature_CNN(b1, b2))
+            featuress[i].append(feature_CNN(state, b1, b2))
 
         pis = []
         states = [state_copy(state)]
@@ -121,10 +120,10 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
                 AIs[1].tau = TAU_MIN
             s, pi, v_prev, v_post, searched_node_num = AIs[0].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[1].prev_tree)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
-                state.display_cui()
+                display_cui(state)
                 exit()
             AIs[1].prev_action = s
 
@@ -140,11 +139,10 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
             if display:
                 print("generate id=", id_)
-                state.display_cui()
-            state.check_placable_array_algo()
+                display_cui(state)
             end = False
             for state2 in states:
-                if equal_draw and state == state2:
+                if equal_draw and eq_state(state, state2):
                     end = True
                     break
             if end:
@@ -153,13 +151,13 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             if state.terminate:
                 break
             for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
-                featuress[i].append(state.feature_CNN(b1, b2))
+                featuress[i].append(feature_CNN(state, b1, b2))
             s, pi, v_prev, v_post, searched_node_num = AIs[1].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[0].prev_tree)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 print(a)
-                state.display_cui()
+                display_cui(state)
                 exit()
             AIs[0].prev_action = s
 
@@ -175,11 +173,10 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
             if display:
                 print("generate id=", id_)
-                state.display_cui()
-            state.check_placable_array_algo()
+                display_cui(state)
             end = False
             for state2 in states:
-                if equal_draw and state == state2:
+                if equal_draw and eq_state(state, state2):
                     end = True
                     break
             if end:
@@ -188,7 +185,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             if state.terminate:
                 break
             for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
-                featuress[i].append(state.feature_CNN(b1, b2))
+                featuress[i].append(feature_CNN(state, b1, b2))
         del states
 
         hash_ += state.turn
@@ -196,12 +193,14 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             continue
 
         # stateは終端状態になっている
-        B_dist = state.dist_array1[state.Bx, state.By]
-        W_dist = state.dist_array2[state.Wx, state.Wy]
+        B_dist, W_dist = get_player_dist_from_goal(state)
         dist_diff = W_dist - B_dist  # 何マス差で勝ったか。勝ちで正になるよう、W-Bにしている
         all_turn_num = state.turn
         move_count[0] += B_dist
         move_count[1] += W_dist
+
+        dist_array1 = calc_dist_array(state, 0)
+        dist_array2 = calc_dist_array(state, BOARD_LEN - 1)
 
         def calc_traversed_arr_list(xy_list):
             traversed_arr = np.zeros((9, 9))
@@ -250,27 +249,29 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
             c = mvarray2.flatten()
             return np.concatenate([a, b, c])
 
+        row_wall = get_row_wall(state)
+        column_wall = get_column_wall(state)
         for turn, feature1, feature2, feature3, feature4, pi, v_prev, v_post, searched_node_num, mid_move_count, B_traversed_arr, W_traversed_arr, next_pi in zip(
             range(all_turn_num), featuress[0], featuress[1], featuress[2], featuress[3], 
             pis, v_prevs, v_posts, searched_node_nums, move_count_list, B_traversed_arr_list, W_traversed_arr_list, next_pis):
 
             data.append((feature1, pi, state.reward, v_prev, v_post, searched_node_num, 
                          dist_diff, state.black_walls, state.white_walls, all_turn_num - turn, move_count[0] - mid_move_count[0], move_count[1] - mid_move_count[1],
-                         state.row_wall, state.column_wall, state.dist_array1, state.dist_array2, B_traversed_arr, W_traversed_arr, next_pi))
+                         row_wall, column_wall, dist_array1, dist_array2, B_traversed_arr, W_traversed_arr, next_pi))
 
             data.append((feature2, pi_flip1(pi), state.reward, v_prev, v_post, searched_node_num, 
                          dist_diff, state.black_walls, state.white_walls, all_turn_num - turn, move_count[0] - mid_move_count[0], move_count[1] - mid_move_count[1],
-                         np.flip(state.row_wall, 0), np.flip(state.column_wall, 0), np.flip(state.dist_array1, 0), np.flip(state.dist_array2, 0), np.flip(B_traversed_arr, 0), np.flip(W_traversed_arr, 0),
+                         np.flip(row_wall, 0), np.flip(column_wall, 0), np.flip(dist_array1, 0), np.flip(dist_array2, 0), np.flip(B_traversed_arr, 0), np.flip(W_traversed_arr, 0),
                          pi_flip1(next_pi)))
 
             data.append((feature3, pi_flip2(pi), -state.reward, -v_prev, -v_post, searched_node_num, 
                          -dist_diff, state.white_walls, state.black_walls, all_turn_num - turn, move_count[1] - mid_move_count[1], move_count[0] - mid_move_count[0],
-                         np.flip(state.row_wall, 1), np.flip(state.column_wall, 1), np.flip(state.dist_array2, 1), np.flip(state.dist_array1, 1), np.flip(W_traversed_arr, 1), np.flip(B_traversed_arr, 1),
+                         np.flip(row_wall, 1), np.flip(column_wall, 1), np.flip(dist_array2, 1), np.flip(dist_array1, 1), np.flip(W_traversed_arr, 1), np.flip(B_traversed_arr, 1),
                          pi_flip2(next_pi)))
 
             data.append((feature4, pi_flip3(pi), -state.reward, -v_prev, -v_post, searched_node_num, 
                          -dist_diff, state.white_walls, state.black_walls, all_turn_num - turn, move_count[1] - mid_move_count[1], move_count[0] - mid_move_count[0],
-                         np.flip(np.flip(state.row_wall, 1), 0), np.flip(np.flip(state.column_wall, 1), 0), np.flip(np.flip(state.dist_array2, 1), 0), np.flip(np.flip(state.dist_array1, 1), 0), np.flip(np.flip(W_traversed_arr, 1), 0), np.flip(np.flip(B_traversed_arr, 1), 0),
+                         np.flip(np.flip(row_wall, 1), 0), np.flip(np.flip(column_wall, 1), 0), np.flip(np.flip(dist_array2, 1), 0), np.flip(np.flip(dist_array1, 1), 0), np.flip(np.flip(W_traversed_arr, 1), 0), np.flip(np.flip(B_traversed_arr, 1), 0),
                          pi_flip3(next_pi)))
     if info:
         print("hash = {}".format(hash_))
@@ -288,16 +289,17 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         game_start_time = time.time()
         is_endgame = False
         state = State()
+        State_init(state)
         AIs[0].init_prev()
         AIs[1].init_prev()
         AIs[i % 2].color = 0
         AIs[1 - i % 2].color = 1
         while True:
             if display:
-                state.display_cui()
+                display_cui(state)
             s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
                 a = actionid2str(state, s)
@@ -312,11 +314,11 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
                 break
 
             if display:
-                state.display_cui()
+                display_cui(state)
 
             s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
             a = actionid2str(state, s)
-            while not state.accept_action_str(a):
+            while not accept_action_str(state, a):
                 print("this action is impossible")
                 s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
                 a = actionid2str(state, s)
@@ -353,21 +355,6 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         return wins, draw_num
     else:
         return wins
-
-
-def debug_learn(AIs):
-    AIs[1].learn(H5_NUM - 1, H5_NUM, LEARN_REP_NUM, TRAIN_ARRAY_SIZE)
-    # ----------evaluation--------
-    AIs[0].tau = TAU_MIN
-    AIs[1].tau = TAU_MIN
-    AIs[0].search_nodes = search_nodes
-    AIs[1].search_nodes = search_nodes
-
-    play_num = 100
-    white_win_num = evaluate(AIs, play_num)
-    win_rate = (play_num - white_win_num) / play_num
-    print("new AI win rate={}".format(win_rate))
-    AIs[1].save(os.path.join(PARAMETER_DIR, "debug.ckpt"))
 
 
 def train_from_random_parameter_process(x):
@@ -433,7 +420,7 @@ def train_without_selfplay_process(x):
 
 
 def measure_inference_time(x):
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # CPUで実行時間計測ならコメントを外す
+    #os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # CPUで実行時間計測ならコメントを外す
 
     filters = 32
     layer_num = 9
@@ -443,15 +430,15 @@ def measure_inference_time(x):
     AI = CNNAI(0)
     #AI.load("data_for_experiment/221204/train_results/parameter/epoch30.ckpt")
 
-    h5file = h5py.File("data_for_experiment/2090/209000.h5", "r")
+    h5file = h5py.File("data_for_experiment/60/6000.h5", "r")
     size = h5file["feature"].shape[0]
     feature_arr = h5file["feature"][:, :, :, :]
 
     s = time.time()
-    INFERENCE_NUM = 100 # MCTS中でpvの計算にかかる時間の測定という想定。大きくしすぎてinput_arrのindexを飛び出さないよう注意
+    INFERENCE_NUM = 1000 # MCTS中でpvの計算にかかる時間の測定という想定。大きくしすぎてinput_arrのindexを飛び出さないよう注意
     total = 0
     for i in tqdm(range(INFERENCE_NUM)):
-        input_arr = feature_arr[i * AI.n_parallel: (i + 1) * AI.n_parallel]
+        input_arr = feature_arr[(i % 50) * AI.n_parallel: ((i % 50) + 1) * AI.n_parallel]
         #input_arr = np.random.rand(*input_arr.shape)
         #p = AI.sess.run(AI.p_tf, feed_dict={AI.x:input_arr})
         p, y_pred = AI.sess.run([AI.p_tf, AI.y], feed_dict={AI.x:input_arr})
@@ -468,6 +455,8 @@ def train_without_selfplay():
     with Pool(processes=1) as p:
         p.map(func=measure_inference_time, iterable=[0])
 
+    exit()
+
     print("="*30)
     with Pool(processes=1) as p:
         p.map(func=train_from_random_parameter_process, iterable=[0])
@@ -481,7 +470,7 @@ def train_without_selfplay():
 
 def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-    seed = h5_id * 10000
+    seed = h5_id * 10000 % (2**30)
     random.seed(seed)
     is_random_AI = (AI_id == 0)
     #print(h5_id, display, AI_id, search_nodes, is_random_AI)
@@ -492,10 +481,10 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
         # AIs = [CNNAI(0, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000),
         #        CNNAI(1, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000)]
     else:
-        AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True),
-               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000, random_playouts=True)]
-        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
-        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
+        AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True),
+               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True)]
+        AIs[0].load(os.path.join(PARAMETER_DIR, "post.ckpt"))
+        AIs[1].load(os.path.join(PARAMETER_DIR, "post.ckpt"))
 
     b_win = 0
     w_win = 0
@@ -563,7 +552,8 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
 
 
 def generate_h5_single(pair):
-    h5_id_, display, AI_id, search_nodes, epoch = pair
+    h5_id_, display, AI_id, search_nodes, epoch, wait_time = pair
+    time.sleep(wait_time)
     return generate_h5(h5_id_, display, AI_id, search_nodes, epoch)
 
 
@@ -577,10 +567,8 @@ def train_AIs_process(arg):
 
     if epoch <= long_warmup_epoch_num:
         pass
-        #AI.save(os.path.join(PARAMETER_DIR, "epoch0.ckpt"))
     else:
         AI.load(os.path.join(PARAMETER_DIR, "post.ckpt"))
-
 
     if epoch <= long_warmup_epoch_num:
         learn_rep_num = LEARN_REP_NUM * 10  # warmup用
@@ -589,8 +577,9 @@ def train_AIs_process(arg):
         learn_rep_num = LEARN_REP_NUM
         ret = AI.learn(epoch, learn_rep_num, loss_dict, valid_loss)
     
-    if save_epoch:
-        AI.save(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(epoch)))
+    if save_epoch and (epoch % SAVE_CYCLE == 0 or epoch <= POOL_EPOCH_NUM + SAVE_FIRST_EPOCH_NUM):
+        os.makedirs(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch)), exist_ok=True)
+        AI.save(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
     AI.save(os.path.join(PARAMETER_DIR, "post.ckpt"))
 
     del AI
@@ -605,12 +594,14 @@ def evaluate_2game_process(arg_tuple):
         AI1 = CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
     else:
         AI1 = CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, seed=seed)
-        AI1.load(os.path.join(PARAMETER_DIR, "epoch{}.ckpt".format(AI_id)))
+        AI1.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id), "epoch{}.ckpt".format(AI_id)))
 
     AIs = [AI1, CNNAI(1, search_nodes=EVALUATION_SEARCHNODES, seed=seed)]
     AIs[0].tau = EVALUATION_TAU
     AIs[1].tau = EVALUATION_TAU
 
+    if AI_load_name.startswith("epoch"):
+        AI_load_name = os.path.join(get_epoch_dir_name(AI_id), AI_load_name)  # epoch500~などの場合だけ、0_1000/epoch500~にアクセスする必要がある
     AIs[1].load(os.path.join(PARAMETER_DIR, AI_load_name.format(AI_id)))
 
     ret = evaluate(AIs, 2, multiprocess=True)
@@ -626,8 +617,8 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
         # for x in tqdm([(old_AI_id, search_nodes, j * 10000, AI_load_name) for j in range(play_num_half)]):
         #     evaluate_2game_process(x)
         with Pool(processes=PROCESS_NUM) as p:
-            imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000, AI_load_name) for j in range(play_num_half)])
-            ret = list(tqdm(imap, total=play_num_half))
+            imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name) for j in range(play_num_half)])
+            ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
         new_ai_win_num = play_num - sum(ret)
         win_num_list.append(new_ai_win_num)
         print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.3f}".format(old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num))
@@ -745,13 +736,11 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
         h5_exist_set = set([int(s.split(".")[0]) for s in files])
         h5_list = list(h5_set - h5_exist_set)
         h5_list = sorted(h5_list)
-
-        # for x in [(h5_id_, h5_id_ % PROCESS_NUM == 0, load_AI_id, search_nodes, epoch) for h5_id_ in h5_list]:
-        #     generate_h5_single(x)
+        wait_time_list = [(x - min(h5_list)) * 3 if x - min(h5_list) < PROCESS_NUM else 0 for x in h5_list]
 
         with Pool(processes=PROCESS_NUM) as p:
-            imap = p.imap(func=generate_h5_single, iterable=[(h5_id_, h5_id_ % PROCESS_NUM == 0, load_AI_id, search_nodes, epoch) for h5_id_ in h5_list])
-            win_tuple_list = list(tqdm(imap, total=len(h5_list)))
+            imap = p.imap(func=generate_h5_single, iterable=[(h5_id_, h5_id_ % PROCESS_NUM == 0, load_AI_id, search_nodes, epoch, wait_time) for h5_id_, wait_time in zip(h5_list, wait_time_list)])
+            win_tuple_list = list(tqdm(imap, total=len(h5_list), file=sys.stdout))
         
         print("")
         #print(win_tuple_list)
@@ -874,9 +863,8 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
 
 
 if __name__ == '__main__':
-    os.makedirs(DATA_DIR, exist_ok=True)
-    os.makedirs(PARAMETER_DIR, exist_ok=True)
-    os.makedirs(TRAIN_LOG_DIR, exist_ok=True)
+    for dir in [DATA_DIR, TRAIN_LOG_DIR, PARAMETER_DIR, KIFU_DIR, JOSEKI_DIR]:
+        os.makedirs(dir, exist_ok=True)
 
     np.seterr(divide='raise', invalid='raise')
     search_nodes = SELFPLAY_SEARCHNODES_MIN
@@ -890,16 +878,13 @@ if __name__ == '__main__':
     elif sys.argv[1] == "train_without_selfplay":
         # 既にあるselfplayデータを使って過学習などについて解析をする
         train_without_selfplay()
-    elif sys.argv[1] == "debug_learn":
-        # １つ目のAIを距離だけで考えるものとして、そこからどれだけ学習の結果強くなれるかを検証する
-        debug_learn([CNNAI(0, search_nodes=search_nodes, v_is_dist=True, p_is_almost_flat=True), CNNAI(1, search_nodes=search_nodes, v_is_dist=True)])
     elif sys.argv[1] == "view":
         AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.25, seed=100)]
         #AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=100, is_mimic_AI=True)]
         # AIs[0].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
         # AIs[1].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
-        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch3090.ckpt"))
-        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch3090.ckpt"))
+        AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(3090), "epoch3090.ckpt"))
+        AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(3090), "epoch3090.ckpt"))
 
         # AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, all_parameter_zero=True, v_is_dist=True, p_is_almost_flat=True), 
         #        CNNAI(1, search_nodes=search_nodes, tau=0.25, all_parameter_zero=True, v_is_dist=True, p_is_almost_flat=True)]
@@ -936,16 +921,16 @@ if __name__ == '__main__':
             # 先後で２試合して勝利数を返す
             AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=seed), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=seed, use_average_Q=True)]
             #AIs[0].load(os.path.join("backup/221219/train_results/parameter/", "epoch680.ckpt"))
-            AIs[0].load(os.path.join(PARAMETER_DIR, "epoch120.ckpt"))
-            AIs[1].load(os.path.join(PARAMETER_DIR, "epoch120.ckpt"))
+            AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(120), "epoch120.ckpt"))
+            AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(120), "epoch120.ckpt"))
             ret = evaluate(AIs, 2, multiprocess=True, display=True)
             del AIs
             return ret
         play_num = 4
         play_num_half = play_num // 2
         with Pool(processes=1) as p:
-            imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 for j in range(play_num_half)])
-            ret = list(tqdm(imap, total=play_num_half))
+            imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
+            ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
         print(sum(ret), play_num - sum(ret))
         
     elif sys.argv[1] == "multiprocess_test":
@@ -955,7 +940,7 @@ if __name__ == '__main__':
         def generate_data_single(seed):
             AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, tau=0.5),
                 CNNAI(1, search_nodes=search_nodes, seed=seed, tau=0.5)]
-            path = os.path.join(PARAMETER_DIR, "epoch290.ckpt")
+            path = os.path.join(PARAMETER_DIR, get_epoch_dir_name(290), "epoch290.ckpt")
             AIs[0].load(path)
             AIs[1].load(path)
             temp_data = generate_data(AIs, game_num, noise=NOISE)
@@ -964,7 +949,7 @@ if __name__ == '__main__':
         start = time.time()
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=generate_data_single, iterable=range(task_num))
-            turn_list = list(tqdm(imap, total=task_num))
+            turn_list = list(tqdm(imap, total=task_num, file=sys.stdout))
         print(turn_list)
         print(sum(turn_list))
         print("elapsed time = {:.3f}s".format(time.time() - start))
@@ -977,32 +962,15 @@ if __name__ == '__main__':
 
     elif sys.argv[1] == "measure":
         np.random.seed(0)
-        game_num = 2
+        game_num = 10
         seed = 0
-        # master_AI = CNNAI(0, search_nodes=search_nodes, seed=seed, random_playouts=True)
-        # slave_AI = CNNAI(1, search_nodes=search_nodes, seed=seed, random_playouts=True, opponent_AI=master_AI)
-        # AIs = [master_AI, slave_AI]
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, random_playouts=True), CNNAI(1, search_nodes=search_nodes, seed=seed, random_playouts=True)]
-        # path = "data_for_experiment/221219/train_results/parameter"
-        # epoch = 350
-        # path = "backup/221228/train_results/parameter"
-        # epoch = 2700
         path = PARAMETER_DIR
-        #path = "backup/23"
-        # epoch = 120
-        # AIs[0].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
-        # AIs[1].load(os.path.join(path, "epoch{}.ckpt".format(epoch)))
-        # AIs[0].load(os.path.join(path, "post.ckpt"))
-        # AIs[1].load(os.path.join(path, "post.ckpt"))
-        AIs[0].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
-        AIs[1].load(os.path.join(PARAMETER_DIR, "epoch4175.ckpt"))
+        AIs[0].load(os.path.join(path, get_epoch_dir_name(240), "epoch240.ckpt"))
+        AIs[1].load(os.path.join(path, get_epoch_dir_name(240), "epoch240.ckpt"))
 
         start_time = time.time()
         temp_data = generate_data(AIs, game_num, noise=NOISE, display=True, info=True)
-        # with open("measure.log", "a") as f:
-        #     f.write("{},{},{}".format(datetime.datetime.today(),
-        #                               #check_output(["git", "show", '--format="%H"', "-s"]).rstrip(),
-        #                               time.time() - start_time, game_num) + os.linesep)
         print()
         print("{:.2f}s".format(time.time() - start_time))
 
@@ -1015,10 +983,10 @@ if __name__ == '__main__':
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, tau=0.32),
                CNNAI(1, search_nodes=search_nodes, seed=seed, tau=0.32)]
         path = PARAMETER_DIR
-        epoch = 3985
+        epoch = 240
 
-        AIs[0].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
-        AIs[1].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
+        AIs[0].load(os.path.join("application_data/parameter", get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
+        AIs[1].load(os.path.join("application_data/parameter", get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
 
         start_time = time.time()
         temp_data = evaluate(AIs, game_num, display=True)

@@ -1,9 +1,10 @@
-from State import State
+from State import State, State_init, State, set_state_by_wall, display_cui
 import numpy as np
 import os
 from config import *
 import pandas as pd
 import time
+import ctypes
 
 TEST_DIR = "testcases/mirror_match"  # 勝敗を
 
@@ -13,6 +14,14 @@ dirs = sorted(dirs, key=int)
 
 start_time = time.time()
 
+if os.name == "nt":
+    lib = ctypes.CDLL('./State_util.dll')
+else:
+    lib = ctypes.CDLL('./State_util.so')
+is_mirror_match = lib.is_mirror_match
+is_mirror_match.argtypes = [ctypes.POINTER(State)]
+is_mirror_match.restype = ctypes.c_bool
+
 results = []
 for dir in dirs:
     path = os.path.join(TEST_DIR, dir)
@@ -20,24 +29,23 @@ for dir in dirs:
     pos_arr = np.loadtxt(os.path.join(path, f"{turn}_pos.txt"))
     row_wall = np.loadtxt(os.path.join(path, f"{turn}_r.txt"), dtype=bool)
     column_wall = np.loadtxt(os.path.join(path, f"{turn}_c.txt"), dtype=bool)
-    p1_walls, p2_walls = np.loadtxt(os.path.join(path, f"{turn}_w.txt"))
+    p1_walls, p2_walls = np.loadtxt(os.path.join(path, f"{turn}_w.txt"), dtype=int)
 
     state = State()
+    State_init(state)
     state.turn = turn
     state.Bx = int(pos_arr[0])
     state.By = int(pos_arr[1])
     state.Wx = int(pos_arr[2])
     state.Wy = int(pos_arr[3])
-    state.row_wall = row_wall
-    state.column_wall = column_wall
     state.black_walls = p1_walls
     state.white_walls = p2_walls
-    state.set_state_by_wall()
+    set_state_by_wall(state, row_wall, column_wall)
 
-    state.display_cui()
-    print(state.is_mirror_match())
+    display_cui(state)
+    print(is_mirror_match(state))
     
-    results.append(state.is_mirror_match())
+    results.append(is_mirror_match(state))
 
 answer_df = pd.read_csv(os.path.join(TEST_DIR, "answer.csv"))
 print(answer_df)

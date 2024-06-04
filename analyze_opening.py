@@ -29,8 +29,8 @@ if __name__ == "__main__":
     target_openings = [x[1] for x in target_opening_data]
 
     # メモリ使用量に注意。240225時点で、20エポック分で1GBほど消費。
-    target_epoch = 4110
-    epoch_num_for_analyze = 810
+    target_epoch = 4200
+    epoch_num_for_analyze = 900
     each_epoch_num_for_analyze = 10
 
     max_depth = 15  # これより深い定跡は作らない（メモリ節約のため）
