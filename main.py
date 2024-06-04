@@ -483,8 +483,8 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
     else:
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True),
                CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True)]
-        AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id), "epoch{}.ckpt".format(AI_id)))
-        AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id), "epoch{}.ckpt".format(AI_id)))
+        AIs[0].load(os.path.join(PARAMETER_DIR, "post.ckpt"))
+        AIs[1].load(os.path.join(PARAMETER_DIR, "post.ckpt"))
 
     b_win = 0
     w_win = 0

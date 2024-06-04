@@ -255,8 +255,8 @@ def save_all_kifu(arr_per_game_list_dict, each_data_dir, div_i):
     for features in features_list:
         kifu = get_kifu_from_features(features)
         save_str += ",".join(kifu) + os.linesep
-    os.makedirs(os.path.join(KIFU_DIR, get_epoch_dir_name(each_data_dir)), exist_ok=True)
-    save_dir = os.path.join(KIFU_DIR, get_epoch_dir_name(each_data_dir), str(each_data_dir))
+    os.makedirs(os.path.join(KIFU_DIR, get_epoch_dir_name(int(each_data_dir))), exist_ok=True)
+    save_dir = os.path.join(KIFU_DIR, get_epoch_dir_name(int(each_data_dir)), str(each_data_dir))
     os.makedirs(save_dir, exist_ok=True)
     with open(os.path.join(save_dir, f"{div_i}.txt"), "w") as fout:
         fout.write(save_str)
