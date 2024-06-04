@@ -317,26 +317,18 @@ def feature_int(state):
 
 
 class ArraysForFeatureCNN():
-    def __init__(self, cross_arr, row_wall, column_wall, placable_r, placable_c):
+    def __init__(self, cross_arr, row_wall, column_wall):
         self.cross_arr = cross_arr
         self.row_wall = row_wall
         self.column_wall = column_wall
-        self.placable_r = placable_r
-        self.placable_c = placable_c
 
 
 def feature_CNN_from_array(state, arrs, xflip=False, yflip=False):
     cross_arr = arrs.cross_arr
     row_wall = arrs.row_wall
     column_wall = arrs.column_wall
-    placable_r = arrs.placable_r
-    placable_c = arrs.placable_c
 
     feature = np.zeros((9, 9, CHANNEL))
-
-    cross_arr = np.zeros((9, 9, 4))
-    for i in range(4):
-        cross_arr[:, :, i] = get_numpy_arr(state.cross_bitarrs, BOARD_LEN, i * 2)
         
     Bx = state.Bx
     By = state.By
@@ -345,8 +337,6 @@ def feature_CNN_from_array(state, arrs, xflip=False, yflip=False):
     black_walls = state.black_walls
     white_walls = state.white_walls
     turn = state.turn
-    row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
-    column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
     dist1, dist2 = get_player_dist_from_goal(state)
     placable_r = get_numpy_arr(state.placable_r_bitarr, BOARD_LEN - 1)
     placable_c = get_numpy_arr(state.placable_c_bitarr, BOARD_LEN - 1)
@@ -411,9 +401,7 @@ def get_arrays_for_feature_CNN(state):
         
     row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
     column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
-    placable_r = get_numpy_arr(state.placable_r_bitarr, BOARD_LEN - 1)
-    placable_c = get_numpy_arr(state.placable_c_bitarr, BOARD_LEN - 1)
-    return ArraysForFeatureCNN(cross_arr, row_wall, column_wall, placable_r, placable_c)
+    return ArraysForFeatureCNN(cross_arr, row_wall, column_wall)
 
 
 def feature_CNN(state, xflip=False, yflip=False):   

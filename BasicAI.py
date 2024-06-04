@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_flatten_array, calc_dist_array, display_cui, feature_int
+from State import State, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_flatten_array, calc_dist_array, display_cui, feature_int, get_arrays_for_feature_CNN
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -590,6 +590,7 @@ class BasicAI(Agent):
             ret.dist_diff_arr = tree.dist_diff_arr
             ret.already_certain_path_confirmed = tree.already_certain_path_confirmed
             ret.state_vec = tree.state_vec
+            ret.arrays_for_feature_CNN = tree.arrays_for_feature_CNN
 
             # if tree.P is None:
             #     ret = Tree(state_copy(tree.s), tree.P)
@@ -716,8 +717,6 @@ class BasicAI(Agent):
             node_num += len(states)
 
             p_arr, v_arr = self.pv_array(states, arrss_for_feature_CNN, leaf_movable_arrs)
-            for nodes, arrs_for_feature_CNN in zip(nodess, arrss_for_feature_CNN):
-                nodes[-1].arrays_for_feature_CNN = arrs_for_feature_CNN
 
             # for nodes2, actions2 in zip(nodess, actionss):
             #     pass
@@ -725,7 +724,7 @@ class BasicAI(Agent):
             # print("")
 
             # expand
-            for count, s, nodes, actions in zip(range(len(states)), states, nodess, actionss):
+            for count, s, nodes, actions, arrs_for_feature_CNN in zip(range(len(states)), states, nodess, actionss, arrss_for_feature_CNN):
                 if not s.pseudo_terminate:
                     # sはtでaを実行したときのstate
                     t = nodes[-1]
@@ -750,6 +749,7 @@ class BasicAI(Agent):
                         t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
                         t.children[a].V = np.array(v_arr[count], dtype=np.float32)
                         self.add_state2node_per_turn_item(s.turn, state_vec, t.children[a])
+                        t.children[a].arrays_for_feature_CNN = arrs_for_feature_CNN
 
             # backup
             count = 0
