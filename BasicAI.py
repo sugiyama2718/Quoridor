@@ -700,19 +700,27 @@ class BasicAI(Agent):
 
             states = []
             leaf_movable_arrs = []
+            arrss_for_feature_CNN = []
             for nodes, actions in zip(nodess, actionss):
                 leaf_movable_arrs.append(self.calc_leaf_movable_arr(state, actions))
                 s = state_copy(nodes[-1].s)
                 #print([self.actionid2str(node.s, action) for node, action in zip(nodes, actions)])
-                accept_action_str(s, actionid2str(s, actions[-1]), check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
+                actionstr = actionid2str(s, actions[-1])
+                accept_action_str(s, actionstr, check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
                 states.append(s)
+                
+                if len(actionstr) == 2:  # 移動なら、行動前の状態の配列を再利用する（NoneはNoneのまま格納）
+                    arrss_for_feature_CNN.append(nodes[-1].arrays_for_feature_CNN)
+                else:
+                    arrss_for_feature_CNN.append(None)
             node_num += len(states)
 
-            p_arr, v_arr = self.pv_array(states, leaf_movable_arrs)
+            p_arr, v_arr = self.pv_array(states, arrss_for_feature_CNN, leaf_movable_arrs)
+            for nodes, arrs_for_feature_CNN in zip(nodess, arrss_for_feature_CNN):
+                nodes[-1].arrays_for_feature_CNN = arrs_for_feature_CNN
 
-            # if showNQ and (state.turn == 42 or state.turn == 43):
-            for nodes2, actions2 in zip(nodess, actionss):
-                pass
+            # for nodes2, actions2 in zip(nodess, actionss):
+            #     pass
             #     print([Glendenning2Official(actionid2str(node.s, action)) for node, action in zip(nodes2, actions2)])
             # print("")
 

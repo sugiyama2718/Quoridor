@@ -5,7 +5,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # warning抑制
 import time
 from BasicAI import BasicAI
 import State
-from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal, placable_flatten_array, display_cui, feature_CNN
+from State import CHANNEL, color_p, movable_array, get_player_dist_from_goal, placable_flatten_array, display_cui, feature_CNN, feature_CNN_from_array, get_arrays_for_feature_CNN
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -512,7 +512,8 @@ class CNNAI(BasicAI):
 
         return p
     
-    def pv_array(self, states, leaf_movable_arrs=None):
+    def pv_array(self, states, arrss_for_feature_CNN, leaf_movable_arrs=None):
+        # arrss_for_feature_CNNは、各stateの特徴量計算のために必要な配列群のリストで、Noneがある場合リストに値を格納する
         if self.v_is_dist:
             assert False, "not implemented"
 
@@ -542,7 +543,9 @@ class CNNAI(BasicAI):
                 if not np.any(mask[i, :]):  # 相手がゴールにいるせいで距離を縮められない場合などに起こる
                     mask[i, :] = np.concatenate(
                         [r, c, movable_array(s, x, y, shortest_only=False).flatten()])
-                feature[i, :] = feature_CNN(s)
+                if arrss_for_feature_CNN[i] is None:
+                    arrss_for_feature_CNN[i] = get_arrays_for_feature_CNN(s)
+                feature[i, :] = feature_CNN_from_array(s, arrss_for_feature_CNN[i])
                 #if s.terminate:
                 #    mask[i, :] = np.zeros((self.action_num,))
             p, y_pred = self.sess.run([self.p_tf, self.y], feed_dict={self.x:feature})

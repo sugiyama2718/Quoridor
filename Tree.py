@@ -25,6 +25,7 @@ class Tree:
         self.already_certain_path_confirmed = False  # 確定路判定を実行済みならTrue
         self.node_id = None  # graphviz向けの一時変数
         self.state_vec = None
+        self.arrays_for_feature_CNN = None
 
     def set_P(self, p):
         self.P = p
