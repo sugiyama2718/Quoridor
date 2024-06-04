@@ -404,7 +404,7 @@ def feature_CNN_from_array(state, arrs, xflip=False, yflip=False):
     return feature
 
 
-def feature_CNN(state, xflip=False, yflip=False):
+def get_arrays_for_feature_CNN(state):
     cross_arr = np.zeros((9, 9, 4))
     for i in range(4):
         cross_arr[:, :, i] = get_numpy_arr(state.cross_bitarrs, BOARD_LEN, i * 2)
@@ -413,9 +413,11 @@ def feature_CNN(state, xflip=False, yflip=False):
     column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
     placable_r = get_numpy_arr(state.placable_r_bitarr, BOARD_LEN - 1)
     placable_c = get_numpy_arr(state.placable_c_bitarr, BOARD_LEN - 1)
-    arrs = ArraysForFeatureCNN(cross_arr, row_wall, column_wall, placable_r, placable_c)
-    
-    return feature_CNN_from_array(state, arrs, xflip, yflip)
+    return ArraysForFeatureCNN(cross_arr, row_wall, column_wall, placable_r, placable_c)
+
+
+def feature_CNN(state, xflip=False, yflip=False):   
+    return feature_CNN_from_array(state, get_arrays_for_feature_CNN(state), xflip, yflip)
 
 
 def get_row_wall(state):
