@@ -6,6 +6,7 @@ import copy
 class Tree:
     # p is prior probability
     # p, vにはNoneが来ても良い。その場合必要なときに代入するべきことを表す。
+    # negate_treeで変数をコピーし忘れないように！
     def __init__(self, s, p=None, v=None, result=0, optimal_action=None):
         #action_n = p.shape[0]
         action_n = 137

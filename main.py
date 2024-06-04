@@ -985,8 +985,8 @@ if __name__ == '__main__':
         path = PARAMETER_DIR
         epoch = 240
 
-        AIs[0].load(os.path.join("application_data/parameter", get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
-        AIs[1].load(os.path.join("application_data/parameter", get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
+        AIs[0].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
+        AIs[1].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
 
         start_time = time.time()
         temp_data = evaluate(AIs, game_num, display=True)
