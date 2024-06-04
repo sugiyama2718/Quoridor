@@ -126,6 +126,13 @@ def evaluate_2game_process_2id(arg_tuple):
     del AIs
     return ret, arg_i, arg_j
 
+
+def list_all_files(directory):
+    file_list = []
+    for root, dirs, files in os.walk(directory):
+        file_list.extend(files)
+    return file_list
+
 if __name__ == "__main__":
     random.seed(0)
     np.random.seed(0)
@@ -136,7 +143,7 @@ if __name__ == "__main__":
 
     use_past_result = args.use_past_result
 
-    param_files = os.listdir(PARAMETER_DIR)
+    param_files = list_all_files(PARAMETER_DIR)
     param_files = list(set([s.split(".")[0] for s in param_files]))
     param_files = [int(s[5:]) for s in param_files if s.startswith("epoch")]
     
