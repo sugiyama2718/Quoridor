@@ -148,14 +148,28 @@ def color_p(state, color):
     return ret.x, ret.y
 
 
-def movable_array(state, x, y, shortest_only=False):
+def movable_array(state, int x, int y, shortest_only=False):
     cdef np.ndarray[DTYPE_t, ndim = 2] mv
+    cdef int dx, dy
     mv_c = (ctypes.c_bool * 9)(*([False] * 9))
     movable_array_c(state, mv_c, x, y, shortest_only)
     mv = np.zeros((3, 3), dtype=DTYPE)
     for dx in [-1, 0, 1]:
         for dy in [-1, 0, 1]:
             mv[dx, dy] = mv_c[(dx + 1) + (dy + 1) * 3]
+
+    return mv
+
+
+def movable_array_flatten(state, int x, int y, shortest_only=False):
+    cdef np.ndarray[DTYPE_t, ndim = 1] mv
+    cdef int dx, dy
+    mv_c = (ctypes.c_bool * 9)(*([False] * 9))
+    movable_array_c(state, mv_c, x, y, shortest_only)
+    mv = np.zeros((9), dtype=DTYPE)
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            mv[(dx % 3) * 3 + (dy % 3)] = mv_c[(dx + 1) + (dy + 1) * 3]
 
     return mv
 

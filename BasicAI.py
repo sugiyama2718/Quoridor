@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree
 import State
-from State import State, State_init, color_p, movable_array, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_flatten_array, calc_dist_array, display_cui, feature_int, get_arrays_for_feature_CNN
+from State import State, State_init, color_p, movable_array, movable_array_flatten, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_flatten_array, calc_dist_array, display_cui, feature_int, get_arrays_for_feature_CNN
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -393,16 +393,16 @@ class BasicAI(Agent):
             return np.zeros((2 * (State.BOARD_LEN - 1) * (State.BOARD_LEN - 1) + 9,), dtype="bool")
         r, c = placable_flatten_array(s, s.turn % 2)
         x, y = color_p(s, s.turn % 2)
-        v = np.concatenate([r, c, movable_array(s, x, y).flatten()])
+        v = np.concatenate([r, c, movable_array_flatten(s, x, y)])
         return np.asarray(v, dtype="bool")
 
     def movable_array(self, x, y, s):
         if self.shortest_only:
-            return movable_array(s, x, y, shortest_only=True).flatten()
+            return movable_array_flatten(s, x, y, shortest_only=True)
 
         # 壁が両方0なら最短路以外の手はない。教師の質向上を目的とする
         if s.black_walls == 0 and s.white_walls == 0:
-            return movable_array(s, x, y, shortest_only=True).flatten()
+            return movable_array_flatten(s, x, y, shortest_only=True)
 
         ret = movable_array(s, x, y, shortest_only=True)  # 距離を縮める方向には必ず動けるとする
 
@@ -837,7 +837,7 @@ class BasicAI(Agent):
             pi[action] = 1.0
         else:
             x, y = color_p(state, state.turn % 2)
-            shortest_move = movable_array(state, x, y, shortest_only=True).flatten()
+            shortest_move = movable_array_flatten(state, x, y, shortest_only=True)
             move_N = root_tree.N[128:]
             move_Q = root_tree.Q[128:]
             use_shortest = (move_N >= int(np.sum(root_tree.N) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる
