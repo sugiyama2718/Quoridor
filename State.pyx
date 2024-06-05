@@ -429,9 +429,8 @@ def get_column_wall(state):
 
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
-    cdef np.ndarray[DTYPE_t, ndim = 2] ret
+    cdef DTYPE_t[:, :] ret = np.zeros((len_, len_), dtype=DTYPE)
     cdef int x, y
-    ret = np.zeros((len_, len_), dtype=DTYPE)
     bool_p = uint128ToBoolArray(bitarr[1 + offset], bitarr[0 + offset])
     for x in range(len_):
         for y in range(len_):
