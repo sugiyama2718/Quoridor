@@ -36,6 +36,12 @@ eq_state = lib.eq_state
 eq_state.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
 eq_state.restype = ctypes.c_bool
 
+test_search_util = lib.test_search_util
+test_search_util.argtypes = []
+test_search_util.restype = None
+
+test_search_util()
+
 results = []
 for i in test_case_list:
     state = State()
