@@ -57,20 +57,4 @@ python setup.py build_ext --inplace
 
 ## Compile C++ program
 
-windows:
-
-```sh
-g++ -c -fPIC State_util.cpp -o State_util.o
-g++ -c -fPIC Search_util.cpp -o Search_util.o
-g++ -shared -o State_util.dll State_util.o Search_util.o
-```
-
-linux:
-
-```sh
-g++ -c -fPIC State_util.cpp -o State_util.o
-g++ -c -fPIC Search_util.cpp -o Search_util.o
-g++ -shared -o State_util.so State_util.o Search_util.o
-```
-
-
+Please install make and run ```make```.
