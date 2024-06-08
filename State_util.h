@@ -1,5 +1,8 @@
 #include <cinttypes>
 
+#ifndef STATE_UTIL_H
+#define STATE_UTIL_H
+
 extern "C" {
 
 // State中の__uint128_tの変数はすべてbitarray
@@ -59,8 +62,6 @@ const __uint128_t BOX_10 = ((__uint128_t)0xFFD00A0140280500ULL << 64) | 0xA01402
 
 const __uint128_t CENTER_21_BOX = ((__uint128_t)0xC000000ULL << 64) | 0x0000000000000000ULL;  // (3, 3), (4, 3)の2マス
 
-__uint128_t public_cross_bitarrs[4];
-
 void State_init(State* state);
 bool eq_state(State* state1, State* state2);
 Point_int color_p(State* state, int color);
@@ -116,3 +117,5 @@ void calc_dist_array_inner(uint8_t* dist_arr_p, int goal_y, __uint128_t cross_bi
 BitArrayPair calc_placable_array_(State* state);
 
 }
+
+#endif

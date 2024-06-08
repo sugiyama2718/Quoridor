@@ -6,6 +6,8 @@
 #include "State_util.h"
 //#include <iostream>  //Could not find moduleが出る
 
+__uint128_t public_cross_bitarrs[4];
+
 void State_init(State* state) {
     state->row_wall_bitarr = state->column_wall_bitarr = 0;
     state->Bx = 4;
