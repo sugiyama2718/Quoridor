@@ -10,8 +10,13 @@ CXXFLAGS = -fPIC -Wall -Wextra
 LDFLAGS = -shared
 
 # ターゲット共有ライブラリ
-# TARGET =  State_util.so  # Linux
-TARGET =  State_util.dll  # Windows
+# OS判別とTARGETの設定
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+    TARGET = State_util.so
+else 
+    TARGET = State_util.dll
+endif
 
 # ソースファイル
 SRCS = State_util.cpp Search_util.cpp
