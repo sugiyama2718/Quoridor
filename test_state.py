@@ -40,8 +40,6 @@ test_search_util = lib.test_search_util
 test_search_util.argtypes = []
 test_search_util.restype = None
 
-test_search_util()
-
 results = []
 for i in test_case_list:
     state = State()
@@ -102,3 +100,5 @@ for i in test_case_list:
             print(dist_8_pred)
             assert False
     sys.stdout.flush()
+
+test_search_util()
