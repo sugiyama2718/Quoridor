@@ -19,16 +19,13 @@ class Tree_c(ctypes.Structure):
     pass
 
 # Tree構造体のフィールドの定義
-Tree_c._fields_ = [("N", ctypes.c_int * 137),
-                 ("children", ctypes.POINTER(Tree_c) * 137)]
+Tree_c._fields_ = [("N_arr", ctypes.c_int * 137),
+                   ("W_arr", ctypes.c_float * 137),
+                   ("Q_arr", ctypes.c_float * 137),
+                   ("children", ctypes.POINTER(Tree_c) * 137)]
 
 create_tree = lib.createTree
 create_tree.restype = ctypes.POINTER(Tree_c)
-set_tree_value = lib.setTreeValue
-set_tree_value.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int]
-get_tree_value = lib.getTreeValue
-get_tree_value.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int]
-get_tree_value.restype = ctypes.c_int
 add_child = lib.addChild
 add_child.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.POINTER(Tree_c)]
 delete_tree = lib.deleteTree
@@ -125,21 +122,13 @@ for i in test_case_list:
 test_search_util()
 root = create_tree()  # pointerが返る
 #root = root_p[0]
-root.contents.N[3] = 2
-print(list(root.contents.N))
-
-# 値の設定と取得
-set_tree_value(root, 0, 42)
-value = get_tree_value(root, 0)
-print("Root node value at index 0:", value)
+root.contents.N_arr[3] = 2
+root.contents.N_arr[130] = 6
+print(list(root.contents.N_arr))
+print(list(root.contents.N_arr[128:]))
 
 # 子ノードの作成と追加
 child = create_tree()
-set_tree_value(child, 1, 84)
 add_child(root, 0, child)
-
-# 子ノードの値を取得
-child_value = get_tree_value(root.contents.children[0], 1)
-print("Child node value at index 1:", child_value)
 
 delete_tree(root)

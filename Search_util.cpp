@@ -21,7 +21,9 @@ Tree* createTree() {
     }
     // 値を初期化
     for (int i = 0; i < 137; i++) {
-        newTree->N[i] = 0;
+        newTree->N_arr[i] = 0;
+        newTree->W_arr[i] = 0.0f;
+        newTree->Q_arr[i] = 0.0f;
         newTree->children[i] = NULL;
     }
     return newTree;
@@ -46,24 +48,6 @@ void addChild(Tree* parent, int index, Tree* child) {
         return;
     }
     parent->children[index] = child;
-}
-
-// Treeの値を設定する関数
-void setTreeValue(Tree* tree, int index, int value) {
-    if (index < 0 || index >= 137) {
-        fprintf(stderr, "Index out of bounds\n");
-        return;
-    }
-    tree->N[index] = value;
-}
-
-// Treeの値を取得する関数
-int getTreeValue(Tree* tree, int index) {
-    if (index < 0 || index >= 137) {
-        fprintf(stderr, "Index out of bounds\n");
-        return -1; // エラー値
-    }
-    return tree->N[index];
 }
 
 }

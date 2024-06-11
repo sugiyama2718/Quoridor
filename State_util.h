@@ -119,15 +119,15 @@ BitArrayPair calc_placable_array_(State* state);
 // ------Search_util.cpp------
 
 typedef struct Tree {
-    int N[137];           // 固定長整数配列
+    int N_arr[137];
+    float W_arr[137];
+    float Q_arr[137];
     struct Tree* children[137]; // 子ノードへのポインタ配列
 } Tree;
 
 Tree* createTree();
 void deleteTree(Tree* tree);
 void addChild(Tree* parent, int index, Tree* child);
-void setTreeValue(Tree* tree, int index, int value);
-int getTreeValue(Tree* tree, int index);
 
 }
 
