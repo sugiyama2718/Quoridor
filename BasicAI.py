@@ -592,10 +592,6 @@ class BasicAI(Agent):
             ret.state_vec = tree.state_vec
             ret.arrays_for_feature_CNN = tree.arrays_for_feature_CNN
 
-            # if tree.P is None:
-            #     ret = Tree(state_copy(tree.s), tree.P)
-            # else:
-            #     ret = Tree(state_copy(tree.s), np.copy(tree.P))
             ret.N = np.copy(tree.N)
             ret.W = -np.copy(tree.W)
             ret.Q = -np.copy(tree.Q)

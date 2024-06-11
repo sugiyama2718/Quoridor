@@ -14,6 +14,24 @@ else:
     lib = ctypes.CDLL('./State_util.so')
 
 
+# Tree構造体の前方宣言
+class Tree_c(ctypes.Structure):
+    pass
+
+# Tree構造体のフィールドの定義
+Tree_c._fields_ = [("N_arr", ctypes.c_int * 137),
+                   ("W_arr", ctypes.c_float * 137),
+                   ("Q_arr", ctypes.c_float * 137),
+                   ("children", ctypes.POINTER(Tree_c) * 137)]
+
+create_tree = lib.createTree
+create_tree.restype = ctypes.POINTER(Tree_c)
+add_child = lib.addChild
+add_child.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.POINTER(Tree_c)]
+delete_tree = lib.deleteTree
+delete_tree.argtypes = [ctypes.POINTER(Tree_c)]
+
+
 set_row_wall_1 = lib.set_row_wall_1
 set_row_wall_1.argtypes = [ctypes.POINTER(State), ctypes.c_int, ctypes.c_int]
 set_row_wall_1.restype = None
@@ -102,3 +120,15 @@ for i in test_case_list:
     sys.stdout.flush()
 
 test_search_util()
+root = create_tree()  # pointerが返る
+#root = root_p[0]
+root.contents.N_arr[3] = 2
+root.contents.N_arr[130] = 6
+print(list(root.contents.N_arr))
+print(list(root.contents.N_arr[128:]))
+
+# 子ノードの作成と追加
+child = create_tree()
+add_child(root, 0, child)
+
+delete_tree(root)

@@ -116,6 +116,19 @@ void calc_cross_bitarrs_global(__uint128_t row_bitarr, __uint128_t column_bitarr
 void calc_dist_array_inner(uint8_t* dist_arr_p, int goal_y, __uint128_t cross_bitarrs[4]);
 BitArrayPair calc_placable_array_(State* state);
 
+// ------Search_util.cpp------
+
+typedef struct Tree {
+    int N_arr[137];
+    float W_arr[137];
+    float Q_arr[137];
+    struct Tree* children[137]; // 子ノードへのポインタ配列
+} Tree;
+
+Tree* createTree();
+void deleteTree(Tree* tree);
+void addChild(Tree* parent, int index, Tree* child);
+
 }
 
 #endif
