@@ -20,7 +20,7 @@ tf.get_logger().setLevel(logging.ERROR)
 SIGMA = 1.5
 RANDOM_EPSILON = 1e-5  # 同スコアのものにランダム性を加える目的
 EPSILON = 1e-10
-FIX_EPOCH_LIST = [60]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
+FIX_EPOCH_LIST = [60, 61, 63, 65, 75, 81, 91, 130, 175, 215, 285, 325, 465, 775]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
 
 # EVALUATE_GAME_NUM = 14000
 # SEARCHNODES_FOR_EXTRACT = 500
