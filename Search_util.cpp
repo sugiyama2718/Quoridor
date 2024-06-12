@@ -72,4 +72,11 @@ void add_virtual_loss(Tree* tree, int action, int virtual_loss_n, int coef) {
     tree->Q_arr[action] = tree->W_arr[action] / tree->N_arr[action];
 }
 
+void subtract_virtual_loss(Tree* tree, int action, int virtual_loss_n, int coef) {
+    tree->N_arr[action] -= virtual_loss_n;
+    tree->W_arr[action] -= coef * virtual_loss_n;  // 先後でQがひっくり返ることを考慮
+    if(tree->N_arr[action] == 0) tree->Q_arr[action] = 0.0f;
+    else tree->Q_arr[action] = tree->W_arr[action] / tree->N_arr[action];
+}
+
 }

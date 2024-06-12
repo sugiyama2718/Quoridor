@@ -53,6 +53,9 @@ add_virtual_loss = lib.add_virtual_loss
 add_virtual_loss.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
 add_virtual_loss.restype = None
 
+subtract_virtual_loss = lib.subtract_virtual_loss
+subtract_virtual_loss.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
+subtract_virtual_loss.restype = None
 
 def get_state_vec(state):
     # stateを固定長タプルにしてdictのkeyにするために使う。state.turnを入れているのは、turnの異なる状態を区別して無限ループを避けるため
@@ -605,14 +608,6 @@ class BasicAI(Agent):
         mult_float_arr(root_tree.tree_c.contents.W_arr, np.array(~illegal, dtype="float32").ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
         mult_float_arr(root_tree.tree_c.contents.Q_arr, np.array(~illegal, dtype="float32").ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
 
-        # def add_virtual_loss(node, action):
-        #     node.tree_c.contents.N_arr[action] += self.virtual_loss_n
-        #     if self.color == node.s.turn % 2:  # 先後でQがひっくり返ることを考慮
-        #         node.tree_c.contents.W_arr[action] -= self.virtual_loss_n
-        #     else:
-        #         node.tree_c.contents.W_arr[action] += self.virtual_loss_n
-        #     node.tree_c.contents.Q_arr[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
-
         def should_deepsearch(W, N, root_v):
             return self.random_playouts and abs(sum(W) / sum(N) - root_v) >= DEEP_TH
 
@@ -657,15 +652,11 @@ class BasicAI(Agent):
             # virtual lossを元に戻す
             for nodes, actions in zip(nodess, actionss):
                 for node, action in zip(nodes, actions):
-                    node.tree_c.contents.N_arr[action] -= self.virtual_loss_n
                     if self.color == node.s.turn % 2:
-                        node.tree_c.contents.W_arr[action] += self.virtual_loss_n
+                        coef = -1
                     else:
-                        node.tree_c.contents.W_arr[action] -= self.virtual_loss_n
-                    if node.tree_c.contents.N_arr[action] == 0:
-                        node.tree_c.contents.Q_arr[action] = 0.
-                    else:
-                        node.tree_c.contents.Q_arr[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
+                        coef = 1
+                    subtract_virtual_loss(node.tree_c, action, self.virtual_loss_n, coef)
 
             states = []
             leaf_movable_arrs = []
