@@ -4,6 +4,7 @@ import numpy as np
 import os, sys
 import ctypes
 from BasicAI import state_copy
+from Tree import *
 
 test_case_list = range(1, 16)
 TEST_DIR = "testcases/placable_array"
@@ -12,24 +13,6 @@ if os.name == "nt":
     lib = ctypes.CDLL('./State_util.dll')
 else:
     lib = ctypes.CDLL('./State_util.so')
-
-
-# Tree構造体の前方宣言
-class Tree_c(ctypes.Structure):
-    pass
-
-# Tree構造体のフィールドの定義
-Tree_c._fields_ = [("N_arr", ctypes.c_int * 137),
-                   ("W_arr", ctypes.c_float * 137),
-                   ("Q_arr", ctypes.c_float * 137),
-                   ("children", ctypes.POINTER(Tree_c) * 137)]
-
-create_tree = lib.createTree
-create_tree.restype = ctypes.POINTER(Tree_c)
-add_child = lib.addChild
-add_child.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.POINTER(Tree_c)]
-delete_tree = lib.deleteTree
-delete_tree.argtypes = [ctypes.POINTER(Tree_c)]
 
 
 set_row_wall_1 = lib.set_row_wall_1
@@ -57,6 +40,22 @@ eq_state.restype = ctypes.c_bool
 test_search_util = lib.test_search_util
 test_search_util.argtypes = []
 test_search_util.restype = None
+
+copy_int_arr = lib.copyIntArr
+copy_int_arr.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+copy_int_arr.restype = None
+
+copy_float_arr = lib.copyFloatArr
+copy_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
+copy_float_arr.restype = None
+
+mult_int_arr = lib.multIntArr
+mult_int_arr.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+mult_int_arr.restype = None
+
+mult_float_arr = lib.multFloatArr
+mult_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float)]
+mult_float_arr.restype = None
 
 results = []
 for i in test_case_list:
@@ -124,11 +123,25 @@ root = create_tree()  # pointerが返る
 #root = root_p[0]
 root.contents.N_arr[3] = 2
 root.contents.N_arr[130] = 6
-print(list(root.contents.N_arr))
+print(np.array(root.contents.N_arr))
+print(sum(root.contents.N_arr))
 print(list(root.contents.N_arr[128:]))
 
-# 子ノードの作成と追加
-child = create_tree()
-add_child(root, 0, child)
+t = create_tree()
+t.contents.N_arr[3] = 10
+t.contents.W_arr[2] = 4.3
+copy_int_arr(root.contents.N_arr, t.contents.N_arr)
+copy_float_arr(root.contents.W_arr, t.contents.W_arr, -1)
+print(np.array(root.contents.N_arr))
+print(np.array(root.contents.W_arr))
+
+x = 3 * np.ones((137,), dtype=int)
+mult_int_arr(root.contents.N_arr, x.ctypes.data_as(ctypes.POINTER(ctypes.c_int)))
+print(np.array(root.contents.N_arr))
+
+# # 子ノードの作成と追加
+# child = create_tree()
+# add_child(root, 0, child)
 
 delete_tree(root)
+delete_tree(t)

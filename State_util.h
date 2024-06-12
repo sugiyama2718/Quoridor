@@ -90,7 +90,7 @@ inline __uint128_t right_down_down_shift(__uint128_t bitarr);
 inline int min(int a, int b) {return (a < b) ? a : b;}
 inline int max(int a, int b) {return (a > b) ? a : b;}
 
-int select_action(float Q[ACTION_NUM], float N[ACTION_NUM], float P[ACTION_NUM],
+int select_action(float Q[ACTION_NUM], int N[ACTION_NUM], float P[ACTION_NUM],
 float C_puct, float estimated_V, int color, int turn);
 void movable_array(State* state, bool* mv, int x, int y, bool shortest_only);
 bool accept_action_str(State* state, const char* s, bool check_placable, bool calc_placable_array, bool check_movable);
@@ -119,15 +119,19 @@ BitArrayPair calc_placable_array_(State* state);
 // ------Search_util.cpp------
 
 typedef struct Tree {
-    int N_arr[137];
-    float W_arr[137];
-    float Q_arr[137];
-    struct Tree* children[137]; // 子ノードへのポインタ配列
+    int N_arr[ACTION_NUM];
+    float W_arr[ACTION_NUM];
+    float Q_arr[ACTION_NUM];
+    struct Tree* children[ACTION_NUM]; // 子ノードへのポインタ配列
 } Tree;
 
 Tree* createTree();
 void deleteTree(Tree* tree);
 void addChild(Tree* parent, int index, Tree* child);
+void copyIntArr(int* new_arr, int* old_arr);
+void copyFloatArr(float* new_arr, float* old_arr, float coef);
+void multIntArr(int* new_arr, int* mult_arr);
+void multFloatArr(float* new_arr, float* mult_arr);
 
 }
 

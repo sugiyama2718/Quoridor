@@ -101,7 +101,7 @@ void print_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BOARD_LEN; y++) {
         for(int x = 0; x < BOARD_LEN; x++) {
             __uint128_t shifted = (bitarr << (x + y * BIT_BOARD_LEN)) >> 64;
-            printf("%d", (uint64_t)(shifted & 0x8000000000000000) >> 63);
+            printf("%" PRIu64, (uint64_t)(shifted & 0x8000000000000000) >> 63);
         }
         printf("\n");
     }
@@ -121,11 +121,11 @@ void print_full_bitarray(__uint128_t bitarr) {
     for(int y = 0; y < BIT_BOARD_LEN; y++) {
         for(int x = 0; x < BIT_BOARD_LEN; x++) {
             __uint128_t shifted = (bitarr << (x + y * BIT_BOARD_LEN)) >> 64;
-            printf("%d", (uint64_t)(shifted & 0x8000000000000000) >> 63);
+            printf("%" PRIu64, (uint64_t)(shifted & 0x8000000000000000) >> 63);
         }
         printf("\n");
     }
-    printf("last=%d\n", (uint64_t)(bitarr & 0xFFFFFFFFFFFFFFFF) & 0x7F);
+    printf("last=%" PRIu64 "\n", (uint64_t)(bitarr & 0xFFFFFFFFFFFFFFFF) & 0x7F);
 }
 
 inline __uint128_t up_shift(__uint128_t bitarr) {
@@ -160,7 +160,7 @@ inline __uint128_t right_down_down_shift(__uint128_t bitarr) {
     return bitarr >> (BIT_BOARD_LEN * 2 + 1);
 }
 
-int select_action(float Q[ACTION_NUM], float N[ACTION_NUM], float P[ACTION_NUM],
+int select_action(float Q[ACTION_NUM], int N[ACTION_NUM], float P[ACTION_NUM],
 float C_puct, float estimated_V, int color, int turn) {
     int N_sum = 0;
     for(int i = 0;i < ACTION_NUM;i++) {

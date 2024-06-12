@@ -43,6 +43,7 @@ from Tree import OpeningTree, load_dict_to_opening_tree
 import copy
 from bs4 import BeautifulSoup
 from tqdm import tqdm
+import ctypes
 
 touched = False
 action = ""
@@ -96,6 +97,27 @@ OPENING_MODE = 2
 
 GOOD_TH = 0.05
 
+if os.name == "nt":
+    lib = ctypes.CDLL('./State_util.dll')
+else:
+    lib = ctypes.CDLL('./State_util.so')
+
+copy_int_arr = lib.copyIntArr
+copy_int_arr.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+copy_int_arr.restype = None
+
+copy_float_arr = lib.copyFloatArr
+copy_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
+copy_float_arr.restype = None
+
+mult_int_arr = lib.multIntArr
+mult_int_arr.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+mult_int_arr.restype = None
+
+mult_float_arr = lib.multFloatArr
+mult_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float)]
+mult_float_arr.restype = None
+
 
 def float2score(x):
     sign = int(x >= 0) - int(x < 0)
@@ -103,25 +125,22 @@ def float2score(x):
 
 
 def tree2score(tree, turn):
-    if int(np.sum(tree.N)) == 0:
+    if int(sum(tree.tree_c.contents.N_arr)) == 0:
         return tree.result * 1000
-    score = float2score(np.sum(tree.W) / np.sum(tree.N)) 
+    score = float2score(np.sum(tree.W) / sum(tree.tree_c.contents.N_arr)) 
     if turn % 2 == 1:
         score *= -1
     return score
 
 
 def get_description(state, action, tree, is_simple=False):
-    #print(action, actionid2str(state, action))
     action_str = Glendenning2Official(actionid2str(state, action))
-    #print(action_str)
-    #print(action_str, tree.N[action], np.sum(tree.children[action].N))
     if action in tree.children.keys():
         score = tree2score(tree.children[action], state.turn)  # 手番によって符号が変わるが、先読みした先では符号は変わらないのでstate.turnを渡す
         if is_simple:
-            return "{:<3} ({:4.1f}%)".format(action_str, 100 * tree.N[action] / np.sum(tree.N))
+            return "{:<3} ({:4.1f}%)".format(action_str, 100 * tree.tree_c.contents.N_arr[action] / sum(tree.tree_c.contents.N_arr))
         else:
-            return "{:<3} ({:4.1f}%) {:5}".format(action_str, 100 * tree.N[action] / np.sum(tree.N), score)
+            return "{:<3} ({:4.1f}%) {:5}".format(action_str, 100 * tree.tree_c.contents.N_arr[action] / sum(tree.tree_c.contents.N_arr), score)
     else:
         return None
 
@@ -669,12 +688,12 @@ class Quoridor(Widget):
         if depth <= 0 or action not in tree.children.keys():
             return ""
         
-        nonzero_num = sum([int(np.sum(tree.children[a].N) >= 1) for a in range(len(tree.N)) if a in tree.children.keys()])
+        nonzero_num = sum([int(sum(tree.children[a].tree_c.contents.N_arr) >= 1) for a in range(len(tree.tree_c.contents.N_arr)) if a in tree.children.keys()])
         if nonzero_num == 0:
             return ""
         
         next_tree = tree.children[action]
-        next_action = np.argsort(next_tree.N)[-1]
+        next_action = np.argsort(np.array(next_tree.tree_c.contents.N_arr))[-1]
         #print(depth, next_action)
         if first_call:
             text = get_description(tree.s, action, tree, is_simple=False)
@@ -701,9 +720,9 @@ class Quoridor(Widget):
     
     def tree2info(self, tree):
         if tree.result == 0:
-            nonzero_num = sum([int(np.sum(tree.children[a].N) >= 1) for a in range(len(tree.N)) if a in tree.children.keys()])
-            goodmove_num = np.sum(tree.N / np.sum(tree.N) >= GOOD_TH)
-            action_cands = np.argsort(tree.N)[::-1][:min(10, max(3, goodmove_num), nonzero_num)]
+            nonzero_num = sum([int(sum(tree.children[a].tree_c.contents.N_arr) >= 1) for a in range(len(tree.tree_c.contents.N_arr)) if a in tree.children.keys()])
+            goodmove_num = np.sum(np.array(tree.tree_c.contents.N_arr) / sum(tree.tree_c.contents.N_arr) >= GOOD_TH)
+            action_cands = np.argsort(np.array(tree.tree_c.contents.N_arr))[::-1][:min(10, max(3, goodmove_num), nonzero_num)]
             root_score = tree2score(tree, tree.s.turn)
         else:
             root_score = tree.result * 1000
