@@ -468,7 +468,7 @@ class BasicAI(Agent):
             node_num_expectation = DEEP_SEARCH_P * SELFPLAY_SEARCHNODES_MAX + (1 - DEEP_SEARCH_P) * SELFPLAY_SEARCHNODES_MIN
         else:
             node_num_expectation = max_node
-
+        
         root_v = self.v(state)[0]
 
         wall_num = state.black_walls + state.white_walls
@@ -597,7 +597,7 @@ class BasicAI(Agent):
         root_tree.set_P(p)
 
         # 非合法手のNを強制的に0にして、例えば探索済みマスに戻るような手を読まないようにする
-        mult_int_arr(root_tree.tree_c.contents.N_arr, np.array(~illegal, dtype=int).ctypes.data_as(ctypes.POINTER(ctypes.c_int)))
+        mult_int_arr(root_tree.tree_c.contents.N_arr, np.array(~illegal, dtype="int32").ctypes.data_as(ctypes.POINTER(ctypes.c_int)))
         root_tree.W = root_tree.W * ~illegal
         root_tree.Q = root_tree.Q * ~illegal
 
@@ -803,7 +803,7 @@ class BasicAI(Agent):
             use_shortest = (move_N >= int(sum(root_tree.tree_c.contents.N_arr) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる
             use_shortest = use_shortest & shortest_move
 
-            N2 = np.array(root_tree.tree_c.contents.N_arr)
+            N2 = np.copy(np.array(root_tree.tree_c.contents.N_arr))
             if np.any(use_shortest):
                 N2[128:] = move_N * use_shortest
 
