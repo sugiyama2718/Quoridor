@@ -410,7 +410,7 @@ class BasicAI(Agent):
                 assert False, "t.P is None is not expected"
 
             # 負けノードは探索しない
-            a = select_action(t.Q.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), t.tree_c.contents.N_arr, t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            a = select_action(t.tree_c.contents.Q_arr, t.tree_c.contents.N_arr, t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                               C_puct, self.estimated_V, self.color, t.s.turn)
 
             nodes.append(t)
@@ -567,7 +567,7 @@ class BasicAI(Agent):
 
             copy_int_arr(ret.tree_c.contents.N_arr, tree.tree_c.contents.N_arr)
             copy_float_arr(ret.tree_c.contents.W_arr, tree.tree_c.contents.W_arr, -1)
-            ret.Q = -np.copy(tree.Q)
+            copy_float_arr(ret.tree_c.contents.Q_arr, tree.tree_c.contents.Q_arr, -1)
             assert count <= max_node, "negate_treeで無限再帰の可能性" 
             for key, child_tree in tree.children.items():
                 ret.children[key] = negate_tree(child_tree, count + 1)
@@ -599,7 +599,7 @@ class BasicAI(Agent):
         # 非合法手のNを強制的に0にして、例えば探索済みマスに戻るような手を読まないようにする
         mult_int_arr(root_tree.tree_c.contents.N_arr, np.array(~illegal, dtype="int32").ctypes.data_as(ctypes.POINTER(ctypes.c_int)))
         mult_float_arr(root_tree.tree_c.contents.W_arr, np.array(~illegal, dtype="float32").ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
-        root_tree.Q = root_tree.Q * ~illegal
+        mult_float_arr(root_tree.tree_c.contents.Q_arr, np.array(~illegal, dtype="float32").ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
 
         def add_virtual_loss(node, action):
             node.tree_c.contents.N_arr[action] += self.virtual_loss_n
@@ -607,7 +607,7 @@ class BasicAI(Agent):
                 node.tree_c.contents.W_arr[action] -= self.virtual_loss_n
             else:
                 node.tree_c.contents.W_arr[action] += self.virtual_loss_n
-            node.Q[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
+            node.tree_c.contents.Q_arr[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
 
         def should_deepsearch(W, N, root_v):
             return self.random_playouts and abs(sum(W) / sum(N) - root_v) >= DEEP_TH
@@ -655,9 +655,9 @@ class BasicAI(Agent):
                     else:
                         node.tree_c.contents.W_arr[action] -= self.virtual_loss_n
                     if node.tree_c.contents.N_arr[action] == 0:
-                        node.Q[action] = 0.
+                        node.tree_c.contents.Q_arr[action] = 0.
                     else:
-                        node.Q[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
+                        node.tree_c.contents.Q_arr[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
 
             states = []
             leaf_movable_arrs = []
@@ -718,7 +718,7 @@ class BasicAI(Agent):
                     node.tree_c.contents.N_arr[action] += 1
                     node.tree_c.contents.W_arr[action] += v_arr[count]
                     self.estimated_V = self.estimated_V * (1 - self.V_ema_w) + v_arr[count] * self.V_ema_w
-                    node.Q[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
+                    node.tree_c.contents.Q_arr[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
                 count += 1
 
             if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.tree_c.contents.W_arr, root_tree.tree_c.contents.N_arr, root_v):
@@ -787,7 +787,7 @@ class BasicAI(Agent):
             print("N=")
             display_parameter(np.asarray(root_tree.tree_c.contents.N_arr, dtype="int32"))
             print("Q=")
-            display_parameter(np.asarray(root_tree.Q * 1000, dtype="int32"))
+            display_parameter(np.asarray(root_tree.tree_c.contents.Q_arr * 1000, dtype="int32"))
             print("prev v={:.3f}, post v={:.3f}".format(root_v, sum(root_tree.tree_c.contents.W_arr) / sum(root_tree.tree_c.contents.N_arr)))
             print("root_tree result = {}".format(root_tree.result))
 
@@ -799,11 +799,11 @@ class BasicAI(Agent):
             x, y = color_p(state, state.turn % 2)
             shortest_move = movable_array_flatten(state, x, y, shortest_only=True)
             move_N = np.array(root_tree.tree_c.contents.N_arr[128:])
-            move_Q = root_tree.Q[128:]
+            move_Q = np.array(root_tree.tree_c.contents.Q_arr[128:])
             use_shortest = (move_N >= int(sum(root_tree.tree_c.contents.N_arr) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる
             use_shortest = use_shortest & shortest_move
 
-            N2 = np.copy(np.array(root_tree.tree_c.contents.N_arr))
+            N2 = np.array(root_tree.tree_c.contents.N_arr)
             if np.any(use_shortest):
                 N2[128:] = move_N * use_shortest
 

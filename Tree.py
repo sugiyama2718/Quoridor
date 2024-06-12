@@ -36,8 +36,6 @@ class Tree:
         action_n = 137
         self.children = {}
         self.s = s
-        self.W = np.zeros((action_n,), dtype=np.float32)
-        self.Q = np.zeros((action_n,), dtype=np.float32)
         self.P = p
         self.V = v
         self.result = result  # 1...先手勝利, -1...後手勝利, 0...不明（引き分けは避けて勝敗が必ず定まるとして実装している） rewardとすると0は引き分けなのでresultとした

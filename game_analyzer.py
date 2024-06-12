@@ -127,7 +127,7 @@ def float2score(x):
 def tree2score(tree, turn):
     if int(sum(tree.tree_c.contents.N_arr)) == 0:
         return tree.result * 1000
-    score = float2score(np.sum(tree.W) / sum(tree.tree_c.contents.N_arr)) 
+    score = float2score(sum(tree.tree_c.contents.W_arr) / sum(tree.tree_c.contents.N_arr)) 
     if turn % 2 == 1:
         score *= -1
     return score
