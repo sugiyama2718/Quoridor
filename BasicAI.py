@@ -597,7 +597,7 @@ class BasicAI(Agent):
         root_tree.set_P(p)
 
         # 非合法手のNを強制的に0にして、例えば探索済みマスに戻るような手を読まないようにする
-        mult_int_arr(root_tree.tree_c.contents.N_arr, (~illegal).ctypes.data_as(ctypes.POINTER(ctypes.c_int)))
+        mult_int_arr(root_tree.tree_c.contents.N_arr, np.array(~illegal, dtype=int).ctypes.data_as(ctypes.POINTER(ctypes.c_int)))
         root_tree.W = root_tree.W * ~illegal
         root_tree.Q = root_tree.Q * ~illegal
 
