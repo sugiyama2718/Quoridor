@@ -25,13 +25,29 @@ else:
     lib = ctypes.CDLL('./State_util.so')
 
 select_action = lib.select_action
-select_action.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float),
+select_action.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_float),
                               ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int)
 select_action.restype = ctypes.c_int
 
 copy_state_c = lib.copy_state
 copy_state_c.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
 copy_state_c.restype = None
+
+copy_int_arr = lib.copyIntArr
+copy_int_arr.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+copy_int_arr.restype = None
+
+copy_float_arr = lib.copyFloatArr
+copy_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
+copy_float_arr.restype = None
+
+mult_int_arr = lib.multIntArr
+mult_int_arr.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+mult_int_arr.restype = None
+
+mult_float_arr = lib.multFloatArr
+mult_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float)]
+mult_float_arr.restype = None
 
 
 def get_state_vec(state):
@@ -84,41 +100,41 @@ def get_graphviz_tree_for_shared_tree(tree, g, threshold=5, root=True, color=Non
         init_tree(tree)
         visited = set([])
         node_id = 0
-    if np.sum(tree.N) == 0:
+    if sum(tree.tree_c.contents.N_arr) == 0:
         # g.node(str(node_id), label="end")
         # node_id += 1
         return
     
-    g.node(str(tree.node_id), label=str(int(np.sum(tree.N))) + os.linesep + "{:.3f}".format(np.sum(tree.W) / np.sum(tree.N)))
+    g.node(str(tree.node_id), label=str(int(sum(tree.tree_c.contents.N_arr))) + os.linesep + "{:.3f}".format(np.sum(tree.W) / sum(tree.tree_c.contents.N_arr)))
 
-    max_N = int(np.max(tree.N))
+    max_N = int(max(tree.tree_c.contents.N_arr))
     for key in range(137):
-        if int(tree.N[key]) == 0:
+        if int(tree.tree_c.contents.N_arr[key]) == 0:
             continue
 
         penwidth = "1"
-        if int(tree.N[key]) == max_N:
+        if int(tree.tree_c.contents.N_arr[key]) == max_N:
             penwidth = "3"
 
         if key in tree.children.keys():
             value = tree.children[key]
-            if int(tree.N[key]) >= threshold:
+            if int(tree.tree_c.contents.N_arr[key]) >= threshold:
                 state_vec = get_state_vec(value.s)
                 if state_vec in visited:
                     # 探索済みの場合、既にnode_idが付与済みなのでそれに接続
-                    g.edge(str(tree.node_id), str(value.node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
+                    g.edge(str(tree.node_id), str(value.node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.tree_c.contents.N_arr[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
                     continue
 
                 visited.add(state_vec)
                 value.node_id = node_id
                 node_id += 1
-                g.edge(str(tree.node_id), str(value.node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
+                g.edge(str(tree.node_id), str(value.node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.tree_c.contents.N_arr[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
 
                 get_graphviz_tree_for_shared_tree(value, g, threshold=threshold, root=False, color=color, visited=visited)
 
         else:
-            if int(tree.N[key]) >= threshold:
-                g.edge(str(tree.node_id), str(node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
+            if int(tree.tree_c.contents.N_arr[key]) >= threshold:
+                g.edge(str(tree.node_id), str(node_id), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.tree_c.contents.N_arr[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
                 state = state_copy(tree.s)
                 accept_action_str(state, actionid2str(tree.s, key))
                 if color == 0:
@@ -129,53 +145,12 @@ def get_graphviz_tree_for_shared_tree(tree, g, threshold=5, root=True, color=Non
 
                 node_id += 1
 
-# 引数のgにgraphviz用のグラフを入れる
-def get_graphviz_tree(tree, g, count=0, threshold=5, root=True, color=None):
-    if tree is None:
-        return
-    if root:
-        color = tree.s.turn % 2
-    if np.sum(tree.N) == 0:
-        g.node(str(count), label="end")
-    else:
-        parent_count = count
-        g.node(str(parent_count), label=str(int(np.sum(tree.N))) + os.linesep + "{:.3f}".format(np.sum(tree.W) / np.sum(tree.N)))
-        count += 1
-        #for key, value in tree.children.items():
-        max_N = int(np.max(tree.N))
-        for key in range(137):
-            if int(tree.N[key]) == 0:
-                continue
-
-            penwidth = "1"
-            if int(tree.N[key]) == max_N:
-                penwidth = "3"
-
-            if key in tree.children.keys():
-                value = tree.children[key]
-                if int(tree.N[key]) >= threshold:
-                    g.edge(str(parent_count), str(count), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}%".format(100 * tree.P[key]), penwidth=penwidth)
-
-                    get_graphviz_tree(value, g, count, root=False, color=color)
-                count += int(np.sum(value.N)) + 1
-            else:
-                if int(tree.N[key]) >= threshold:
-
-                    g.edge(str(parent_count), str(count), label=Glendenning2Official(actionid2str(tree.s, key)) + os.linesep + str(int(tree.N[key])) + os.linesep + "{:.1f}".format(100 * tree.P[key]), penwidth=penwidth)
-                    state = state_copy(tree.s)
-                    accept_action_str(state, actionid2str(tree.s, key))
-                    if color == 0:
-                        v = state.pseudo_reward
-                    else:
-                        v = -state.pseudo_reward
-                    g.node(str(count), label="end" + os.linesep + str(v))
-                count += int(tree.N[key]) + 1
-
 
 def state_copy(s):
     ret = State()
     copy_state_c(ret, s)
     return ret
+
 
 def calc_optimal_move_by_DP(s):
     s = state_copy(s)
@@ -433,11 +408,9 @@ class BasicAI(Agent):
                 print("!"*200)
                 print(actions)
                 assert False, "t.P is None is not expected"
-                #return t, a, nodes, actions, True  # tは葉ノード
 
             # 負けノードは探索しない
-            #a = select_action(t.Q, t.N, t.P, C_puct, self.use_estimated_V, self.estimated_V, self.color, t.s.turn, self.use_average_Q)
-            a = select_action(t.Q.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), t.N.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            a = select_action(t.Q.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), t.tree_c.contents.N_arr, t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
                               C_puct, self.estimated_V, self.color, t.s.turn)
 
             nodes.append(t)
@@ -592,7 +565,7 @@ class BasicAI(Agent):
             ret.state_vec = tree.state_vec
             ret.arrays_for_feature_CNN = tree.arrays_for_feature_CNN
 
-            ret.N = np.copy(tree.N)
+            copy_int_arr(ret.tree_c.contents.N_arr, tree.tree_c.contents.N_arr)
             ret.W = -np.copy(tree.W)
             ret.Q = -np.copy(tree.Q)
             assert count <= max_node, "negate_treeで無限再帰の可能性" 
@@ -624,24 +597,24 @@ class BasicAI(Agent):
         root_tree.set_P(p)
 
         # 非合法手のNを強制的に0にして、例えば探索済みマスに戻るような手を読まないようにする
-        root_tree.N = root_tree.N * ~illegal
+        mult_int_arr(root_tree.tree_c.contents.N_arr, (~illegal).ctypes.data_as(ctypes.POINTER(ctypes.c_int)))
         root_tree.W = root_tree.W * ~illegal
         root_tree.Q = root_tree.Q * ~illegal
 
         def add_virtual_loss(node, action):
-            node.N[action] += self.virtual_loss_n
+            node.tree_c.contents.N_arr[action] += self.virtual_loss_n
             if self.color == node.s.turn % 2:  # 先後でQがひっくり返ることを考慮
                 node.W[action] -= self.virtual_loss_n
             else:
                 node.W[action] += self.virtual_loss_n
-            node.Q[action] = node.W[action] / node.N[action]
+            node.Q[action] = node.W[action] / node.tree_c.contents.N_arr[action]
 
         def should_deepsearch(W, N, root_v):
-            return self.random_playouts and abs(np.sum(W) / np.sum(N) - root_v) >= DEEP_TH
+            return self.random_playouts and abs(np.sum(W) / sum(N) - root_v) >= DEEP_TH
 
-        node_num = np.sum(root_tree.N)
+        node_num = sum(root_tree.tree_c.contents.N_arr)
 
-        if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.W, root_tree.N, root_v):
+        if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.W, root_tree.tree_c.contents.N_arr, root_v):
             max_node = SELFPLAY_SEARCHNODES_MAX
 
         # force_openingがある場合、合法手である限りは必ず指す
@@ -676,24 +649,15 @@ class BasicAI(Agent):
             # virtual lossを元に戻す
             for nodes, actions in zip(nodess, actionss):
                 for node, action in zip(nodes, actions):
-                    node.N[action] -= self.virtual_loss_n
+                    node.tree_c.contents.N_arr[action] -= self.virtual_loss_n
                     if self.color == node.s.turn % 2:
                         node.W[action] += self.virtual_loss_n
                     else:
                         node.W[action] -= self.virtual_loss_n
-                    if node.N[action] == 0:
+                    if node.tree_c.contents.N_arr[action] == 0:
                         node.Q[action] = 0.
                     else:
-                        node.Q[action] = node.W[action] / node.N[action]
-
-            # thread_input_list = []
-            # for nodes, actions in zip(nodess, actionss):
-            #     s = state_copy(nodes[-1].s)
-            #     a = actions[-1]
-            #     thread_input_list.append((s, a))
-
-            # with ThreadPoolExecutor(max_workers=2) as thread:
-            #     states = list(thread.map(calc_next_state, thread_input_list))
+                        node.Q[action] = node.W[action] / node.tree_c.contents.N_arr[action]
 
             states = []
             leaf_movable_arrs = []
@@ -751,13 +715,13 @@ class BasicAI(Agent):
             count = 0
             for nodes, actions, s in zip(nodess, actionss, states):
                 for node, action in zip(nodes, actions):
-                    node.N[action] += 1
+                    node.tree_c.contents.N_arr[action] += 1
                     node.W[action] += v_arr[count]
                     self.estimated_V = self.estimated_V * (1 - self.V_ema_w) + v_arr[count] * self.V_ema_w
-                    node.Q[action] = node.W[action] / node.N[action]
+                    node.Q[action] = node.W[action] / node.tree_c.contents.N_arr[action]
                 count += 1
 
-            if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.W, root_tree.N, root_v):
+            if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.W, root_tree.tree_c.contents.N_arr, root_v):
                 max_node = SELFPLAY_SEARCHNODES_MAX
 
             # 勝敗ノード決定
@@ -821,10 +785,10 @@ class BasicAI(Agent):
             print("p=")
             display_parameter(np.asarray(root_tree.P * 1000, dtype="int32"))
             print("N=")
-            display_parameter(np.asarray(root_tree.N, dtype="int32"))
+            display_parameter(np.asarray(root_tree.tree_c.contents.N_arr, dtype="int32"))
             print("Q=")
             display_parameter(np.asarray(root_tree.Q * 1000, dtype="int32"))
-            print("prev v={:.3f}, post v={:.3f}".format(root_v, np.sum(root_tree.W) / np.sum(root_tree.N)))
+            print("prev v={:.3f}, post v={:.3f}".format(root_v, np.sum(root_tree.W) / sum(root_tree.tree_c.contents.N_arr)))
             print("root_tree result = {}".format(root_tree.result))
 
         if root_tree.result != 0:  # 勝敗決定の場合
@@ -834,17 +798,17 @@ class BasicAI(Agent):
         else:
             x, y = color_p(state, state.turn % 2)
             shortest_move = movable_array_flatten(state, x, y, shortest_only=True)
-            move_N = root_tree.N[128:]
+            move_N = np.array(root_tree.tree_c.contents.N_arr[128:])
             move_Q = root_tree.Q[128:]
-            use_shortest = (move_N >= int(np.sum(root_tree.N) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる
+            use_shortest = (move_N >= int(sum(root_tree.tree_c.contents.N_arr) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる
             use_shortest = use_shortest & shortest_move
 
-            N2 = root_tree.N
+            N2 = np.array(root_tree.tree_c.contents.N_arr)
             if np.any(use_shortest):
                 N2[128:] = move_N * use_shortest
 
             if tau == 0:
-                N2 = N2* (N2 == np.max(N2))
+                N2 = N2 * (N2 == np.max(N2))
             else:
                 N2 = np.power(np.asarray(N2, dtype="float64"), 1. / tau)
             pi = N2 / np.sum(N2)
@@ -873,10 +837,10 @@ class BasicAI(Agent):
                     action_id = dxdy2actionid(move_x, move_y)
                     # print(move_x, move_y, action_id)
 
-                end_mimic = state.turn >= FORCE_MIMIC_TURN and root_tree.N[action_id] / np.sum(root_tree.N) <= MIMIC_N_RATIO
+                end_mimic = state.turn >= FORCE_MIMIC_TURN and root_tree.tree_c.contents.N_arr[action_id] / sum(root_tree.tree_c.contents.N_arr) <= MIMIC_N_RATIO
                 
                 # 合法手でない手を打たないように対策
-                if root_tree.N[action_id] == 0:
+                if root_tree.tree_c.contents.N_arr[action_id] == 0:
                     end_mimic = True
 
                 if not self.end_mimic and not end_mimic:
@@ -897,9 +861,9 @@ class BasicAI(Agent):
             return action, root_tree
         elif root_tree.result != 0:  # 勝敗決定の場合
             
-            return action, pi, root_v, (np.sum(root_tree.W) + root_v) / (np.sum(root_tree.N) + 1), node_num_expectation
+            return action, pi, root_v, (np.sum(root_tree.W) + root_v) / (sum(root_tree.tree_c.contents.N_arr) + 1), node_num_expectation
         else:
-            return action, root_tree.N / np.sum(root_tree.N), root_v, (np.sum(root_tree.W) + root_v) / (np.sum(root_tree.N) + 1), np.sum(root_tree.N)
+            return action, np.array(root_tree.tree_c.contents.N_arr) / sum(root_tree.tree_c.contents.N_arr), root_v, (np.sum(root_tree.W) + root_v) / (sum(root_tree.tree_c.contents.N_arr) + 1), sum(root_tree.tree_c.contents.N_arr)
 
     def get_tree_for_graphviz(self):
         if self.tree_for_visualize is None:
