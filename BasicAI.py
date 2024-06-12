@@ -795,7 +795,7 @@ class BasicAI(Agent):
             print("N=")
             display_parameter(np.asarray(root_tree.tree_c.contents.N_arr, dtype="int32"))
             print("Q=")
-            display_parameter(np.asarray(root_tree.tree_c.contents.Q_arr * 1000, dtype="int32"))
+            display_parameter(np.asarray(np.array(root_tree.tree_c.contents.Q_arr) * 1000, dtype="int32"))
             print("prev v={:.3f}, post v={:.3f}".format(root_v, sum(root_tree.tree_c.contents.W_arr) / sum(root_tree.tree_c.contents.N_arr)))
             print("root_tree result = {}".format(root_tree.result))
 
