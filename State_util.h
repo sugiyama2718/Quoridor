@@ -132,6 +132,7 @@ void copyIntArr(int* new_arr, int* old_arr);
 void copyFloatArr(float* new_arr, float* old_arr, float coef);
 void multIntArr(int* new_arr, int* mult_arr);
 void multFloatArr(float* new_arr, float* mult_arr);
+void add_virtual_loss(Tree* tree, int action, int virtual_loss_n, int coef);
 
 }
 

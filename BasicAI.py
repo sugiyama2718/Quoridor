@@ -1,7 +1,7 @@
 # coding:utf-8
 #from memory_profiler import profile
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
-from Tree import Tree
+from Tree import Tree, Tree_c
 import State
 from State import State, State_init, color_p, movable_array, movable_array_flatten, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_flatten_array, calc_dist_array, display_cui, feature_int, get_arrays_for_feature_CNN
 import numpy as np
@@ -48,6 +48,10 @@ mult_int_arr.restype = None
 mult_float_arr = lib.multFloatArr
 mult_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float)]
 mult_float_arr.restype = None
+
+add_virtual_loss = lib.add_virtual_loss
+add_virtual_loss.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
+add_virtual_loss.restype = None
 
 
 def get_state_vec(state):
@@ -601,13 +605,13 @@ class BasicAI(Agent):
         mult_float_arr(root_tree.tree_c.contents.W_arr, np.array(~illegal, dtype="float32").ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
         mult_float_arr(root_tree.tree_c.contents.Q_arr, np.array(~illegal, dtype="float32").ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
 
-        def add_virtual_loss(node, action):
-            node.tree_c.contents.N_arr[action] += self.virtual_loss_n
-            if self.color == node.s.turn % 2:  # 先後でQがひっくり返ることを考慮
-                node.tree_c.contents.W_arr[action] -= self.virtual_loss_n
-            else:
-                node.tree_c.contents.W_arr[action] += self.virtual_loss_n
-            node.tree_c.contents.Q_arr[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
+        # def add_virtual_loss(node, action):
+        #     node.tree_c.contents.N_arr[action] += self.virtual_loss_n
+        #     if self.color == node.s.turn % 2:  # 先後でQがひっくり返ることを考慮
+        #         node.tree_c.contents.W_arr[action] -= self.virtual_loss_n
+        #     else:
+        #         node.tree_c.contents.W_arr[action] += self.virtual_loss_n
+        #     node.tree_c.contents.Q_arr[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
 
         def should_deepsearch(W, N, root_v):
             return self.random_playouts and abs(sum(W) / sum(N) - root_v) >= DEEP_TH
@@ -644,7 +648,11 @@ class BasicAI(Agent):
                 actionss.append(actions)
 
                 for node, action in zip(nodes, actions):
-                    add_virtual_loss(node, action)
+                    if self.color == node.s.turn % 2:
+                        coef = -1
+                    else:
+                        coef = 1
+                    add_virtual_loss(node.tree_c, action, self.virtual_loss_n, coef)
 
             # virtual lossを元に戻す
             for nodes, actions in zip(nodess, actionss):

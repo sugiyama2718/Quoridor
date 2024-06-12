@@ -66,4 +66,10 @@ void multFloatArr(float* new_arr, float* mult_arr) {
     for(int i = 0;i < ACTION_NUM;i++) new_arr[i] *= mult_arr[i];
 }
 
+void add_virtual_loss(Tree* tree, int action, int virtual_loss_n, int coef) {
+    tree->N_arr[action] += virtual_loss_n;
+    tree->W_arr[action] += coef * virtual_loss_n;  // 先後でQがひっくり返ることを考慮
+    tree->Q_arr[action] = tree->W_arr[action] / tree->N_arr[action];
+}
+
 }
