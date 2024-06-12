@@ -560,7 +560,7 @@ def generate_h5_single(pair):
 def train_AIs_process(arg):
     epoch, loss_dict, valid_loss, save_epoch = arg
         
-    AI = CNNAI(0, search_nodes=search_nodes, per_process_gpu_memory_fraction=0.5)
+    AI = CNNAI(0, search_nodes=search_nodes)
 
     long_warmup_epoch_num = POOL_EPOCH_NUM
     #long_warmup_epoch_num = 250
