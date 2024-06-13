@@ -61,6 +61,7 @@ DEEP_SEARCH_P = 0.15  # 深い探索を実施する確率
 DEEP_TH = 0.5  # prev_v, post_vにどれだけ差があれば深い探索にするか
 EVALUATION_SEARCHNODES = 1000
 
+GPU_NUM = 1
 PROCESS_NUM = 15
 
 RATE_TH = 0.1  # レートがいくつ以上あがったら新AIとして採用するか
