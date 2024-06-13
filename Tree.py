@@ -1,19 +1,41 @@
 # coding:utf-8
 import numpy as np
 import copy
+import ctypes
+import os
+
+if os.name == "nt":
+    lib = ctypes.CDLL('./State_util.dll')
+else:
+    lib = ctypes.CDLL('./State_util.so')
+
+# Tree構造体の前方宣言
+class Tree_c(ctypes.Structure):
+    pass
+
+# Tree構造体のフィールドの定義
+Tree_c._fields_ = [("N_arr", ctypes.c_int * 137),
+                   ("W_arr", ctypes.c_float * 137),
+                   ("Q_arr", ctypes.c_float * 137),
+                   ("children", ctypes.POINTER(Tree_c) * 137)]
+
+
+create_tree = lib.createTree
+create_tree.restype = ctypes.POINTER(Tree_c)
+add_child = lib.addChild
+add_child.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.POINTER(Tree_c)]
+delete_tree = lib.deleteTree
+delete_tree.argtypes = [ctypes.POINTER(Tree_c)]
 
 
 class Tree:
     # p is prior probability
     # p, vにはNoneが来ても良い。その場合必要なときに代入するべきことを表す。
+    # negate_treeで変数をコピーし忘れないように！
     def __init__(self, s, p=None, v=None, result=0, optimal_action=None):
-        #action_n = p.shape[0]
         action_n = 137
         self.children = {}
         self.s = s
-        self.N = np.zeros((action_n,), dtype=np.float32)
-        self.W = np.zeros((action_n,), dtype=np.float32)
-        self.Q = np.zeros((action_n,), dtype=np.float32)
         self.P = p
         self.V = v
         self.result = result  # 1...先手勝利, -1...後手勝利, 0...不明（引き分けは避けて勝敗が必ず定まるとして実装している） rewardとすると0は引き分けなのでresultとした
@@ -24,6 +46,13 @@ class Tree:
         self.already_certain_path_confirmed = False  # 確定路判定を実行済みならTrue
         self.node_id = None  # graphviz向けの一時変数
         self.state_vec = None
+        self.arrays_for_feature_CNN = None
+
+        self.tree_c = create_tree()
+
+    def __del__(self):
+        delete_tree(self.tree_c)
+
 
     def set_P(self, p):
         self.P = p

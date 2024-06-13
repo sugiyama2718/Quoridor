@@ -560,7 +560,7 @@ def generate_h5_single(pair):
 def train_AIs_process(arg):
     epoch, loss_dict, valid_loss, save_epoch = arg
         
-    AI = CNNAI(0, search_nodes=search_nodes, per_process_gpu_memory_fraction=0.5)
+    AI = CNNAI(0, search_nodes=search_nodes)
 
     long_warmup_epoch_num = POOL_EPOCH_NUM
     #long_warmup_epoch_num = 250
@@ -983,10 +983,10 @@ if __name__ == '__main__':
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=seed, tau=0.32),
                CNNAI(1, search_nodes=search_nodes, seed=seed, tau=0.32)]
         path = PARAMETER_DIR
-        epoch = 240
+        epoch = 775
 
-        AIs[0].load(os.path.join("application_data/parameter", get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
-        AIs[1].load(os.path.join("application_data/parameter", get_epoch_dir_name(epoch), "epoch{}.ckpt".format(epoch)))
+        AIs[0].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
+        AIs[1].load(os.path.join("application_data/parameter", "epoch{}.ckpt".format(epoch)))
 
         start_time = time.time()
         temp_data = evaluate(AIs, game_num, display=True)

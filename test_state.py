@@ -4,6 +4,7 @@ import numpy as np
 import os, sys
 import ctypes
 from BasicAI import state_copy
+from Tree import *
 
 test_case_list = range(1, 16)
 TEST_DIR = "testcases/placable_array"
@@ -35,6 +36,26 @@ print_state.restype = None
 eq_state = lib.eq_state
 eq_state.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
 eq_state.restype = ctypes.c_bool
+
+test_search_util = lib.test_search_util
+test_search_util.argtypes = []
+test_search_util.restype = None
+
+copy_int_arr = lib.copyIntArr
+copy_int_arr.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+copy_int_arr.restype = None
+
+copy_float_arr = lib.copyFloatArr
+copy_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float), ctypes.c_float]
+copy_float_arr.restype = None
+
+mult_int_arr = lib.multIntArr
+mult_int_arr.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+mult_int_arr.restype = None
+
+mult_float_arr = lib.multFloatArr
+mult_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float)]
+mult_float_arr.restype = None
 
 results = []
 for i in test_case_list:
@@ -96,3 +117,31 @@ for i in test_case_list:
             print(dist_8_pred)
             assert False
     sys.stdout.flush()
+
+test_search_util()
+root = create_tree()  # pointerが返る
+#root = root_p[0]
+root.contents.N_arr[3] = 2
+root.contents.N_arr[130] = 6
+print(np.array(root.contents.N_arr))
+print(sum(root.contents.N_arr))
+print(list(root.contents.N_arr[128:]))
+
+t = create_tree()
+t.contents.N_arr[3] = 10
+t.contents.W_arr[2] = 4.3
+copy_int_arr(root.contents.N_arr, t.contents.N_arr)
+copy_float_arr(root.contents.W_arr, t.contents.W_arr, -1)
+print(np.array(root.contents.N_arr))
+print(np.array(root.contents.W_arr))
+
+x = 3 * np.ones((137,), dtype=int)
+mult_int_arr(root.contents.N_arr, x.ctypes.data_as(ctypes.POINTER(ctypes.c_int)))
+print(np.array(root.contents.N_arr))
+
+# # 子ノードの作成と追加
+# child = create_tree()
+# add_child(root, 0, child)
+
+delete_tree(root)
+delete_tree(t)

@@ -1,7 +1,7 @@
 from sys import exit
 # coding: utf-8
 # cython: language_level=3, boundscheck=False
-# cython: profile=True
+# cython: profile=False
 import numpy as np
 cimport numpy as np
 import sys, os
@@ -148,14 +148,28 @@ def color_p(state, color):
     return ret.x, ret.y
 
 
-def movable_array(state, x, y, shortest_only=False):
+def movable_array(state, int x, int y, shortest_only=False):
     cdef np.ndarray[DTYPE_t, ndim = 2] mv
+    cdef int dx, dy
     mv_c = (ctypes.c_bool * 9)(*([False] * 9))
     movable_array_c(state, mv_c, x, y, shortest_only)
     mv = np.zeros((3, 3), dtype=DTYPE)
     for dx in [-1, 0, 1]:
         for dy in [-1, 0, 1]:
             mv[dx, dy] = mv_c[(dx + 1) + (dy + 1) * 3]
+
+    return mv
+
+
+def movable_array_flatten(state, int x, int y, shortest_only=False):
+    cdef np.ndarray[DTYPE_t, ndim = 1] mv
+    cdef int dx, dy
+    mv_c = (ctypes.c_bool * 9)(*([False] * 9))
+    movable_array_c(state, mv_c, x, y, shortest_only)
+    mv = np.zeros((9), dtype=DTYPE)
+    for dx in [-1, 0, 1]:
+        for dy in [-1, 0, 1]:
+            mv[(dx % 3) * 3 + (dy % 3)] = mv_c[(dx + 1) + (dy + 1) * 3]
 
     return mv
 
@@ -316,12 +330,19 @@ def feature_int(state):
     return feature
 
 
-def feature_CNN(state, xflip=False, yflip=False):
-    feature = np.zeros((9, 9, CHANNEL))
+class ArraysForFeatureCNN():
+    def __init__(self, cross_arr, row_wall, column_wall):
+        self.cross_arr = cross_arr
+        self.row_wall = row_wall
+        self.column_wall = column_wall
 
-    cross_arr = np.zeros((9, 9, 4))
-    for i in range(4):
-        cross_arr[:, :, i] = get_numpy_arr(state.cross_bitarrs, BOARD_LEN, i * 2)
+
+def feature_CNN_from_array(state, arrs, xflip=False, yflip=False):
+    cross_arr = arrs.cross_arr
+    row_wall = arrs.row_wall
+    column_wall = arrs.column_wall
+
+    feature = np.zeros((9, 9, CHANNEL))
         
     Bx = state.Bx
     By = state.By
@@ -330,8 +351,6 @@ def feature_CNN(state, xflip=False, yflip=False):
     black_walls = state.black_walls
     white_walls = state.white_walls
     turn = state.turn
-    row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
-    column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
     dist1, dist2 = get_player_dist_from_goal(state)
     placable_r = get_numpy_arr(state.placable_r_bitarr, BOARD_LEN - 1)
     placable_c = get_numpy_arr(state.placable_c_bitarr, BOARD_LEN - 1)
@@ -389,6 +408,20 @@ def feature_CNN(state, xflip=False, yflip=False):
     return feature
 
 
+def get_arrays_for_feature_CNN(state):
+    cross_arr = np.zeros((9, 9, 4))
+    for i in range(4):
+        cross_arr[:, :, i] = get_numpy_arr(state.cross_bitarrs, BOARD_LEN, i * 2)
+        
+    row_wall = get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
+    column_wall = get_numpy_arr(state.column_wall_bitarr, BOARD_LEN - 1)
+    return ArraysForFeatureCNN(cross_arr, row_wall, column_wall)
+
+
+def feature_CNN(state, xflip=False, yflip=False):   
+    return feature_CNN_from_array(state, get_arrays_for_feature_CNN(state), xflip, yflip)
+
+
 def get_row_wall(state):
     return get_numpy_arr(state.row_wall_bitarr, BOARD_LEN - 1)
 
@@ -398,9 +431,8 @@ def get_column_wall(state):
 
 
 def get_numpy_arr(bitarr, int len_, int offset=0):
-    cdef np.ndarray[DTYPE_t, ndim = 2] ret
+    cdef np.ndarray[DTYPE_t, ndim = 2] ret = np.zeros((len_, len_), dtype=DTYPE)
     cdef int x, y
-    ret = np.zeros((len_, len_), dtype=DTYPE)
     bool_p = uint128ToBoolArray(bitarr[1 + offset], bitarr[0 + offset])
     for x in range(len_):
         for y in range(len_):
