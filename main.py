@@ -553,8 +553,10 @@ def generate_h5_single(pair):
 
 def train_AIs_process(arg):
     epoch, loss_dict, valid_loss, save_epoch = arg
-        
+    
+    print("[training] before CNNAI", file=sys.stderr)
     AI = CNNAI(0, search_nodes=search_nodes)
+    print("[training] after CNNAI", file=sys.stderr)
 
     long_warmup_epoch_num = POOL_EPOCH_NUM
     #long_warmup_epoch_num = 250
@@ -562,14 +564,18 @@ def train_AIs_process(arg):
     if epoch <= long_warmup_epoch_num:
         pass
     else:
+        print("[training] before load", file=sys.stderr)
         AI.load(os.path.join(PARAMETER_DIR, "post.ckpt"))
+        print("[training] after load", file=sys.stderr)
 
     if epoch <= long_warmup_epoch_num:
         learn_rep_num = LEARN_REP_NUM * 10  # warmup用
         ret = AI.learn(epoch, learn_rep_num, loss_dict, valid_loss, long_warmup_epoch_num=long_warmup_epoch_num)
     else:
         learn_rep_num = LEARN_REP_NUM
+        print("[training] before learn", file=sys.stderr)
         ret = AI.learn(epoch, learn_rep_num, loss_dict, valid_loss)
+        print("[training] after learn", file=sys.stderr)
     
     if save_epoch and (epoch % SAVE_CYCLE == 0 or epoch <= POOL_EPOCH_NUM + SAVE_FIRST_EPOCH_NUM):
         os.makedirs(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch)), exist_ok=True)
@@ -582,8 +588,10 @@ def train_AIs_process(arg):
 
 def evaluate_2game_process(arg_tuple):
     # 先後で２試合して勝利数を返す
-    AI_id, _, seed, AI_load_name, gpu = arg_tuple
+    AI_id, _, seed, AI_load_name, gpu, wait_time = arg_tuple
     os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
+
+    time.sleep(wait_time)
 
     if AI_id == -1:
         AI1 = CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
@@ -609,10 +617,9 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
     win_num_list = []
     for old_AI_id, old_rate in zip(AI_id_list, AI_rate_list):
         play_num_half = play_num // 2
-        # for x in tqdm([(old_AI_id, search_nodes, j * 10000, AI_load_name) for j in range(play_num_half)]):
-        #     evaluate_2game_process(x)
+        wait_time_list = [(x - min(h5_list)) * 3 if x < PROCESS_NUM else 0 for x in range(play_num_half)]
         with Pool(processes=PROCESS_NUM) as p:
-            imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM) for j in range(play_num_half)])
+            imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM, wait_time) for j, wait_time in enumerate(wait_time_list)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
         new_ai_win_num = play_num - sum(ret)
         win_num_list.append(new_ai_win_num)
@@ -752,8 +759,6 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
         
         # --------training---------
         start = time.time()
-
-        time.sleep(3)  # trainingでGPUが認識できなくなることが多いため試しに導入
     
         # 親プロセスでtfを起動すると子プロセスでエラーが出るのであえて子プロセスに分けて学習する
         with Pool(processes=1) as p:
