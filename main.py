@@ -28,6 +28,7 @@ import shutil
 import random
 from util import get_epoch_dir_name
 
+
 # agentsは初期化されてるとする
 def normal_play(agents, initial_state=None):
     if initial_state is None:
@@ -468,8 +469,10 @@ def train_without_selfplay():
     print("レート{:.4f}".format(rate))
 
 
-def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
+def generate_h5(h5_id, display, AI_id, search_nodes, epoch, gpu, is_test=False):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
+
     seed = h5_id * 10000 % (2**30)
     random.seed(seed)
     is_random_AI = (AI_id == 0)
@@ -477,12 +480,10 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
 
     if is_random_AI:
         AIs = [CNNAI(0, search_nodes=1, all_parameter_zero=True, p_is_almost_flat=True, seed=seed, random_playouts=False),
-               CNNAI(1, search_nodes=1, all_parameter_zero=True, p_is_almost_flat=True, seed=seed, random_playouts=False)]
-        # AIs = [CNNAI(0, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000),
-        #        CNNAI(1, search_nodes=search_nodes, all_parameter_zero=True, p_is_almost_flat=True, seed=h5_id*10000)]
+            CNNAI(1, search_nodes=1, all_parameter_zero=True, p_is_almost_flat=True, seed=seed, random_playouts=False)]
     else:
         AIs = [CNNAI(0, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True),
-               CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True)]
+            CNNAI(1, search_nodes=search_nodes, seed=h5_id*10000 % (2**30), random_playouts=True)]
         AIs[0].load(os.path.join(PARAMETER_DIR, "post.ckpt"))
         AIs[1].load(os.path.join(PARAMETER_DIR, "post.ckpt"))
 
@@ -506,9 +507,6 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
         if h5_id < H5_NUM:
             temp_data = generate_data(AIs, 1, noise=1., id_=h5_id, display=is_test, info=is_test)
         else:
-            # display = False
-            # if h5_id == 326919:
-            #     display = True
             temp_data = generate_data(AIs, 1, noise=NOISE, id_=h5_id, display=is_test, info=is_test)
         all_data.extend(temp_data)
 
@@ -525,8 +523,8 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
     data_size = len(all_data)
     # ***h5に項目を追加したら、shape_listにshapeを追加する必要がある***
     shape_list = [(data_size, 9, 9, CHANNEL), (data_size, 137), (data_size,), (data_size,), (data_size,), (data_size,), 
-                  (data_size,), (data_size,), (data_size,), (data_size,), (data_size,), (data_size,),
-                  (data_size, 8, 8), (data_size, 8, 8), (data_size, 9, 9), (data_size, 9, 9), (data_size, 9, 9), (data_size, 9, 9), (data_size, 137)]
+                (data_size,), (data_size,), (data_size,), (data_size,), (data_size,), (data_size,),
+                (data_size, 8, 8), (data_size, 8, 8), (data_size, 9, 9), (data_size, 9, 9), (data_size, 9, 9), (data_size, 9, 9), (data_size, 137)]
     data_list = [np.zeros(shape) for shape in shape_list]
     
     for i, each_data in enumerate(all_data):
@@ -535,10 +533,6 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
             data_list[j][i] = each_data[j]
 
     del all_data
-
-    # if display:
-    #     sys.stderr.write('\r\033[Kepoch{}:data={}/{} B{}win W{}win {}draw'.format(epoch + 1, index, STEP, b_win, w_win, draw))
-    #     sys.stderr.flush()
 
     if not is_test:
         h5file = h5py.File(os.path.join(DATA_DIR, str(epoch), "{}.h5".format(h5_id)), "w")
@@ -552,15 +546,17 @@ def generate_h5(h5_id, display, AI_id, search_nodes, epoch, is_test=False):
 
 
 def generate_h5_single(pair):
-    h5_id_, display, AI_id, search_nodes, epoch, wait_time = pair
+    h5_id_, display, AI_id, search_nodes, epoch, wait_time, gpu = pair
     time.sleep(wait_time)
-    return generate_h5(h5_id_, display, AI_id, search_nodes, epoch)
+    return generate_h5(h5_id_, display, AI_id, search_nodes, epoch, gpu)
 
 
 def train_AIs_process(arg):
     epoch, loss_dict, valid_loss, save_epoch = arg
-        
+    
+    print("[training] before CNNAI", file=sys.stderr)
     AI = CNNAI(0, search_nodes=search_nodes)
+    print("[training] after CNNAI", file=sys.stderr)
 
     long_warmup_epoch_num = POOL_EPOCH_NUM
     #long_warmup_epoch_num = 250
@@ -568,14 +564,18 @@ def train_AIs_process(arg):
     if epoch <= long_warmup_epoch_num:
         pass
     else:
+        print("[training] before load", file=sys.stderr)
         AI.load(os.path.join(PARAMETER_DIR, "post.ckpt"))
+        print("[training] after load", file=sys.stderr)
 
     if epoch <= long_warmup_epoch_num:
         learn_rep_num = LEARN_REP_NUM * 10  # warmup用
         ret = AI.learn(epoch, learn_rep_num, loss_dict, valid_loss, long_warmup_epoch_num=long_warmup_epoch_num)
     else:
         learn_rep_num = LEARN_REP_NUM
+        print("[training] before learn", file=sys.stderr)
         ret = AI.learn(epoch, learn_rep_num, loss_dict, valid_loss)
+        print("[training] after learn", file=sys.stderr)
     
     if save_epoch and (epoch % SAVE_CYCLE == 0 or epoch <= POOL_EPOCH_NUM + SAVE_FIRST_EPOCH_NUM):
         os.makedirs(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch)), exist_ok=True)
@@ -588,7 +588,10 @@ def train_AIs_process(arg):
 
 def evaluate_2game_process(arg_tuple):
     # 先後で２試合して勝利数を返す
-    AI_id, _, seed, AI_load_name = arg_tuple
+    AI_id, _, seed, AI_load_name, gpu, wait_time = arg_tuple
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu)
+
+    time.sleep(wait_time)
 
     if AI_id == -1:
         AI1 = CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
@@ -614,10 +617,9 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
     win_num_list = []
     for old_AI_id, old_rate in zip(AI_id_list, AI_rate_list):
         play_num_half = play_num // 2
-        # for x in tqdm([(old_AI_id, search_nodes, j * 10000, AI_load_name) for j in range(play_num_half)]):
-        #     evaluate_2game_process(x)
+        wait_time_list = [(x - min(h5_list)) * 3 if x < PROCESS_NUM else 0 for x in range(play_num_half)]
         with Pool(processes=PROCESS_NUM) as p:
-            imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name) for j in range(play_num_half)])
+            imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM, wait_time) for j, wait_time in enumerate(wait_time_list)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
         new_ai_win_num = play_num - sum(ret)
         win_num_list.append(new_ai_win_num)
@@ -739,11 +741,11 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
         wait_time_list = [(x - min(h5_list)) * 3 if x - min(h5_list) < PROCESS_NUM else 0 for x in h5_list]
 
         with Pool(processes=PROCESS_NUM) as p:
-            imap = p.imap(func=generate_h5_single, iterable=[(h5_id_, h5_id_ % PROCESS_NUM == 0, load_AI_id, search_nodes, epoch, wait_time) for h5_id_, wait_time in zip(h5_list, wait_time_list)])
+            imap = p.imap(func=generate_h5_single, iterable=[(h5_id_, h5_id_ % PROCESS_NUM == 0, load_AI_id, search_nodes, epoch, wait_time, i % GPU_NUM) 
+            for i, h5_id_, wait_time in zip(range(len(h5_list)), h5_list, wait_time_list)])
             win_tuple_list = list(tqdm(imap, total=len(h5_list), file=sys.stdout))
         
         print("")
-        #print(win_tuple_list)
 
         elapsed_time = time.time() - start
         print("elapsed time(self-play)={}".format(elapsed_time))
