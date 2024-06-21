@@ -617,7 +617,7 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
     win_num_list = []
     for old_AI_id, old_rate in zip(AI_id_list, AI_rate_list):
         play_num_half = play_num // 2
-        wait_time_list = [(x - min(h5_list)) * 3 if x < PROCESS_NUM else 0 for x in range(play_num_half)]
+        wait_time_list = [x * 3 if x < PROCESS_NUM else 0 for x in range(play_num_half)]
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM, wait_time) for j, wait_time in enumerate(wait_time_list)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
