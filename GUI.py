@@ -37,11 +37,14 @@ import pickle
 from util import Glendenning2Official, RECORDS_PATH
 from datetime import datetime
 from engine_util import prepare_AI
+from config import read_application_config
 
 touched = False
 action = ""
 
-SEARCH_NODE_LIST = [1, 100, 200, 300, 500, 800, 1000, 1500, 2000, 3000, 5000, 7500, 10000, 15000, 20000, 30000, 50000, 100000]
+config_dict = read_application_config()
+
+SEARCH_NODE_LIST = config_dict["search_nodes_list"]
 SEARCH_NODE_LIST_LEN = len(SEARCH_NODE_LIST)
 TAU_LIST = [0.16 * i for i in range(5)]
 DEFAULT_SEARCH_NODE_INDEX = 6
@@ -73,9 +76,7 @@ param_files = os.listdir(PARAMETER_PATH)
 epoch_list = [0] + sorted(list(set([int(s.split(".")[0][5:]) for s in param_files])))
 LEVEL_NUM = len(epoch_list)
 
-# TRAINING_LIST = [(0, 500), (1, 500), (2, 500), (3, 500), (4, 500), (5, 500), (6, 500), (7, 500), (8, 500), (9, 500), 
-#                  (10, 500), (11, 500), (12, 500), (13, 200), (13, 500), (14, 500), (15, 500), (16, 500), (17, 500), (18, 500), (19, 500), (20, 500), (21, 500)]
-TRAINING_LIST = [(i, 500) for i in range(15)]
+TRAINING_LIST = config_dict["training_AI_info"]
 TRAINING_LEVEL_NUM = len(TRAINING_LIST)
 
 # 対戦モードid
