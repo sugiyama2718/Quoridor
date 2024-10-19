@@ -281,8 +281,10 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
 
 # 中で先手後手を順番に入れ替えている
-def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False):
+def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False, return_detail=False):
     wins = 0.
+    sente_win_num = 0.
+    gote_win_num = 0.
     draw_num = 0
     total_time_without_endgame = 0.0
     total_turn_without_endgame = 0
@@ -335,10 +337,14 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
 
         if i % 2 == 0 and state.reward == 1:
             wins += 1.
+            sente_win_num += 1.
         elif i % 2 == 1 and state.reward == -1:
             wins += 1.
+            gote_win_num += 1.
         elif state.reward == 0:
             wins += 0.5
+            sente_win_num += 0.5
+            gote_win_num += 0.5
             draw_num += 1
         if not multiprocess:
             sys.stderr.write('\r\033[K {}win/{}'.format(i + 1 - wins, i + 1))
@@ -352,7 +358,9 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
     if display:
         print("total_time_without_endgame = {:.3f}s, time per one move = {:.3f}s".format(total_time_without_endgame, total_time_without_endgame / total_turn_without_endgame))
 
-    if return_draw:
+    if return_detail:
+        return sente_win_num, gote_win_num, draw_num
+    elif return_draw:
         return wins, draw_num
     else:
         return wins
@@ -607,7 +615,7 @@ def evaluate_2game_process(arg_tuple):
         AI_load_name = os.path.join(get_epoch_dir_name(AI_id), AI_load_name)  # epoch500~などの場合だけ、0_1000/epoch500~にアクセスする必要がある
     AIs[1].load(os.path.join(PARAMETER_DIR, AI_load_name.format(AI_id)))
 
-    ret = evaluate(AIs, 2, multiprocess=True)
+    ret = evaluate(AIs, 2, multiprocess=True, return_detail=True)
     del AIs
     return ret
 
@@ -621,9 +629,14 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM, wait_time) for j, wait_time in enumerate(wait_time_list)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
-        new_ai_win_num = play_num - sum(ret)
+        sente_win_num_total = sum([x[0] for x in ret])
+        gote_win_num_total = sum([x[1] for x in ret])
+        new_ai_win_num = play_num - (sente_win_num_total + gote_win_num_total)
         win_num_list.append(new_ai_win_num)
-        print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.3f}".format(old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num))
+        print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.1f}%, sente win {}/{} ({:.1f}%), gote win {}/{} ({:.1f}%)".format(
+            old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num * 100,
+            sente_win_num_total, play_num_half, sente_win_num_total / play_num_half * 100,
+            gote_win_num_total, play_num_half, gote_win_num_total / play_num_half * 100))
     
     return calc_rate(play_num, np.array(AI_rate_list), np.array(win_num_list)), win_num_list
 
@@ -921,19 +934,25 @@ if __name__ == '__main__':
     elif sys.argv[1] == "evaluate":
         def evaluate_2game_process(seed):
             # 先後で２試合して勝利数を返す
-            AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=seed), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=seed, use_average_Q=True)]
+            epoch1 = 4740
+            epoch2 = 11700
+            AIs = [CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed), CNNAI(1, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed)]
             #AIs[0].load(os.path.join("backup/221219/train_results/parameter/", "epoch680.ckpt"))
-            AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(120), "epoch120.ckpt"))
-            AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(120), "epoch120.ckpt"))
-            ret = evaluate(AIs, 2, multiprocess=True, display=True)
+            AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch1), f"epoch{epoch1}.ckpt"))
+            AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch2), f"epoch{epoch2}.ckpt"))
+            ret = evaluate(AIs, 2, multiprocess=True, display=False, return_detail=True)
             del AIs
             return ret
-        play_num = 4
+        play_num = 100
         play_num_half = play_num // 2
-        with Pool(processes=1) as p:
+        with Pool(processes=4) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
-        print(sum(ret), play_num - sum(ret))
+        sente_win_num_total = sum([x[0] for x in ret])
+        gote_win_num_total = sum([x[1] for x in ret])
+        print("sente win {}/{} ({:.1f}%)".format(sente_win_num_total, play_num_half, sente_win_num_total / play_num_half * 100))
+        print("gote win {}/{} ({:.1f}%)".format(gote_win_num_total, play_num_half, gote_win_num_total / play_num_half * 100))
+        #print(sum(ret), play_num - sum(ret))
         
     elif sys.argv[1] == "multiprocess_test":
         np.random.seed(0)
