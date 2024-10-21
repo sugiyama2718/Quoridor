@@ -288,6 +288,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
     draw_num = 0
     total_time_without_endgame = 0.0
     total_turn_without_endgame = 0
+    action_lists = []
     for i in range(play_num):
         game_start_time = time.time()
         is_endgame = False
@@ -297,6 +298,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         AIs[1].init_prev()
         AIs[i % 2].color = 0
         AIs[1 - i % 2].color = 1
+        action_list = []
         while True:
             if display:
                 display_cui(state)
@@ -307,6 +309,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
                 s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
                 a = actionid2str(state, s)
             AIs[1 - i % 2].prev_action = s
+            action_list.append(a)
 
             if not is_endgame and state.pseudo_terminate:
                 total_time_without_endgame += time.time() - game_start_time
@@ -326,6 +329,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
                 s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
                 a = actionid2str(state, s)
             AIs[i % 2].prev_action = s
+            action_list.append(a)
 
             if not is_endgame and state.pseudo_terminate:
                 total_time_without_endgame += time.time() - game_start_time
@@ -334,6 +338,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
 
             if state.terminate:
                 break
+        action_lists.append(action_list)
 
         if i % 2 == 0 and state.reward == 1:
             wins += 1.
@@ -351,7 +356,6 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
             sys.stderr.flush()
     if not multiprocess:
         print("")
-    
     AIs[0].color = 0
     AIs[1].color = 1
 
@@ -629,9 +633,9 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM, wait_time) for j, wait_time in enumerate(wait_time_list)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
-        sente_win_num_total = sum([x[0] for x in ret])
-        gote_win_num_total = sum([x[1] for x in ret])
-        new_ai_win_num = play_num - (sente_win_num_total + gote_win_num_total)
+        sente_win_num_total = play_num_half - sum([x[0] for x in ret])  # 最新パラメータからみた先手での勝数
+        gote_win_num_total = play_num_half - sum([x[1] for x in ret])
+        new_ai_win_num = sente_win_num_total + gote_win_num_total
         win_num_list.append(new_ai_win_num)
         print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.1f}%, sente win {}/{} ({:.1f}%), gote win {}/{} ({:.1f}%)".format(
             old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num * 100,
@@ -940,12 +944,12 @@ if __name__ == '__main__':
             #AIs[0].load(os.path.join("backup/221219/train_results/parameter/", "epoch680.ckpt"))
             AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch1), f"epoch{epoch1}.ckpt"))
             AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch2), f"epoch{epoch2}.ckpt"))
-            ret = evaluate(AIs, 2, multiprocess=True, display=False, return_detail=True)
+            ret = evaluate(AIs, 2, multiprocess=True, display=True, return_detail=True)
             del AIs
             return ret
-        play_num = 100
+        play_num = 4
         play_num_half = play_num // 2
-        with Pool(processes=4) as p:
+        with Pool(processes=1) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
         sente_win_num_total = sum([x[0] for x in ret])
