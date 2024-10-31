@@ -96,7 +96,7 @@ def get_normalized_state(action_list):
         return mirror_state, mirror_state_vec, True
 
 
-def generate_opening_tree(target_epoch, all_kifu_list, max_depth):
+def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None):
     statevec2node = {}
     add_state = State()
     State_init(add_state)

@@ -26,7 +26,7 @@ from collections import OrderedDict
 from analyze_h5 import analyze_h5_main
 import shutil
 import random
-from util import get_epoch_dir_name
+from util import get_epoch_dir_name, generate_opening_tree
 
 
 # agentsは初期化されてるとする
@@ -363,7 +363,7 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         print("total_time_without_endgame = {:.3f}s, time per one move = {:.3f}s".format(total_time_without_endgame, total_time_without_endgame / total_turn_without_endgame))
 
     if return_detail:
-        return sente_win_num, gote_win_num, draw_num
+        return sente_win_num, gote_win_num, draw_num, action_lists
     elif return_draw:
         return wins, draw_num
     else:
@@ -624,6 +624,21 @@ def evaluate_2game_process(arg_tuple):
     return ret
 
 
+def process_evaluate_data(evaluate_ret, old_AI_id, old_rate):
+    kifu = []
+    for x in evaluate_ret:
+        kifu.extend(x[3])
+    kifu_tree, _ = generate_opening_tree(kifu, 20)
+    sente_win_num_total = play_num_half - sum([x[0] for x in evaluate_ret])  # 最新パラメータからみた先手での勝数
+    gote_win_num_total = play_num_half - sum([x[1] for x in evaluate_ret])
+    new_ai_win_num = sente_win_num_total + gote_win_num_total
+    print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.1f}%, sente win {}/{} ({:.1f}%), gote win {}/{} ({:.1f}%)".format(
+        old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num * 100,
+        sente_win_num_total, play_num_half, sente_win_num_total / play_num_half * 100,
+        gote_win_num_total, play_num_half, gote_win_num_total / play_num_half * 100))
+    return new_ai_win_num
+
+
 def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", evaluate_play_num=EVALUATE_PLAY_NUM):
     play_num = evaluate_play_num // len(AI_id_list) // 2 * 2
     win_num_list = []
@@ -633,14 +648,9 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM, wait_time) for j, wait_time in enumerate(wait_time_list)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
-        sente_win_num_total = play_num_half - sum([x[0] for x in ret])  # 最新パラメータからみた先手での勝数
-        gote_win_num_total = play_num_half - sum([x[1] for x in ret])
-        new_ai_win_num = sente_win_num_total + gote_win_num_total
+
+        new_ai_win_num = process_evaluate_data(ret, old_AI_id, old_rate)
         win_num_list.append(new_ai_win_num)
-        print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.1f}%, sente win {}/{} ({:.1f}%), gote win {}/{} ({:.1f}%)".format(
-            old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num * 100,
-            sente_win_num_total, play_num_half, sente_win_num_total / play_num_half * 100,
-            gote_win_num_total, play_num_half, gote_win_num_total / play_num_half * 100))
     
     return calc_rate(play_num, np.array(AI_rate_list), np.array(win_num_list)), win_num_list
 
@@ -952,11 +962,8 @@ if __name__ == '__main__':
         with Pool(processes=1) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
-        sente_win_num_total = sum([x[0] for x in ret])
-        gote_win_num_total = sum([x[1] for x in ret])
-        print("sente win {}/{} ({:.1f}%)".format(sente_win_num_total, play_num_half, sente_win_num_total / play_num_half * 100))
-        print("gote win {}/{} ({:.1f}%)".format(gote_win_num_total, play_num_half, gote_win_num_total / play_num_half * 100))
-        #print(sum(ret), play_num - sum(ret))
+        
+        new_ai_win_num = process_evaluate_data(ret, -100, -100)  # この中で各種情報がprintされる
         
     elif sys.argv[1] == "multiprocess_test":
         np.random.seed(0)
