@@ -1,4 +1,5 @@
 import os
+import graphviz
 from Tree import OpeningTree
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
@@ -161,6 +162,40 @@ def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None):
 def get_epoch_dir_name(epoch):
     floor_epoch = (epoch // EPOCH_DIR_UNIT) * EPOCH_DIR_UNIT
     return "{}_{}".format(floor_epoch, floor_epoch + EPOCH_DIR_UNIT)
+
+
+def build_graph(node, graph, parent_id=None, edge_label=None):
+    node_id = str(id(node))
+    
+    # ノードのラベルを作成
+    visited_num = node.visited_num
+    p1_win_num = node.p1_win_num
+    p2_win_num = node.p2_win_num
+    
+    if visited_num is not None and p1_win_num is not None and p2_win_num is not None:
+        p1_percentage = (p1_win_num / visited_num) * 100 if visited_num else 0
+        p2_percentage = (p2_win_num / visited_num) * 100 if visited_num else 0
+        label = f"{visited_num}\n"
+        label += f"{p1_percentage:.1f}%\n"
+    else:
+        label = "Data missing"
+
+    # ノードをグラフに追加
+    graph.node(node_id, label=label)
+    
+    # 親ノードから現在のノードへのエッジを追加
+    if parent_id is not None and edge_label is not None:
+        graph.edge(parent_id, node_id, label=edge_label)
+    
+    # 子ノードに対して再帰的に処理
+    for child_key, child_node in node.children.items():
+        build_graph(child_node, graph, node_id, child_key)
+
+def save_tree_graph(root):
+    graph = graphviz.Digraph(format='png')
+    build_graph(root, graph)
+    graph.render('kifu_tree', view=False)
+
 
 if __name__ == "__main__":
     print(get_epoch_dir_name(0))

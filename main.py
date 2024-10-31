@@ -26,7 +26,7 @@ from collections import OrderedDict
 from analyze_h5 import analyze_h5_main
 import shutil
 import random
-from util import get_epoch_dir_name, generate_opening_tree
+from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph
 
 
 # agentsは初期化されてるとする
@@ -624,11 +624,15 @@ def evaluate_2game_process(arg_tuple):
     return ret
 
 
-def process_evaluate_data(evaluate_ret, old_AI_id, old_rate):
+def process_evaluate_data(evaluate_ret, old_AI_id, old_rate, play_num):
+    play_num_half = play_num // 2
+    
     kifu = []
     for x in evaluate_ret:
         kifu.extend(x[3])
     kifu_tree, _ = generate_opening_tree(kifu, 20)
+    save_tree_graph(kifu_tree)
+
     sente_win_num_total = play_num_half - sum([x[0] for x in evaluate_ret])  # 最新パラメータからみた先手での勝数
     gote_win_num_total = play_num_half - sum([x[1] for x in evaluate_ret])
     new_ai_win_num = sente_win_num_total + gote_win_num_total
@@ -649,7 +653,7 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
             imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM, wait_time) for j, wait_time in enumerate(wait_time_list)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
 
-        new_ai_win_num = process_evaluate_data(ret, old_AI_id, old_rate)
+        new_ai_win_num = process_evaluate_data(ret, old_AI_id, old_rate, play_num)
         win_num_list.append(new_ai_win_num)
     
     return calc_rate(play_num, np.array(AI_rate_list), np.array(win_num_list)), win_num_list
@@ -963,7 +967,7 @@ if __name__ == '__main__':
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
         
-        new_ai_win_num = process_evaluate_data(ret, -100, -100)  # この中で各種情報がprintされる
+        new_ai_win_num = process_evaluate_data(ret, -100, -100, play_num)  # この中で各種情報がprintされる
         
     elif sys.argv[1] == "multiprocess_test":
         np.random.seed(0)
