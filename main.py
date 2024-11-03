@@ -659,7 +659,7 @@ def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", e
             imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM, wait_time) for j, wait_time in enumerate(wait_time_list)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
 
-        new_ai_win_num = process_evaluate_data(ret, old_AI_id, old_rate, play_num)
+        new_ai_win_num = process_evaluate_data(ret, old_AI_id, old_rate, play_num, epoch_now)
         win_num_list.append(new_ai_win_num)
     
     return calc_rate(play_num, np.array(AI_rate_list), np.array(win_num_list)), win_num_list
