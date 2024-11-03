@@ -147,7 +147,7 @@ def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None):
                 node = move_to_child(node, key, statevec2node)
                 path.append(node)
 
-        is_sente_win = 1 - state.turn % 2  # 引き分けは極めて稀なので考慮しない。
+        is_sente_win = state.turn % 2  # 引き分けは極めて稀なので考慮しない。
 
         for node in path:
             node.visited_num += 1
