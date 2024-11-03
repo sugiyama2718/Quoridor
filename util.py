@@ -164,14 +164,25 @@ def get_epoch_dir_name(epoch):
     return "{}_{}".format(floor_epoch, floor_epoch + EPOCH_DIR_UNIT)
 
 
-def build_graph(node, graph, parent_id=None, edge_label=None):
+visited = None
+def build_graph(node, graph, statevec2node, parent_id=None, edge_label=None):
+    global visited
+
     node_id = str(id(node))
-    
+
+    # ノードが既に処理されている場合はスキップ（循環参照対策）
+    if id(node) in visited:
+        # 親ノードから現在のノードへのエッジを追加
+        if parent_id is not None and edge_label is not None:
+            graph.edge(parent_id, node_id, label=edge_label)
+        return
+    visited.add(id(node))
+
     # ノードのラベルを作成
     visited_num = node.visited_num
     p1_win_num = node.p1_win_num
     p2_win_num = node.p2_win_num
-    
+
     if visited_num is not None and p1_win_num is not None and p2_win_num is not None:
         p1_percentage = (p1_win_num / visited_num) * 100 if visited_num else 0
         p2_percentage = (p2_win_num / visited_num) * 100 if visited_num else 0
@@ -182,19 +193,23 @@ def build_graph(node, graph, parent_id=None, edge_label=None):
 
     # ノードをグラフに追加
     graph.node(node_id, label=label)
-    
+
     # 親ノードから現在のノードへのエッジを追加
     if parent_id is not None and edge_label is not None:
         graph.edge(parent_id, node_id, label=edge_label)
-    
-    # 子ノードに対して再帰的に処理
-    for child_key, child_node in node.children.items():
-        build_graph(child_node, graph, node_id, child_key)
 
-def save_tree_graph(root):
+    # 子ノードに対して再帰的に処理
+    for child_key in node.children.keys():
+        next_node = move_to_child(node, child_key, statevec2node)
+        build_graph(next_node, graph, statevec2node, node_id, child_key)
+
+def save_tree_graph(root, statevec2node, path):
+    global visited
+
     graph = graphviz.Digraph(format='png')
-    build_graph(root, graph)
-    graph.render('kifu_tree', view=False)
+    visited = set()
+    build_graph(root, graph, statevec2node)
+    graph.render(path, view=False)
 
 
 if __name__ == "__main__":

@@ -624,17 +624,23 @@ def evaluate_2game_process(arg_tuple):
     return ret
 
 
-def process_evaluate_data(evaluate_ret, old_AI_id, old_rate, play_num):
+def process_evaluate_data(evaluate_ret, old_AI_id, old_rate, play_num, epoch_now=-100):
     play_num_half = play_num // 2
     
     kifu = []
     for x in evaluate_ret:
         kifu.extend(x[3])
-    kifu_tree, _ = generate_opening_tree(kifu, 20)
-    save_tree_graph(kifu_tree)
 
-    sente_win_num_total = play_num_half - sum([x[0] for x in evaluate_ret])  # 最新パラメータからみた先手での勝数
-    gote_win_num_total = play_num_half - sum([x[1] for x in evaluate_ret])
+    save_dir = os.path.join(EVAL_DETAIL_DIR, str(epoch_now))
+    os.makedirs(save_dir, exist_ok=True)
+
+    kifu_tree_p1, statevec2node_p1 = generate_opening_tree([x for i, x in enumerate(kifu) if i % 2 == 0], 20)
+    save_tree_graph(kifu_tree_p1, statevec2node_p1, os.path.join(save_dir, f"p1_{old_AI_id}_sente"))
+    kifu_tree_p2, statevec2node_p2 = generate_opening_tree([x for i, x in enumerate(kifu) if i % 2 == 1], 20)
+    save_tree_graph(kifu_tree_p2, statevec2node_p2, os.path.join(save_dir, f"p2_{old_AI_id}_sente"))
+
+    gote_win_num_total = play_num_half - sum([x[0] for x in evaluate_ret])  # 最新パラメータからみた先手での勝数
+    sente_win_num_total = play_num_half - sum([x[1] for x in evaluate_ret])
     new_ai_win_num = sente_win_num_total + gote_win_num_total
     print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.1f}%, sente win {}/{} ({:.1f}%), gote win {}/{} ({:.1f}%)".format(
         old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num * 100,
@@ -643,7 +649,7 @@ def process_evaluate_data(evaluate_ret, old_AI_id, old_rate, play_num):
     return new_ai_win_num
 
 
-def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", evaluate_play_num=EVALUATE_PLAY_NUM):
+def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", evaluate_play_num=EVALUATE_PLAY_NUM, epoch_now=-100):
     play_num = evaluate_play_num // len(AI_id_list) // 2 * 2
     win_num_list = []
     for old_AI_id, old_rate in zip(AI_id_list, AI_rate_list):
@@ -749,6 +755,7 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
 
     if restart:
         initial_epoch, AI_id_list, AI_rate_list, new_rate, load_AI_id, loss_dict, valid_loss = pickle.load(open(restart_filename, "rb"))
+        #initial_epoch -= 1
         print("retrain: {}, {}, {}, {}, {}, {}".format(initial_epoch, AI_id_list, AI_rate_list, new_rate, load_AI_id, loss_dict, valid_loss))
 
     print("epoch num in pool = {}".format(POOL_EPOCH_NUM))
@@ -805,7 +812,7 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
         # --------evaluation---------
         if epoch % EVALUATION_EPOCH_NUM == 0:
             start = time.time()
-            new_rate, win_num_list = evaluate_and_calc_rate(AI_id_list, AI_rate_list)
+            new_rate, win_num_list = evaluate_and_calc_rate(AI_id_list, AI_rate_list, epoch_now=epoch)
 
             win_num_dir = os.path.join(TRAIN_LOG_DIR, "win_num")
             os.makedirs(win_num_dir, exist_ok=True)
@@ -958,12 +965,12 @@ if __name__ == '__main__':
             #AIs[0].load(os.path.join("backup/221219/train_results/parameter/", "epoch680.ckpt"))
             AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch1), f"epoch{epoch1}.ckpt"))
             AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch2), f"epoch{epoch2}.ckpt"))
-            ret = evaluate(AIs, 2, multiprocess=True, display=True, return_detail=True)
+            ret = evaluate(AIs, 2, multiprocess=True, display=False, return_detail=True)
             del AIs
             return ret
-        play_num = 4
+        play_num = 100
         play_num_half = play_num // 2
-        with Pool(processes=1) as p:
+        with Pool(processes=4) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
         
