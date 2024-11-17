@@ -213,19 +213,28 @@ def save_tree_graph(root, statevec2node, path):
     graph.render(path, view=False)
 
 
-def compute_contributions(root, total_games, max_depth):
+def compute_contributions(root, statevec2node, total_games, max_depth):
     # Initialize data structures
     nodes_at_depth = {}
     entropies = []
+    nodes_seen = set()  # Set to keep track of nodes we've already processed
+
+    # Start with the root node
     nodes_at_depth[0] = [root]
+    nodes_seen.add(id(root))  # Use id(root) as a unique identifier
 
     # Collect nodes at each depth up to max_depth
     for depth in range(max_depth):
         nodes = nodes_at_depth.get(depth, [])
         next_nodes = []
         for node in nodes:
-            for child in node.children.values():
-                next_nodes.append(child)
+            for child_key in node.children.keys():
+                # Use move_to_child function to get the child node
+                next_node = move_to_child(node, child_key, statevec2node)
+                node_id = id(next_node)
+                if node_id not in nodes_seen:
+                    nodes_seen.add(node_id)
+                    next_nodes.append(next_node)
         if next_nodes:
             nodes_at_depth[depth + 1] = next_nodes
 
@@ -262,11 +271,9 @@ def compute_contributions(root, total_games, max_depth):
     max_entropy = math.log(total_games) if total_games > 0 else 0.0
 
     # Compute contribution rates
-    if abs(player1_contrib - max_entropy) < 1e-10:
+    if abs(player1_contrib - max_entropy) < 1e-10 or abs(player2_contrib - max_entropy) < 1e-10:
+        # If one player's contribution equals max_entropy, set both rates to 1
         player1_contrib_rate = 1.0
-        player2_contrib_rate = 0.0
-    elif abs(player2_contrib - max_entropy) < 1e-10:
-        player1_contrib_rate = 0.0
         player2_contrib_rate = 1.0
     else:
         denominator1 = max_entropy - player2_contrib
@@ -283,9 +290,9 @@ def compute_contributions(root, total_games, max_depth):
     # Print the results
     print("Maximum Entropy: {:.4f}".format(max_entropy))
     print("Player 1 Contribution: {:.4f}".format(p1_contrib))
-    print("Player 1 Contribution Rate: {:.4f}".format(p1_contrib_rate))
+    print("Player 1 Contribution Rate: {:.2f}%".format(p1_contrib_rate * 100))
     print("Player 2 Contribution: {:.4f}".format(p2_contrib))
-    print("Player 2 Contribution Rate: {:.4f}".format(p2_contrib_rate))
+    print("Player 2 Contribution Rate: {:.2f}%".format(p2_contrib_rate * 100))
 
     return (p1_contrib, p1_contrib_rate), (p2_contrib, p2_contrib_rate)
 

@@ -642,8 +642,8 @@ def process_evaluate_data(evaluate_ret, old_AI_id, old_rate, play_num, epoch_now
 
     print(f"graph saved at {save_dir}")
 
-    kifu_tree, _ = generate_opening_tree(kifu, MAX_DEPTH)
-    compute_contributions(kifu_tree, len(kifu), MAX_DEPTH)
+    kifu_tree, statevec2node = generate_opening_tree(kifu, MAX_DEPTH)
+    compute_contributions(kifu_tree, statevec2node, len(kifu), MAX_DEPTH)
 
     gote_win_num_total = play_num_half - sum([x[0] for x in evaluate_ret])  # 最新パラメータからみた先手での勝数
     sente_win_num_total = play_num_half - sum([x[1] for x in evaluate_ret])
@@ -974,7 +974,7 @@ if __name__ == '__main__':
             ret = evaluate(AIs, 2, multiprocess=True, display=False, return_detail=True)
             del AIs
             return ret
-        play_num = 100
+        play_num = 10
         play_num_half = play_num // 2
         with Pool(processes=4) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
