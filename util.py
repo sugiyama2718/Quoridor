@@ -1,5 +1,6 @@
 import os
 import graphviz
+import math
 from Tree import OpeningTree
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
@@ -210,6 +211,83 @@ def save_tree_graph(root, statevec2node, path):
     visited = set()
     build_graph(root, graph, statevec2node)
     graph.render(path, view=False)
+
+
+def compute_contributions(root, total_games, max_depth):
+    # Initialize data structures
+    nodes_at_depth = {}
+    entropies = []
+    nodes_at_depth[0] = [root]
+
+    # Collect nodes at each depth up to max_depth
+    for depth in range(max_depth):
+        nodes = nodes_at_depth.get(depth, [])
+        next_nodes = []
+        for node in nodes:
+            for child in node.children.values():
+                next_nodes.append(child)
+        if next_nodes:
+            nodes_at_depth[depth + 1] = next_nodes
+
+    # Compute entropies at each depth
+    for depth in range(max_depth + 1):
+        nodes = nodes_at_depth.get(depth, [])
+        visited_nums = []
+        total_visits = 0
+        for node in nodes:
+            if node.visited_num is not None:
+                visited_nums.append(node.visited_num)
+                total_visits += node.visited_num
+        if total_visits > 0 and visited_nums:
+            probabilities = [vn / total_visits for vn in visited_nums]
+            entropy = -sum(p * math.log(p) for p in probabilities if p > 0)
+        else:
+            entropy = 0.0  # No games at this depth
+        entropies.append(entropy)
+
+    # Compute contributions for each player
+    player1_contrib = 0.0
+    player2_contrib = 0.0
+
+    for t in range(len(entropies) - 1):
+        delta_entropy = entropies[t + 1] - entropies[t]
+        if t % 2 == 0:
+            # Player 1 moves at even turns
+            player1_contrib += delta_entropy
+        else:
+            # Player 2 moves at odd turns
+            player2_contrib += delta_entropy
+
+    # Compute maximum entropy
+    max_entropy = math.log(total_games) if total_games > 0 else 0.0
+
+    # Compute contribution rates
+    if abs(player1_contrib - max_entropy) < 1e-10:
+        player1_contrib_rate = 1.0
+        player2_contrib_rate = 0.0
+    elif abs(player2_contrib - max_entropy) < 1e-10:
+        player1_contrib_rate = 0.0
+        player2_contrib_rate = 1.0
+    else:
+        denominator1 = max_entropy - player2_contrib
+        denominator2 = max_entropy - player1_contrib
+        player1_contrib_rate = player1_contrib / denominator1 if denominator1 != 0 else 0.0
+        player2_contrib_rate = player2_contrib / denominator2 if denominator2 != 0 else 0.0
+
+    # Store the results in variables
+    p1_contrib = player1_contrib
+    p2_contrib = player2_contrib
+    p1_contrib_rate = player1_contrib_rate
+    p2_contrib_rate = player2_contrib_rate
+
+    # Print the results
+    print("Maximum Entropy: {:.4f}".format(max_entropy))
+    print("Player 1 Contribution: {:.4f}".format(p1_contrib))
+    print("Player 1 Contribution Rate: {:.4f}".format(p1_contrib_rate))
+    print("Player 2 Contribution: {:.4f}".format(p2_contrib))
+    print("Player 2 Contribution Rate: {:.4f}".format(p2_contrib_rate))
+
+    return (p1_contrib, p1_contrib_rate), (p2_contrib, p2_contrib_rate)
 
 
 if __name__ == "__main__":
