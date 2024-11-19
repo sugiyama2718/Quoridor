@@ -635,15 +635,16 @@ def process_evaluate_data(evaluate_ret, old_AI_id, old_rate, play_num, epoch_now
     os.makedirs(save_dir, exist_ok=True)
 
     MAX_DEPTH = 20
+
     kifu_tree_p1, statevec2node_p1 = generate_opening_tree([x for i, x in enumerate(kifu) if i % 2 == 0], MAX_DEPTH)
     save_tree_graph(kifu_tree_p1, statevec2node_p1, os.path.join(save_dir, f"p1_{old_AI_id}_sente"))
+    compute_contributions(kifu_tree_p1, statevec2node_p1, len([x for i, x in enumerate(kifu) if i % 2 == 0]), MAX_DEPTH)
+
     kifu_tree_p2, statevec2node_p2 = generate_opening_tree([x for i, x in enumerate(kifu) if i % 2 == 1], MAX_DEPTH)
     save_tree_graph(kifu_tree_p2, statevec2node_p2, os.path.join(save_dir, f"p2_{old_AI_id}_sente"))
+    compute_contributions(kifu_tree_p2, statevec2node_p2, len([x for i, x in enumerate(kifu) if i % 2 == 1]), MAX_DEPTH)
 
     print(f"graph saved at {save_dir}")
-
-    kifu_tree, statevec2node = generate_opening_tree(kifu, MAX_DEPTH)
-    compute_contributions(kifu_tree, statevec2node, len(kifu), MAX_DEPTH)
 
     gote_win_num_total = play_num_half - sum([x[0] for x in evaluate_ret])  # 最新パラメータからみた先手での勝数
     sente_win_num_total = play_num_half - sum([x[1] for x in evaluate_ret])
@@ -974,7 +975,7 @@ if __name__ == '__main__':
             ret = evaluate(AIs, 2, multiprocess=True, display=False, return_detail=True)
             del AIs
             return ret
-        play_num = 10
+        play_num = 100
         play_num_half = play_num // 2
         with Pool(processes=4) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
