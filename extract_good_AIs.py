@@ -155,7 +155,7 @@ def evaluate_2game_process_2id(arg_tuple):
 
 def get_winner_from_action_list(action_list):
     # 勝者が先手なら1、後手なら-1、引き分けなら0を返す
-    return 1 if len(action_list) % 2 == 0 else -1
+    return -1 if len(action_list) % 2 == 0 else 1
 
 
 def list_all_files(directory):
