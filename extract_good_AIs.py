@@ -14,13 +14,15 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import argparse
 import logging
-from util import get_epoch_dir_name
+from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions
 tf.get_logger().setLevel(logging.ERROR)
 
 SIGMA = 1.5
 RANDOM_EPSILON = 1e-5  # 同スコアのものにランダム性を加える目的
 EPSILON = 1e-10
 FIX_EPOCH_LIST = [60, 61, 63, 65, 75, 81, 91, 130, 175, 215, 285, 325, 465, 775]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
+EPOCH_CYCLE = 100
+MAX_DEPTH = 20
 
 # EVALUATE_GAME_NUM = 14000
 # SEARCHNODES_FOR_EXTRACT = 500
@@ -44,15 +46,39 @@ FIX_EPOCH_LIST = [60, 61, 63, 65, 75, 81, 91, 130, 175, 215, 285, 325, 465, 775]
 # ELIMINATE_STEP = 1500  # 何試合ごとにAI消去処理を実施するか
 
 # 240603AI選定の設定
-EVALUATE_GAME_NUM = 10000
+# EVALUATE_GAME_NUM = 10000
+# SEARCHNODES_FOR_EXTRACT = 500
+# START_CAND_NUM = 32
+# START_DIFF_NUM = 16
+# END_CAND_NUM = 4
+# DIFF_R = 0.5
+# ELIMINATE_NUM = 6  # AI消去処理の最大回数
+# RATE_DIV = 0.5
+# ELIMINATE_STEP = 1000  # 何試合ごとにAI消去処理を実施するか
+# MAX_GAME_NUM_PER_EPOCH = 50
+
+# 240902AI選定の設定
+# EVALUATE_GAME_NUM = 20000
+# SEARCHNODES_FOR_EXTRACT = 500
+# START_CAND_NUM = 16
+# START_DIFF_NUM = 8
+# END_CAND_NUM = 4
+# DIFF_R = 0.5
+# ELIMINATE_NUM = 5  # AI消去処理の最大回数
+# RATE_DIV = 0.5
+# ELIMINATE_STEP = 3000  # 何試合ごとにAI消去処理を実施するか
+# MAX_GAME_NUM_PER_EPOCH = 50
+
+# 241201AI選定の設定
+EVALUATE_GAME_NUM = 2000
 SEARCHNODES_FOR_EXTRACT = 500
-START_CAND_NUM = 32
-START_DIFF_NUM = 16
+START_CAND_NUM = 16
+START_DIFF_NUM = 8
 END_CAND_NUM = 4
 DIFF_R = 0.5
-ELIMINATE_NUM = 6  # AI消去処理の最大回数
+ELIMINATE_NUM = 5  # AI消去処理の最大回数
 RATE_DIV = 0.5
-ELIMINATE_STEP = 1000  # 何試合ごとにAI消去処理を実施するか
+ELIMINATE_STEP = 3000  # 何試合ごとにAI消去処理を実施するか
 MAX_GAME_NUM_PER_EPOCH = 50
 
 # elimination無し
@@ -122,9 +148,14 @@ def evaluate_2game_process_2id(arg_tuple):
     AIs[0].tau = EVALUATION_TAU
     AIs[1].tau = EVALUATION_TAU
 
-    ret = evaluate(AIs, 2, multiprocess=True)
+    ret = evaluate(AIs, 2, multiprocess=True, return_detail=True)
     del AIs
     return ret, arg_i, arg_j
+
+
+def get_winner_from_action_list(action_list):
+    # 勝者が先手なら1、後手なら-1、引き分けなら0を返す
+    return 1 if len(action_list) % 2 == 0 else -1
 
 
 def list_all_files(directory):
@@ -170,9 +201,9 @@ if __name__ == "__main__":
         #ends_num = 100
         ends_num = 0
         if ends_num > 0:
-            additional_AI_id_list = [AI_id for AI_id in AI_id_list[:-ends_num] if AI_id % 5 == 0] + AI_id_list[-ends_num:]
+            additional_AI_id_list = [AI_id for AI_id in AI_id_list[:-ends_num] if AI_id % EPOCH_CYCLE == 0] + AI_id_list[-ends_num:]
         else:
-            additional_AI_id_list = [AI_id for AI_id in AI_id_list if AI_id % 5 == 0]
+            additional_AI_id_list = [AI_id for AI_id in AI_id_list if AI_id % EPOCH_CYCLE == 0]
         AI_id_list = list(past_AI_id_arr) + additional_AI_id_list
         search_nodes_list = list(past_search_nodes_arr) + [SEARCHNODES_FOR_EXTRACT] * len(additional_AI_id_list)
         # print(AI_id_list)
@@ -195,31 +226,73 @@ if __name__ == "__main__":
         AI_id_list = [-1] + list(sorted(param_files))
         # both_ends_num = 100  # AI_id_listの両端をいくつそのまま残すか
         # AI_id_list = AI_id_list[:both_ends_num] + [AI_id for AI_id in AI_id_list[both_ends_num:-both_ends_num] if AI_id % 5 == 0] + AI_id_list[-both_ends_num:]
-        first_num = 50  # AI_id_listの最初をいくつそのまま残すか
-        AI_id_list = AI_id_list[:first_num] + [AI_id for AI_id in AI_id_list[first_num:] if AI_id % 5 == 0]
+        # first_num = 10  # AI_id_listの最初をいくつそのまま残すか
+        # AI_id_list = AI_id_list[:first_num] + [AI_id for AI_id in AI_id_list[first_num:] if AI_id % EPOCH_CYCLE == 0]
+
+        # 選別条件をパラメータとして定義
+        # 各タプルは (start_index, end_index, modulus) を表す
+        # selection_criteria = [
+        #     (0, 49, 1),    # 最初の50個はすべて含める (AI_id % 1 == 0)
+        #     (50, 99, 5),   # 次の50個は AI_id % 5 == 0 のものを含める
+        #     (100, len(AI_id_list)-1, 100)  # 残りは AI_id % 100 == 0 のものを含める
+        # ]
+
+        selection_criteria = [
+            (0, 9, 1),
+            (10, 29, 5),
+            (30, len(AI_id_list)-1, 100) 
+        ]
+
+        # 選別されたAI_idを格納するリストを初期化
+        selected_AI_id_list = []
+
+        # 選別条件に従って AI_id_list を選別
+        for start_idx, end_idx, modulus in selection_criteria:
+            # インデックス範囲が AI_id_list の範囲内に収まるように調整
+            end_idx = min(end_idx, len(AI_id_list)-1)
+            # 指定された範囲のAI_idを選別
+            selected_AI_id_list.extend([
+                AI_id for AI_id in AI_id_list[start_idx:end_idx+1]
+                if AI_id % modulus == 0
+            ])
+
+        # 元の AI_id_list を選別されたものに置き換える
+        AI_id_list = selected_AI_id_list
+
         search_nodes_list = [SEARCHNODES_FOR_EXTRACT] * len(AI_id_list)
         print(AI_id_list)
 
     AI_num = len(AI_id_list)
     print(f"AI num = {AI_num}")
 
+    # 各AIの先手・後手の勝利数と棋譜を格納する辞書を初期化
+    sente_win_num_dict = {i: 0 for i in range(AI_num)}
+    gote_win_num_dict = {i: 0 for i in range(AI_num)}
+    action_lists_sente_dict = {i: [] for i in range(AI_num)}
+    action_lists_gote_dict = {i: [] for i in range(AI_num)}
+
     dummy_AI_num = AI_num
     dummy_r_arr = np.log(np.arange(dummy_AI_num) + 1) + np.random.rand(dummy_AI_num)
     dummy_r_arr -= np.min(dummy_r_arr)
 
     def dummy_evaluate_2game_process(arg_tuple):
-        arg_i, arg_j, AI_id1, AI_id2, seed, search_nodes1, search_nodes2 = arg_tuple
+        arg_i, arg_j, AI_id1, AI_id2, seed, search_nodes1, search_nodes2, wait_time = arg_tuple
         p = 1 / (1 + np.exp(dummy_r_arr[arg_j] - dummy_r_arr[arg_i]))
         ret = []
         for _ in range(2):
             ret.append(int(random.random() < p))
-        return sum(ret), arg_i, arg_j
+        sente_win_num = ret[0]
+        gote_win_num = ret[1]
+        draw_num = 0
+        action_lists = []
+        return (sente_win_num, gote_win_num, draw_num, action_lists), arg_i, arg_j
+        #return sum(ret), arg_i, arg_j
 
     n_arr = np.zeros((AI_num, AI_num))
     N_arr = np.zeros((AI_num, AI_num))
 
     # train_logにn_arrが残っている場合、AI_idとsearch_nodesがそのときのものと一致している前提で新しいn_arr, N_arrに読み込む
-    if os.path.exists(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr_extracted.csv")):
+    if use_past_result and os.path.exists(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr_extracted.csv")):
         past_n_arr = np.loadtxt(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr_extracted.csv"), delimiter=',')
         past_N_arr = np.loadtxt(os.path.join(TRAIN_LOG_DIR, "detail", "N_arr_extracted.csv"), delimiter=',')
         past_n_arr = past_n_arr[np.ix_(use_index_list, use_index_list)]
@@ -259,11 +332,34 @@ if __name__ == "__main__":
             #imap = p.imap(func=dummy_evaluate_2game_process, iterable=args)
             ret = list(tqdm(imap, total=len(matches)))
 
-        for game_result, i, j in ret:
-            n_arr[i, j] += game_result
+        for evaluate_ret, i, j in ret:
+            sente_win_num, gote_win_num, draw_num, action_lists = evaluate_ret
+            win_num_total = sente_win_num + gote_win_num
+            n_arr[i, j] += win_num_total
             N_arr[i, j] += 2
-            n_arr[j, i] += 2 - game_result
+            n_arr[j, i] += 2 - win_num_total
             N_arr[j, i] += 2
+
+            for game_index, action_list in enumerate(action_lists):
+                winner = get_winner_from_action_list(action_list)
+                if game_index == 0:
+                    # ゲーム1: AI iが先手、AI jが後手
+                    if winner == 1:
+                        sente_win_num_dict[i] += 1
+                    elif winner == -1:
+                        gote_win_num_dict[j] += 1
+                    # 棋譜を更新
+                    action_lists_sente_dict[i].append(action_list)
+                    action_lists_gote_dict[j].append(action_list)
+                elif game_index == 1:
+                    # ゲーム2: AI jが先手、AI iが後手
+                    if winner == 1:
+                        sente_win_num_dict[j] += 1
+                    elif winner == -1:
+                        gote_win_num_dict[i] += 1
+                    # 棋譜を更新
+                    action_lists_sente_dict[j].append(action_list)
+                    action_lists_gote_dict[i].append(action_list)
 
     cand_num = START_CAND_NUM
     diff_num = START_DIFF_NUM
@@ -295,7 +391,33 @@ if __name__ == "__main__":
             imap = p.imap(func=estimate_multi_rate_process, iterable=[(n_arr, N_arr, AI_num)])
             estimated_r_arr = list(imap)[0]
 
-        r_df = pd.DataFrame({"AI_id": np.array(AI_id_list)[survived_list], "search nodes": np.array(search_nodes_list)[survived_list], "rate": estimated_r_arr[survived_list]})
+        diversity_sente_dict = {}
+        diversity_gote_dict = {}
+
+        for i in survived_list:
+            # 先手の棋譜から多様性を計算
+            kifu_sente = action_lists_sente_dict[i]
+            kifu_tree_sente, statevec2node_sente = generate_opening_tree(kifu_sente, MAX_DEPTH, disable_tqdm=True)
+            diversity_sente = compute_contributions(kifu_tree_sente, statevec2node_sente, len(kifu_sente), MAX_DEPTH, is_print=False)
+            diversity_sente_dict[i] = diversity_sente
+
+            # 後手の棋譜から多様性を計算
+            kifu_gote = action_lists_gote_dict[i]
+            kifu_tree_gote, statevec2node_gote = generate_opening_tree(kifu_gote, MAX_DEPTH, disable_tqdm=True)
+            diversity_gote = compute_contributions(kifu_tree_gote, statevec2node_gote, len(kifu_gote), MAX_DEPTH, is_print=False)
+            diversity_gote_dict[i] = diversity_gote
+
+        # 結果をデータフレームにまとめる
+        r_df = pd.DataFrame({
+            "AI_id": np.array(AI_id_list)[survived_list],
+            "search nodes": np.array(search_nodes_list)[survived_list],
+            "rate": estimated_r_arr[survived_list],
+            "sente_win_num": [sente_win_num_dict[i] for i in survived_list],
+            "gote_win_num": [gote_win_num_dict[i] for i in survived_list],
+            "diversity_sente": [diversity_sente_dict[i] for i in survived_list],
+            "diversity_gote": [diversity_gote_dict[i] for i in survived_list],
+        })
+
         r_df.to_csv(os.path.join(save_dir, "estimated_rate.csv"))
 
         np.savetxt(os.path.join(save_dir, "n_arr.csv"), n_arr, delimiter=",")
