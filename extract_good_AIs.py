@@ -23,6 +23,7 @@ EPSILON = 1e-10
 FIX_EPOCH_LIST = [60, 61, 63, 65, 75, 81, 91, 130, 175, 215, 285, 325, 465, 775]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
 EPOCH_CYCLE = 100
 MAX_DEPTH = 20
+EXTRACT_GOOD_AIS_TAU = 0.48
 
 # EVALUATE_GAME_NUM = 14000
 # SEARCHNODES_FOR_EXTRACT = 500
@@ -70,27 +71,28 @@ MAX_DEPTH = 20
 # MAX_GAME_NUM_PER_EPOCH = 50
 
 # 241201AI選定の設定
-EVALUATE_GAME_NUM = 2000
-SEARCHNODES_FOR_EXTRACT = 500
-START_CAND_NUM = 16
-START_DIFF_NUM = 8
-END_CAND_NUM = 4
-DIFF_R = 0.5
-ELIMINATE_NUM = 5  # AI消去処理の最大回数
-RATE_DIV = 0.5
-ELIMINATE_STEP = 3000  # 何試合ごとにAI消去処理を実施するか
-MAX_GAME_NUM_PER_EPOCH = 50
-
-# elimination無し
 # EVALUATE_GAME_NUM = 10000
 # SEARCHNODES_FOR_EXTRACT = 500
-# START_CAND_NUM = 100
-# START_DIFF_NUM = 0
-# END_CAND_NUM = 100
+# START_CAND_NUM = 16
+# START_DIFF_NUM = 8
+# END_CAND_NUM = 4
 # DIFF_R = 0.5
-# ELIMINATE_NUM = 0
+# ELIMINATE_NUM = 5  # AI消去処理の最大回数
 # RATE_DIV = 0.5
-# ELIMINATE_STEP = 1000
+# ELIMINATE_STEP = 1500  # 何試合ごとにAI消去処理を実施するか
+# MAX_GAME_NUM_PER_EPOCH = 50
+
+# elimination無し
+EVALUATE_GAME_NUM = 10000
+SEARCHNODES_FOR_EXTRACT = 500
+START_CAND_NUM = 100
+START_DIFF_NUM = 0
+END_CAND_NUM = 100
+DIFF_R = 0.5
+ELIMINATE_NUM = 0
+RATE_DIV = 0.5
+ELIMINATE_STEP = 1000
+MAX_GAME_NUM_PER_EPOCH = 50
 
 # EVALUATE_GAME_NUM = 50
 # START_CAND_NUM = 3
@@ -145,8 +147,8 @@ def evaluate_2game_process_2id(arg_tuple):
         AI2.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id2), "epoch{}.ckpt".format(AI_id2)))
 
     AIs = [AI1, AI2]
-    AIs[0].tau = EVALUATION_TAU
-    AIs[1].tau = EVALUATION_TAU
+    AIs[0].tau = EXTRACT_GOOD_AIS_TAU
+    AIs[1].tau = EXTRACT_GOOD_AIS_TAU
 
     ret = evaluate(AIs, 2, multiprocess=True, return_detail=True)
     del AIs
@@ -170,9 +172,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="")
     parser.add_argument('--use_past_result', action='store_true', help='Use past result if specified')
+    parser.add_argument('--use_past_id_only', action='store_true', help='Use past result if specified')
     args = parser.parse_args()
 
-    use_past_result = args.use_past_result
+    use_past_result = args.use_past_result or args.use_past_id_only
+    use_past_id_only = args.use_past_id_only
+    load_array = use_past_result and not use_past_id_only
 
     param_files = list_all_files(PARAMETER_DIR)
     param_files = list(set([s.split(".")[0] for s in param_files]))
@@ -198,12 +203,16 @@ if __name__ == "__main__":
         AI_id_set = all_AI_id_set - set(range(-1, max(past_AI_id_arr) + 1))
         AI_id_list = sorted(list(AI_id_set))
 
-        #ends_num = 100
-        ends_num = 0
-        if ends_num > 0:
-            additional_AI_id_list = [AI_id for AI_id in AI_id_list[:-ends_num] if AI_id % EPOCH_CYCLE == 0] + AI_id_list[-ends_num:]
+        if use_past_id_only:
+            additional_AI_id_list = []
         else:
-            additional_AI_id_list = [AI_id for AI_id in AI_id_list if AI_id % EPOCH_CYCLE == 0]
+            #ends_num = 100
+            ends_num = 0
+            if ends_num > 0:
+                additional_AI_id_list = [AI_id for AI_id in AI_id_list[:-ends_num] if AI_id % EPOCH_CYCLE == 0] + AI_id_list[-ends_num:]
+            else:
+                additional_AI_id_list = [AI_id for AI_id in AI_id_list if AI_id % EPOCH_CYCLE == 0]
+
         AI_id_list = list(past_AI_id_arr) + additional_AI_id_list
         search_nodes_list = list(past_search_nodes_arr) + [SEARCHNODES_FOR_EXTRACT] * len(additional_AI_id_list)
         # print(AI_id_list)
@@ -238,9 +247,10 @@ if __name__ == "__main__":
         # ]
 
         selection_criteria = [
-            (0, 9, 1),
-            (10, 29, 5),
-            (30, len(AI_id_list)-1, 100) 
+            (0, 29, 1),
+            (30, 199, 5),
+            (200, 499, 20),
+            (500, len(AI_id_list)-1, 100) 
         ]
 
         # 選別されたAI_idを格納するリストを初期化
@@ -292,7 +302,7 @@ if __name__ == "__main__":
     N_arr = np.zeros((AI_num, AI_num))
 
     # train_logにn_arrが残っている場合、AI_idとsearch_nodesがそのときのものと一致している前提で新しいn_arr, N_arrに読み込む
-    if use_past_result and os.path.exists(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr_extracted.csv")):
+    if load_array and os.path.exists(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr_extracted.csv")):
         past_n_arr = np.loadtxt(os.path.join(TRAIN_LOG_DIR, "detail", "n_arr_extracted.csv"), delimiter=',')
         past_N_arr = np.loadtxt(os.path.join(TRAIN_LOG_DIR, "detail", "N_arr_extracted.csv"), delimiter=',')
         past_n_arr = past_n_arr[np.ix_(use_index_list, use_index_list)]
@@ -367,6 +377,10 @@ if __name__ == "__main__":
     save_dir = os.path.join(TRAIN_LOG_DIR, "detail")
     os.makedirs(save_dir, exist_ok=True)
 
+    # 各AIの棋譜を保存するディレクトリを作成
+    kifu_save_dir = os.path.join(save_dir, "kifu")
+    os.makedirs(kifu_save_dir, exist_ok=True)
+
     all_eliminate_AI_indices_list = []
     survived_list = range(len(AI_id_list))
     total_game_num = 0
@@ -395,17 +409,39 @@ if __name__ == "__main__":
         diversity_gote_dict = {}
 
         for i in survived_list:
+            AI_id = AI_id_list[i]
+
             # 先手の棋譜から多様性を計算
             kifu_sente = action_lists_sente_dict[i]
             kifu_tree_sente, statevec2node_sente = generate_opening_tree(kifu_sente, MAX_DEPTH, disable_tqdm=True)
-            diversity_sente = compute_contributions(kifu_tree_sente, statevec2node_sente, len(kifu_sente), MAX_DEPTH, is_print=False)
+            (_, diversity_sente), (_, _) = compute_contributions(kifu_tree_sente, statevec2node_sente, len(kifu_sente), MAX_DEPTH, is_print=False)
             diversity_sente_dict[i] = diversity_sente
+
+            # 先手の棋譜の木構造を生成・保存
+            tree_file_sente = os.path.join(kifu_save_dir, f"AI_{AI_id}_sente_tree")
+            save_tree_graph(kifu_tree_sente, statevec2node_sente, tree_file_sente)
+
+            # 先手の棋譜を保存
+            sente_file_path = os.path.join(kifu_save_dir, f"AI_{AI_id}_sente.txt")
+            with open(sente_file_path, 'w') as f:
+                for kifu in kifu_sente:
+                    f.write(','.join(kifu) + '\n')
 
             # 後手の棋譜から多様性を計算
             kifu_gote = action_lists_gote_dict[i]
             kifu_tree_gote, statevec2node_gote = generate_opening_tree(kifu_gote, MAX_DEPTH, disable_tqdm=True)
-            diversity_gote = compute_contributions(kifu_tree_gote, statevec2node_gote, len(kifu_gote), MAX_DEPTH, is_print=False)
+            (_, _), (_, diversity_gote) = compute_contributions(kifu_tree_gote, statevec2node_gote, len(kifu_gote), MAX_DEPTH, is_print=False)
             diversity_gote_dict[i] = diversity_gote
+
+            # 後手の棋譜の木構造を生成・保存
+            tree_file_gote = os.path.join(kifu_save_dir, f"AI_{AI_id}_gote_tree")
+            save_tree_graph(kifu_tree_gote, statevec2node_gote, tree_file_gote)
+
+            # 後手の棋譜を保存
+            gote_file_path = os.path.join(kifu_save_dir, f"AI_{AI_id}_gote.txt")
+            with open(gote_file_path, 'w') as f:
+                for kifu in kifu_gote:
+                    f.write(','.join(kifu) + '\n')
 
         # 結果をデータフレームにまとめる
         r_df = pd.DataFrame({
