@@ -408,6 +408,7 @@ if __name__ == "__main__":
         diversity_sente_dict = {}
         diversity_gote_dict = {}
 
+        # 棋譜などの保存。時間がかかるので最後に一回だけ実行する
         for i in survived_list:
             AI_id = AI_id_list[i]
 
@@ -417,31 +418,11 @@ if __name__ == "__main__":
             (_, diversity_sente), (_, _) = compute_contributions(kifu_tree_sente, statevec2node_sente, len(kifu_sente), MAX_DEPTH, is_print=False)
             diversity_sente_dict[i] = diversity_sente
 
-            # 先手の棋譜の木構造を生成・保存
-            tree_file_sente = os.path.join(kifu_save_dir, f"AI_{AI_id}_sente_tree")
-            save_tree_graph(kifu_tree_sente, statevec2node_sente, tree_file_sente)
-
-            # 先手の棋譜を保存
-            sente_file_path = os.path.join(kifu_save_dir, f"AI_{AI_id}_sente.txt")
-            with open(sente_file_path, 'w') as f:
-                for kifu in kifu_sente:
-                    f.write(','.join(kifu) + '\n')
-
             # 後手の棋譜から多様性を計算
             kifu_gote = action_lists_gote_dict[i]
             kifu_tree_gote, statevec2node_gote = generate_opening_tree(kifu_gote, MAX_DEPTH, disable_tqdm=True)
             (_, _), (_, diversity_gote) = compute_contributions(kifu_tree_gote, statevec2node_gote, len(kifu_gote), MAX_DEPTH, is_print=False)
             diversity_gote_dict[i] = diversity_gote
-
-            # 後手の棋譜の木構造を生成・保存
-            tree_file_gote = os.path.join(kifu_save_dir, f"AI_{AI_id}_gote_tree")
-            save_tree_graph(kifu_tree_gote, statevec2node_gote, tree_file_gote)
-
-            # 後手の棋譜を保存
-            gote_file_path = os.path.join(kifu_save_dir, f"AI_{AI_id}_gote.txt")
-            with open(gote_file_path, 'w') as f:
-                for kifu in kifu_gote:
-                    f.write(','.join(kifu) + '\n')
 
         # 結果をデータフレームにまとめる
         r_df = pd.DataFrame({
@@ -522,4 +503,26 @@ if __name__ == "__main__":
             
             matches.append((i, j))
 
+    # 棋譜などの保存。時間がかかるので最後に一回だけ実行する
+    for i in survived_list:
+        AI_id = AI_id_list[i]
 
+        # 先手の棋譜の木構造を生成・保存
+        tree_file_sente = os.path.join(kifu_save_dir, f"AI_{AI_id}_sente_tree")
+        save_tree_graph(kifu_tree_sente, statevec2node_sente, tree_file_sente)
+
+        # 先手の棋譜を保存
+        sente_file_path = os.path.join(kifu_save_dir, f"AI_{AI_id}_sente.txt")
+        with open(sente_file_path, 'w') as f:
+            for kifu in kifu_sente:
+                f.write(','.join(kifu) + '\n')
+
+        # 後手の棋譜の木構造を生成・保存
+        tree_file_gote = os.path.join(kifu_save_dir, f"AI_{AI_id}_gote_tree")
+        save_tree_graph(kifu_tree_gote, statevec2node_gote, tree_file_gote)
+
+        # 後手の棋譜を保存
+        gote_file_path = os.path.join(kifu_save_dir, f"AI_{AI_id}_gote.txt")
+        with open(gote_file_path, 'w') as f:
+            for kifu in kifu_gote:
+                f.write(','.join(kifu) + '\n')
