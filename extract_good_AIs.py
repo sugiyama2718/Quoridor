@@ -23,7 +23,11 @@ EPSILON = 1e-10
 FIX_EPOCH_LIST = [60, 61, 63, 65, 75, 81, 91, 130, 175, 215, 285, 325, 465, 775]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
 EPOCH_CYCLE = 100
 MAX_DEPTH = 20
-EXTRACT_GOOD_AIS_TAU = 0.48
+#EXTRACT_GOOD_AIS_TAU = 0.48
+# AIのデフォルトパラメータを設定
+default_C_puct = 2.0
+default_tau = 0.48
+default_p_tau = 1.0
 
 # EVALUATE_GAME_NUM = 14000
 # SEARCHNODES_FOR_EXTRACT = 500
@@ -83,7 +87,7 @@ EXTRACT_GOOD_AIS_TAU = 0.48
 # MAX_GAME_NUM_PER_EPOCH = 50
 
 # elimination無し
-EVALUATE_GAME_NUM = 10000
+EVALUATE_GAME_NUM = 200
 SEARCHNODES_FOR_EXTRACT = 500
 START_CAND_NUM = 100
 START_DIFF_NUM = 0
@@ -125,32 +129,65 @@ def calc_match_score_arr(N_arr, r_arr):
 
 
 def evaluate_2game_process_2id(arg_tuple):
-    arg_i, arg_j, AI_id1, AI_id2, seed, search_nodes1, search_nodes2, wait_time = arg_tuple
+    arg_i, arg_j, ai_param_i, ai_param_j, seed, wait_time = arg_tuple
 
     import time
     time.sleep(wait_time)
-    
+
     from main import evaluate
     from CNNAI import CNNAI
-    # 先後で２試合して勝利数を返す
-    
-    if AI_id1 == -1:
-        AI1 = CNNAI(0, search_nodes=search_nodes1, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
-    else:
-        AI1 = CNNAI(0, search_nodes=search_nodes1, seed=seed)
-        AI1.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id1), "epoch{}.ckpt".format(AI_id1)))
 
-    if AI_id2 == -1:
-        AI2 = CNNAI(1, search_nodes=search_nodes2, all_parameter_zero=True, p_is_almost_flat=True, seed=seed)
+    # AI1の作成
+    if ai_param_i['AI_id'] == -1:
+        AI1 = CNNAI(
+            0,
+            search_nodes=ai_param_i['search_nodes'],
+            all_parameter_zero=True,
+            p_is_almost_flat=True,
+            seed=seed,
+            C_puct=ai_param_i['C_puct'],
+            tau=ai_param_i['tau'],
+            p_tau=ai_param_i['p_tau']
+        )
     else:
-        AI2 = CNNAI(1, search_nodes=search_nodes2, seed=seed)
-        AI2.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(AI_id2), "epoch{}.ckpt".format(AI_id2)))
+        AI1 = CNNAI(
+            0,
+            search_nodes=ai_param_i['search_nodes'],
+            seed=seed,
+            C_puct=ai_param_i['C_puct'],
+            tau=ai_param_i['tau'],
+            p_tau=ai_param_i['p_tau']
+        )
+        AI1.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(ai_param_i['AI_id']), "epoch{}.ckpt".format(ai_param_i['AI_id'])))
+
+    # AI2の作成
+    if ai_param_j['AI_id'] == -1:
+        AI2 = CNNAI(
+            1,
+            search_nodes=ai_param_j['search_nodes'],
+            all_parameter_zero=True,
+            p_is_almost_flat=True,
+            seed=seed,
+            C_puct=ai_param_j['C_puct'],
+            tau=ai_param_j['tau'],
+            p_tau=ai_param_j['p_tau']
+        )
+    else:
+        AI2 = CNNAI(
+            1,
+            search_nodes=ai_param_j['search_nodes'],
+            seed=seed,
+            C_puct=ai_param_j['C_puct'],
+            tau=ai_param_j['tau'],
+            p_tau=ai_param_j['p_tau']
+        )
+        AI2.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(ai_param_j['AI_id']), "epoch{}.ckpt".format(ai_param_j['AI_id'])))
 
     AIs = [AI1, AI2]
-    AIs[0].tau = EXTRACT_GOOD_AIS_TAU
-    AIs[1].tau = EXTRACT_GOOD_AIS_TAU
+    AIs[0].tau = EVALUATION_TAU
+    AIs[1].tau = EVALUATION_TAU
 
-    ret = evaluate(AIs, 2, multiprocess=True, return_detail=True)
+    ret = evaluate(AIs, 2, multiprocess=True)
     del AIs
     return ret, arg_i, arg_j
 
@@ -272,6 +309,20 @@ if __name__ == "__main__":
         search_nodes_list = [SEARCHNODES_FOR_EXTRACT] * len(AI_id_list)
         print(AI_id_list)
 
+    # AIのパラメータを格納するリストを作成
+    ai_parameters = []
+
+    # AI_id_listをもとに、各AIのパラメータを辞書として作成
+    for AI_id in AI_id_list:
+        ai_param = {
+            'AI_id': AI_id,
+            'search_nodes': SEARCHNODES_FOR_EXTRACT,
+            'C_puct': default_C_puct,
+            'tau': default_tau,
+            'p_tau': default_p_tau
+        }
+        ai_parameters.append(ai_param)
+
     AI_num = len(AI_id_list)
     print(f"AI num = {AI_num}")
 
@@ -335,11 +386,10 @@ if __name__ == "__main__":
         for i in range(len(matches)):
             wait_time_list[i] = i
         for k, (i, j) in enumerate(matches):
-            args.append((i, j, AI_id_list[i], AI_id_list[j], (k + total_game_num) * 10000, search_nodes_list[i], search_nodes_list[j], wait_time_list[k]))
+            args.append((i, j, ai_parameters[i], ai_parameters[j], (k + total_game_num) * 10000, wait_time_list[k]))
 
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process_2id, iterable=args)
-            #imap = p.imap(func=dummy_evaluate_2game_process, iterable=args)
             ret = list(tqdm(imap, total=len(matches)))
 
         for evaluate_ret, i, j in ret:
@@ -408,7 +458,6 @@ if __name__ == "__main__":
         diversity_sente_dict = {}
         diversity_gote_dict = {}
 
-        # 棋譜などの保存。時間がかかるので最後に一回だけ実行する
         for i in survived_list:
             AI_id = AI_id_list[i]
 
@@ -424,15 +473,27 @@ if __name__ == "__main__":
             (_, _), (_, diversity_gote) = compute_contributions(kifu_tree_gote, statevec2node_gote, len(kifu_gote), MAX_DEPTH, is_print=False)
             diversity_gote_dict[i] = diversity_gote
 
-        # 結果をデータフレームにまとめる
+        # survived_list に対応する AI パラメータを取得
+        survived_ai_params = [ai_parameters[i] for i in survived_list]
+
+        # 各AIの勝利数と多様性をリストにまとめる（必要に応じて）
+        sente_win_nums = [sente_win_num_dict[i] for i in survived_list]
+        gote_win_nums = [gote_win_num_dict[i] for i in survived_list]
+        diversity_sente_list = [diversity_sente_dict.get(i, 0) for i in survived_list]
+        diversity_gote_list = [diversity_gote_dict.get(i, 0) for i in survived_list]
+
+        # データフレームを作成
         r_df = pd.DataFrame({
-            "AI_id": np.array(AI_id_list)[survived_list],
-            "search nodes": np.array(search_nodes_list)[survived_list],
+            "AI_id": [param['AI_id'] for param in survived_ai_params],
+            "search_nodes": [param['search_nodes'] for param in survived_ai_params],
+            "C_puct": [param['C_puct'] for param in survived_ai_params],
+            "tau": [param['tau'] for param in survived_ai_params],
+            "p_tau": [param['p_tau'] for param in survived_ai_params],
             "rate": estimated_r_arr[survived_list],
-            "sente_win_num": [sente_win_num_dict[i] for i in survived_list],
-            "gote_win_num": [gote_win_num_dict[i] for i in survived_list],
-            "diversity_sente": [diversity_sente_dict[i] for i in survived_list],
-            "diversity_gote": [diversity_gote_dict[i] for i in survived_list],
+            "sente_win_num": sente_win_nums,
+            "gote_win_num": gote_win_nums,
+            "diversity_sente": diversity_sente_list,
+            "diversity_gote": diversity_gote_list,
         })
 
         r_df.to_csv(os.path.join(save_dir, "estimated_rate.csv"))

@@ -98,7 +98,7 @@ def get_normalized_state(action_list):
         return mirror_state, mirror_state_vec, True
 
 
-def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None):
+def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_tqdm=False):
     statevec2node = {}
     add_state = State()
     State_init(add_state)
@@ -110,7 +110,7 @@ def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None):
     opening_tree.game_num = len(all_kifu_list)
 
     # 定跡木の作成
-    for action_list in tqdm(all_kifu_list):
+    for action_list in tqdm(all_kifu_list, disable=disable_tqdm):
         state = State()
         State_init(state)
         mirror_state = State()
@@ -213,7 +213,7 @@ def save_tree_graph(root, statevec2node, path):
     graph.render(path, view=False)
 
 
-def compute_contributions(root, statevec2node, total_games, max_depth):
+def compute_contributions(root, statevec2node, total_games, max_depth, is_print=True):
     # Initialize data structures
     nodes_at_depth = {}
     entropies = []
@@ -288,11 +288,12 @@ def compute_contributions(root, statevec2node, total_games, max_depth):
     p2_contrib_rate = player2_contrib_rate
 
     # Print the results
-    print("Maximum Entropy: {:.4f}".format(max_entropy))
-    print("Player 1 Contribution: {:.4f}".format(p1_contrib))
-    print("Player 1 Contribution Rate: {:.2f}%".format(p1_contrib_rate * 100))
-    print("Player 2 Contribution: {:.4f}".format(p2_contrib))
-    print("Player 2 Contribution Rate: {:.2f}%".format(p2_contrib_rate * 100))
+    if is_print:
+        print("Maximum Entropy: {:.4f}".format(max_entropy))
+        print("Player 1 Contribution: {:.4f}".format(p1_contrib))
+        print("Player 1 Contribution Rate: {:.2f}%".format(p1_contrib_rate * 100))
+        print("Player 2 Contribution: {:.4f}".format(p2_contrib))
+        print("Player 2 Contribution Rate: {:.2f}%".format(p2_contrib_rate * 100))
 
     return (p1_contrib, p1_contrib_rate), (p2_contrib, p2_contrib_rate)
 
