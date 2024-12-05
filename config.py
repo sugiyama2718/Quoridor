@@ -135,6 +135,7 @@ FORCE_OPENING_LIST = [  # Official notation
 ] + [["e2", "e8", "e3", "e7", "e4", "e6", "d3h", "c6h", "d5v"]] * 1
 
 SHORTEST_P_RATIO = 0.15  # 最短路の向きにPを高める割合
+OPENING_TURN = 20  # 何ターンを前半とみなすか
 
 V_REGULARIZER = 0.1
 P_REGULARIZER = 0.01
