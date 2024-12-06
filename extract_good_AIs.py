@@ -171,7 +171,7 @@ if __name__ == "__main__":
     if use_past_result:
         rate_df = pd.read_csv(os.path.join(TRAIN_LOG_DIR, "detail", "estimated_rate.csv"))
         past_AI_id_arr = rate_df["AI_id"].values
-        past_search_nodes_arr = rate_df["search nodes"].values
+        past_search_nodes_arr = rate_df["search_nodes"].values
 
         # SEARCHNODES_FOR_EXTRACTのAIのみ使用
         is_normal_search_nodes_list = [x == SEARCHNODES_FOR_EXTRACT for x in past_search_nodes_arr]
@@ -192,8 +192,9 @@ if __name__ == "__main__":
             else:
                 additional_AI_id_list = [AI_id for AI_id in AI_id_list if AI_id % EPOCH_CYCLE == 0]
 
-        AI_id_list = list(past_AI_id_arr) + additional_AI_id_list
-        search_nodes_list = list(past_search_nodes_arr) + [SEARCHNODES_FOR_EXTRACT] * len(additional_AI_id_list)
+        #AI_id_list = list(past_AI_id_arr) + additional_AI_id_list
+        AI_id_list = sorted(list(set((past_AI_id_arr)))) + additional_AI_id_list
+        print(AI_id_list)
 
     else:
         AI_id_list = [-1] + list(sorted(param_files))
@@ -214,7 +215,6 @@ if __name__ == "__main__":
             ])
 
         AI_id_list = selected_AI_id_list
-        search_nodes_list = [SEARCHNODES_FOR_EXTRACT] * len(AI_id_list)
 
     # ai_parametersを作成する
     ai_parameters = []
