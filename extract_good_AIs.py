@@ -23,7 +23,6 @@ EPSILON = 1e-10
 FIX_EPOCH_LIST = [60, 61, 63, 65, 75, 81, 91, 130, 175, 215, 285, 325, 465, 775]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
 EPOCH_CYCLE = 100
 MAX_DEPTH = 20
-#EXTRACT_GOOD_AIS_TAU = 0.48
 
 # AIのデフォルトパラメータを設定
 default_C_puct = 2.0
@@ -132,8 +131,6 @@ def evaluate_2game_process_2id(arg_tuple):
         AI2.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(ai_param_j['AI_id']), "epoch{}.ckpt".format(ai_param_j['AI_id'])))
 
     AIs = [AI1, AI2]
-    AIs[0].tau = EVALUATION_TAU
-    AIs[1].tau = EVALUATION_TAU
 
     ret = evaluate(AIs, 2, multiprocess=True, return_detail=True)
     del AIs
@@ -454,25 +451,31 @@ if __name__ == "__main__":
     # 棋譜保存処理
     for i in survived_list:
         AI_id = ai_parameters[i]['AI_id']
+        config_id = ai_parameters[i]['config_id']
 
         kifu_sente = action_lists_sente_dict[i]
         kifu_gote = action_lists_gote_dict[i]
 
-        # 再度ツリー生成(必要であればキャッシュを使うなど工夫可能)
+        # ツリーの生成
         kifu_tree_sente, statevec2node_sente = generate_opening_tree(kifu_sente, MAX_DEPTH, disable_tqdm=True)
-        tree_file_sente = os.path.join(kifu_save_dir, f"AI_{AI_id}_sente_tree")
-        save_tree_graph(kifu_tree_sente, statevec2node_sente, tree_file_sente)
+        kifu_tree_gote, statevec2node_gote = generate_opening_tree(kifu_gote, MAX_DEPTH, disable_tqdm=True)
 
-        sente_file_path = os.path.join(kifu_save_dir, f"AI_{AI_id}_sente.txt")
+        # ファイル名にconfig_idを付与する
+        tree_file_sente = os.path.join(kifu_save_dir, f"AI_{AI_id}_config_{config_id}_sente_tree")
+        tree_file_gote  = os.path.join(kifu_save_dir, f"AI_{AI_id}_config_{config_id}_gote_tree")
+
+        # 棋譜木の保存
+        save_tree_graph(kifu_tree_sente, statevec2node_sente, tree_file_sente)
+        save_tree_graph(kifu_tree_gote, statevec2node_gote, tree_file_gote)
+
+        # 棋譜リストの保存
+        sente_file_path = os.path.join(kifu_save_dir, f"AI_{AI_id}_config_{config_id}_sente.txt")
+        gote_file_path  = os.path.join(kifu_save_dir, f"AI_{AI_id}_config_{config_id}_gote.txt")
+
         with open(sente_file_path, 'w') as f:
             for kifu in kifu_sente:
                 f.write(','.join(kifu) + '\n')
 
-        kifu_tree_gote, statevec2node_gote = generate_opening_tree(kifu_gote, MAX_DEPTH, disable_tqdm=True)
-        tree_file_gote = os.path.join(kifu_save_dir, f"AI_{AI_id}_gote_tree")
-        save_tree_graph(kifu_tree_gote, statevec2node_gote, tree_file_gote)
-
-        gote_file_path = os.path.join(kifu_save_dir, f"AI_{AI_id}_gote.txt")
         with open(gote_file_path, 'w') as f:
             for kifu in kifu_gote:
                 f.write(','.join(kifu) + '\n')
