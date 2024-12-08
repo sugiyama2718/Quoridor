@@ -825,7 +825,7 @@ class BasicAI(Agent):
 
             N2_sum = np.sum(N2)
             pi_prev = N2 / N2_sum
-            pi_prev = pi_prev * 0.998 + 0.001  # ベータ分布の変換ですべてが0にならないように対策
+            pi_prev = pi_prev * 0.999  # ベータ分布の変換ですべてが0にならないように対策
             N2 = N2_sum * weighted_by_beta(pi_prev, self.post_alpha, self.post_beta)
 
             if tau == 0:
