@@ -26,7 +26,7 @@ MAX_DEPTH = 20
 
 # AIのデフォルトパラメータを設定
 default_C_puct = 2.0
-default_tau = 0.48
+default_tau = 0.32
 default_p_tau = 1.0
 
 # 241201AI選定の設定
@@ -225,7 +225,7 @@ if __name__ == "__main__":
             'search_nodes': SEARCHNODES_FOR_EXTRACT,
             'C_puct': default_C_puct,
             'tau': default_tau,
-            'p_tau': default_p_tau
+            'p_tau': 0.7
         }
         ai_parameters.append(ai_param)
         config_counter += 1
@@ -236,9 +236,9 @@ if __name__ == "__main__":
             'config_id': config_counter,  # 内部識別用ID
             'AI_id': AI_id,
             'search_nodes': SEARCHNODES_FOR_EXTRACT,
-            'C_puct': default_C_puct,
-            'tau': 0.32,
-            'p_tau': default_p_tau
+            'C_puct': 2.5,
+            'tau': default_tau,
+            'p_tau': 0.7
         }
         ai_parameters.append(ai_param)
         config_counter += 1
