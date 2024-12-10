@@ -44,6 +44,8 @@ action = ""
 
 config_dict = read_application_config()
 
+MAX_PAST_GAMES = 30
+
 SEARCH_NODE_LIST = config_dict["search_nodes_list"]
 SEARCH_NODE_LIST_LEN = len(SEARCH_NODE_LIST)
 TAU_LIST = [0.16 * i for i in range(5)]
@@ -161,6 +163,13 @@ class Quoridor(Widget):
         State_init(self.state)
         self.agents = [GUIHuman(0), CNNAI(1, search_nodes=self.search_nodes, tau=0.5)]
         self.playing_game = False
+
+        # 過去ゲームの棋譜をリストで保存
+        # 形式: [[game1のaction_history(文字列リスト)], [game2のaction_history], ...]
+        self.past_games = []
+
+        self.prev_mode = None
+        self.prev_agent_settings = None
 
         self.button.bind(on_release=lambda touch: self.start_game())
         self.turn0_button.bind(on_release=lambda touch: self.turn0())
@@ -412,6 +421,19 @@ class Quoridor(Widget):
 
         self.remaining_time_str = ""
 
+        current_agent_settings = (self.mode,
+                                  self.level, self.tau,
+                                  self.level_1p, self.tau_1p, self.search_nodes_1p,
+                                  self.level_2p, self.tau_2p, self.search_nodes_2p,
+                                  self.level_training)
+
+        # 対戦スタート時に今までとは違う条件（= agentが変わる）ならpast_gamesを初期化
+        if self.prev_mode is not None and (self.prev_mode != self.mode or self.prev_agent_settings != current_agent_settings):
+            self.past_games = []
+
+        self.prev_mode = self.mode
+        self.prev_agent_settings = current_agent_settings
+
         if self.mode == HUMAN_HUMAN_MODE:
             agent1 = GUIHuman(0)
             agent2 = GUIHuman(1)
@@ -563,6 +585,15 @@ class Quoridor(Widget):
         else:
             win_player = 2 - self.state.turn % 2  # resignの有無にかかわらずこの条件で判定可能
             self.set_game_result(f"{win_player}p win")
+
+        # ゲーム終了時のaction_historyをpast_gamesに追加
+        # action_historyは[None, 手1, 手2, ...]という構造のはずなので、手はインデックス1から
+        copy_action_history = self.action_history[1:] if self.action_history is not None else []
+        self.past_games.append(copy_action_history)
+
+        # 要素数がMAX_PAST_GAMESを超えたら古いものから削除
+        while len(self.past_games) > MAX_PAST_GAMES:
+            self.past_games.pop(0)
 
         self.training_level_label.text = ""
 
