@@ -34,7 +34,7 @@ import os
 from Agent import Agent
 import random
 import pickle
-from util import Glendenning2Official, RECORDS_PATH
+from util import Glendenning2Official, RECORDS_PATH, get_recent_move_distribution
 from datetime import datetime
 from engine_util import prepare_AI
 from config import read_application_config
@@ -347,6 +347,7 @@ class Quoridor(Widget):
         display_cui(self.state)
         self.turn += 1
         self.add_history(self.state, a)
+        print(get_recent_move_distribution(self.past_games, self.action_history[1:]))
 
         self.prev_act_time = time.time()
         self.ai_wait_time = AI_WAIT_TIME

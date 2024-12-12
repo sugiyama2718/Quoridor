@@ -5,6 +5,9 @@ from Tree import OpeningTree
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
 from config import *
+from collections import defaultdict
+import numpy as np
+from Agent import str2actionid
 
 def Glendenning2Official(s):
     """
@@ -296,6 +299,88 @@ def compute_contributions(root, statevec2node, total_games, max_depth, is_print=
         print("Player 2 Contribution Rate: {:.2f}%".format(p2_contrib_rate * 100))
 
     return (p1_contrib, p1_contrib_rate), (p2_contrib, p2_contrib_rate)
+
+
+def get_recent_move_distribution(past_games, action_list):
+    """
+    現在のaction_listに対応する局面と同じ局面が過去に出現したとき、
+    その直後に選ばれた手の分布を返す関数。
+    左右対称局面も同一視し、その場合には次手を左右反転してカウントする。
+
+    Parameters
+    ----------
+    past_games : list of list of str
+        過去ゲームの指し手履歴のリスト。
+        例: [ [game1手順...], [game2手順...] ]
+    action_list : list of str
+        現在の局面までの指し手履歴
+
+    Returns
+    -------
+    numpy.ndarray shape=(137,)
+        過去に同じ局面が現れた場合、その次に選ばれた手の頻度分布を返すベクトル
+    """
+
+    # 現在の局面(正規化)を取得
+    # get_normalized_state(action_list)は (state, state_vec, is_mirrored) を返す想定
+    _, current_state_vec, current_is_mirrored = get_normalized_state(action_list)
+
+    action_count_dict = defaultdict(int)
+
+    # 過去ゲームを走査
+    for game in past_games:
+        if len(game) == 0:
+            continue
+
+        # 過去ゲームの局面を逐次構築
+        past_state = State()
+        State_init(past_state)
+        past_action_list = []
+
+        # gameは手順が [a1, a2, ...] のリストで、i手目を指すときの局面はpast_action_listまでで求まる
+        # 各手を指す前の局面についてget_normalized_stateして一致判定を行う
+        for i, a in enumerate(game):
+            # i手目を指す前の局面を正規化
+            # past_action_list は i手分までのactionを含まない、つまり(i手目を打つ直前)のaction_list
+            # よって past_action_listは game[:i]
+            # ここでの局面はpast_stateにi-1手目まで反映済み(初回i=0では初期局面)
+            past_action_list_tuple = past_action_list[:]  # 現状の履歴コピー
+            # normalized state の取得
+            _, past_state_vec, past_is_mirrored = get_normalized_state(past_action_list_tuple)
+
+            # 局面一致判定
+            if past_state_vec == current_state_vec:
+                # この直後(i手目に指された手)をカウント
+                # i手目に指されたactionがあるかチェック
+                # 現在見ている局面は i手目指す前の局面なので、次手は game[i] になる
+                next_action = a
+                # 左右反転状態が異なる場合、手を左右反転
+                if past_is_mirrored != current_is_mirrored:
+                    next_action = mirror_action(next_action)
+
+                # action_id取得
+                # str2actionidには状態とaction_strが必要
+                # ここでのpast_stateは i手目指す直前の局面
+                # next_actionが合法かどうかはここでは確かめず、そのまま変換
+                # (記録上は必ず合法と仮定できる)
+                action_id = str2actionid(past_state, next_action)
+                if action_id != -1:
+                    action_count_dict[action_id] += 1
+
+            # i手目のaction a を適用して次へ進む
+            # accept_action_strで状態更新
+            accept_action_str(past_state, a)
+            past_action_list.append(a)
+
+        # 最終手を指した後の局面についても一応チェックする(過去が終局で同一局面なら次手なし)
+        # ただし終局直後なので次手はないため、カウントは不要。
+
+    # action_count_dictを137次元のnumpy配列に変換
+    n = np.zeros((137,), dtype=int)
+    for aid, cnt in action_count_dict.items():
+        n[aid] = cnt
+
+    return n
 
 
 if __name__ == "__main__":
