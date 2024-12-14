@@ -164,12 +164,9 @@ class Quoridor(Widget):
         self.agents = [GUIHuman(0), CNNAI(1, search_nodes=self.search_nodes, tau=0.5)]
         self.playing_game = False
 
-        # 過去ゲームの棋譜をリストで保存
-        # 形式: [[game1のaction_history(文字列リスト)], [game2のaction_history], ...]
-        self.past_games = []
-
-        self.prev_mode = None
-        self.prev_agent_settings = None
+        # past_gamesをcurrent_agent_settingsごと+p1/p2ごとに保持する辞書
+        # past_games_dict[(mode, level, tau, search_nodes)] = {"p1": [...], "p2": [...]}
+        self.past_games_dict = {}
 
         self.button.bind(on_release=lambda touch: self.start_game())
         self.turn0_button.bind(on_release=lambda touch: self.turn0())
@@ -347,7 +344,7 @@ class Quoridor(Widget):
         display_cui(self.state)
         self.turn += 1
         self.add_history(self.state, a)
-        print(get_recent_move_distribution(self.past_games, self.action_history[1:]))
+        #print(get_recent_move_distribution(self.past_games, self.action_history[1:]))
 
         self.prev_act_time = time.time()
         self.ai_wait_time = AI_WAIT_TIME
@@ -422,33 +419,62 @@ class Quoridor(Widget):
 
         self.remaining_time_str = ""
 
-        current_agent_settings = (self.mode,
-                                  self.level, self.tau,
-                                  self.level_1p, self.tau_1p, self.search_nodes_1p,
-                                  self.level_2p, self.tau_2p, self.search_nodes_2p,
-                                  self.level_training)
-
-        # 対戦スタート時に今までとは違う条件（= agentが変わる）ならpast_gamesを初期化
-        if self.prev_mode is not None and (self.prev_mode != self.mode or self.prev_agent_settings != current_agent_settings):
-            self.past_games = []
-
-        self.prev_mode = self.mode
-        self.prev_agent_settings = current_agent_settings
-
+        # HUMAN_AI_MODE, TRAINING_MODEでは1つのAI設定のみ
+        # AI_AI_MODEでは2つのAI設定がある
         if self.mode == HUMAN_HUMAN_MODE:
+            # AIなし
             agent1 = GUIHuman(0)
             agent2 = GUIHuman(1)
+            # p1は先手側、p2は後手側
+            # この場合、AIがいないのでpast_gamesへの記録は行わない
+            self.current_agent_settings_p1 = None
+            self.current_agent_settings_p2 = None
+
         elif self.mode == HUMAN_AI_MODE:
+            # humanとAIがいる
+            # humanが1pの場合
             if self.teban_1p.state == "down":
                 agent1 = GUIHuman(0)
                 agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes, self.tau, self.level, seed=int(time.time()))
+                # AIは2p側
+                self.current_agent_settings_p1 = None
+                self.current_agent_settings_p2 = (self.mode, self.level, self.tau, self.search_nodes)
             else:
+                # humanが2pの場合
                 agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes, self.tau, self.level, seed=int(time.time()))
                 agent2 = GUIHuman(1)
+                # AIは1p側
+                self.current_agent_settings_p1 = (self.mode, self.level, self.tau, self.search_nodes)
+                self.current_agent_settings_p2 = None
+
         elif self.mode == AI_AI_MODE:
+            # AI vs AI
             agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes_1p, self.tau_1p, self.level_1p, seed=int(time.time()))
             agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes_2p, self.tau_2p, self.level_2p, seed=int(time.time()))
+
+            # p1側のAI設定
+            self.current_agent_settings_p1 = (self.mode, self.level_1p, self.tau_1p, self.search_nodes_1p)
+            # p2側のAI設定
+            self.current_agent_settings_p2 = (self.mode, self.level_2p, self.tau_2p, self.search_nodes_2p)
+
         elif self.mode == TRAINING_MODE:
+            # training_colorでプレイヤーが先手(p1)か後手(p2)か分かる
+            # training_index, training_search_nodesは元コードから取得済みとする
+            if self.training_game_num % 2 == 0:
+                self.training_color = 0
+                agent1 = GUIHuman(0)
+                agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()))
+                # AIはp2側
+                self.current_agent_settings_p1 = None
+                self.current_agent_settings_p2 = (self.mode, training_index, 0.32, training_search_nodes)
+            else:
+                self.training_color = 1
+                agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()))
+                agent2 = GUIHuman(1)
+                # AIはp1側
+                self.current_agent_settings_p1 = (self.mode, training_index, 0.32, training_search_nodes)
+                self.current_agent_settings_p2 = None
+
             if self.low_time.state == "down":
                 self.remaining_time = TRAINING_LOW_TIME
             elif self.high_time.state == "down":
@@ -502,6 +528,17 @@ class Quoridor(Widget):
             print(self.training_joseki)
 
         self.agents = [agent1, agent2]
+
+        # 必要なcurrent_agent_settingsに対応する辞書がなければ初期化
+        # p1側設定
+        if self.current_agent_settings_p1 is not None:
+            if self.current_agent_settings_p1 not in self.past_games_dict:
+                self.past_games_dict[self.current_agent_settings_p1] = {"p1": [], "p2": []}
+        # p2側設定
+        if self.current_agent_settings_p2 is not None:
+            if self.current_agent_settings_p2 not in self.past_games_dict:
+                self.past_games_dict[self.current_agent_settings_p2] = {"p1": [], "p2": []}
+
 
         if self.mode == TRAINING_MODE or self.state.terminate:
             self.state = State()
@@ -587,14 +624,28 @@ class Quoridor(Widget):
             win_player = 2 - self.state.turn % 2  # resignの有無にかかわらずこの条件で判定可能
             self.set_game_result(f"{win_player}p win")
 
-        # ゲーム終了時のaction_historyをpast_gamesに追加
-        # action_historyは[None, 手1, 手2, ...]という構造のはずなので、手はインデックス1から
+        # action_history: [None, 手1, 手2, ...]
         copy_action_history = self.action_history[1:] if self.action_history is not None else []
-        self.past_games.append(copy_action_history)
 
-        # 要素数がMAX_PAST_GAMESを超えたら古いものから削除
-        while len(self.past_games) > MAX_PAST_GAMES:
-            self.past_games.pop(0)
+        # 各設定に対して、対応するp1/p2に棋譜を保存
+        # p1/p2判定: 
+        #   先手がp1、後手がp2で固定。
+        # current_agent_settings_p1 は先手側のAI設定(ある場合)
+        # current_agent_settings_p2 は後手側のAI設定(ある場合)
+
+        if self.current_agent_settings_p1 is not None:
+            # p1側設定をもつagentの棋譜リストにappend
+            self.past_games_dict[self.current_agent_settings_p1]["p1"].append(copy_action_history)
+            # 古いもの削除
+            while len(self.past_games_dict[self.current_agent_settings_p1]["p1"]) > MAX_PAST_GAMES:
+                self.past_games_dict[self.current_agent_settings_p1]["p1"].pop(0)
+
+        if self.current_agent_settings_p2 is not None:
+            # p2側設定をもつagentの棋譜リストにappend
+            self.past_games_dict[self.current_agent_settings_p2]["p2"].append(copy_action_history)
+            # 古いもの削除
+            while len(self.past_games_dict[self.current_agent_settings_p2]["p2"]) > MAX_PAST_GAMES:
+                self.past_games_dict[self.current_agent_settings_p2]["p2"].pop(0)
 
         self.training_level_label.text = ""
 
