@@ -304,76 +304,66 @@ def compute_contributions(root, statevec2node, total_games, max_depth, is_print=
 def get_recent_move_distribution(past_games, action_list):
     """
     現在のaction_listに対応する局面と同じ局面が過去に出現したとき、
-    その直後に選ばれた手の分布を返す関数。
-    左右対称局面も同一視し、その場合には次手を左右反転してカウントする。
+    局面が左右対称であれば、次手の元手と左右反転手の両方をaction_count_dictに+1する。
+    局面が左右対称でなければ、次手のaction_idを+2する。
 
-    Parameters
-    ----------
-    past_games : list of list of str
-        過去ゲームの指し手履歴のリスト。
-        例: [ [game1手順...], [game2手順...] ]
-    action_list : list of str
-        現在の局面までの指し手履歴
-
-    Returns
-    -------
-    numpy.ndarray shape=(137,)
-        過去に同じ局面が現れた場合、その次に選ばれた手の頻度分布を返すベクトル
+    左右対称判定方法:
+    mirror_action_listを作り、それぞれから得たstate_vecとmirror_state_vecが等しければ左右対称とみなす。
     """
+    # 現在の局面
+    state = get_state_from_action_list(action_list)
+    state_vec = tuple(feature_int(state).flatten())
 
-    # 現在の局面(正規化)を取得
-    # get_normalized_state(action_list)は (state, state_vec, is_mirrored) を返す想定
-    _, current_state_vec, current_is_mirrored = get_normalized_state(action_list)
+    mirror_action_list = list(map(mirror_action, action_list))
+    mirror_state = get_state_from_action_list(mirror_action_list)
+    mirror_state_vec = tuple(feature_int(mirror_state).flatten())
+
+    # 対称性判定
+    symmetrical = (state_vec == mirror_state_vec)
+
+    _, current_state_vec_normalized, current_is_mirrored = get_normalized_state(action_list)
 
     action_count_dict = defaultdict(int)
 
-    # 過去ゲームを走査
+    # 過去ゲーム走査
     for game in past_games:
         if len(game) == 0:
             continue
 
-        # 過去ゲームの局面を逐次構築
         past_state = State()
         State_init(past_state)
         past_action_list = []
 
-        # gameは手順が [a1, a2, ...] のリストで、i手目を指すときの局面はpast_action_listまでで求まる
-        # 各手を指す前の局面についてget_normalized_stateして一致判定を行う
         for i, a in enumerate(game):
-            # i手目を指す前の局面を正規化
-            # past_action_list は i手分までのactionを含まない、つまり(i手目を打つ直前)のaction_list
-            # よって past_action_listは game[:i]
-            # ここでの局面はpast_stateにi-1手目まで反映済み(初回i=0では初期局面)
-            past_action_list_tuple = past_action_list[:]  # 現状の履歴コピー
-            # normalized state の取得
-            _, past_state_vec, past_is_mirrored = get_normalized_state(past_action_list_tuple)
+            # i手目を指す前の局面（past_action_listまで）
+            _, past_state_vec_normalized, past_is_mirrored = get_normalized_state(past_action_list)
 
-            # 局面一致判定
-            if past_state_vec == current_state_vec:
-                # この直後(i手目に指された手)をカウント
-                # i手目に指されたactionがあるかチェック
-                # 現在見ている局面は i手目指す前の局面なので、次手は game[i] になる
+            # 一致判定
+            if past_state_vec_normalized == current_state_vec_normalized:
+                # この直後(i手目)に指された手を取得
                 next_action = a
-                # 左右反転状態が異なる場合、手を左右反転
+
+                # is_mirroredが異なる場合、手を左右反転
                 if past_is_mirrored != current_is_mirrored:
                     next_action = mirror_action(next_action)
 
                 # action_id取得
-                # str2actionidには状態とaction_strが必要
-                # ここでのpast_stateは i手目指す直前の局面
-                # next_actionが合法かどうかはここでは確かめず、そのまま変換
-                # (記録上は必ず合法と仮定できる)
                 action_id = str2actionid(past_state, next_action)
                 if action_id != -1:
-                    action_count_dict[action_id] += 1
+                    if symmetrical:
+                        # 対象局面なら、action_idとmirror_action_idを両方+1
+                        action_count_dict[action_id] += 1
+                        mirrored_next_action = mirror_action(next_action)
+                        mirrored_action_id = str2actionid(past_state, mirrored_next_action)
+                        if mirrored_action_id != -1:
+                            action_count_dict[mirrored_action_id] += 1
+                    else:
+                        # 非対称局面なら+2
+                        action_count_dict[action_id] += 2
 
-            # i手目のaction a を適用して次へ進む
-            # accept_action_strで状態更新
+            # 状態を次手aで更新
             accept_action_str(past_state, a)
             past_action_list.append(a)
-
-        # 最終手を指した後の局面についても一応チェックする(過去が終局で同一局面なら次手なし)
-        # ただし終局直後なので次手はないため、カウントは不要。
 
     # action_count_dictを137次元のnumpy配列に変換
     n = np.zeros((137,), dtype=int)
@@ -381,6 +371,56 @@ def get_recent_move_distribution(past_games, action_list):
         n[aid] = cnt
 
     return n
+
+
+def adaptive_next_sample(p, counts, beta=1.0, random_state=None):
+    """
+    適応的確率サンプリングによる、次の1サンプルを生成する関数。
+    
+    Parameters
+    ----------
+    p : array-like
+        目標分布 p = (p_0, p_1, ..., p_{N-1}) 。長さ N の1次元配列。
+    counts : array-like
+        現在までに観測されている各カテゴリの出現回数。
+        長さ N の1次元整数配列。
+    beta : float, optional
+        補正パラメータ。0に近いほど元の分布 p に従う独立サンプリングに近くなり、
+        値が大きいほど経験分布からのずれを強く補正する。
+    random_state : int or None, optional
+        再現性のための乱数シード。
+
+    Returns
+    -------
+    x_next : int
+        選ばれた次のサンプル（カテゴリのインデックス）。
+    """
+    p = np.array(p, dtype=float)
+    counts = np.array(counts, dtype=int)
+    N = len(p)
+    rng = np.random.default_rng(random_state)
+    
+    # これまでのサンプル数 n
+    n = counts.sum()
+    
+    # 経験分布 hat_p の計算
+    # n=0 の場合、hat_p = 0 とする
+    if n > 0:
+        hat_p = counts / n
+    else:
+        hat_p = np.zeros(N, dtype=float)
+    
+    # Δ_k = hat_p_k - p_k
+    delta = hat_p - p
+    
+    # q_k = p_k * exp(-beta * Δ_k) を計算し、正規化
+    unnormalized_q = p * np.exp(-beta * delta)
+    q = unnormalized_q / unnormalized_q.sum()
+    
+    # qに従って一つサンプル
+    x_next = rng.choice(N, p=q)
+    
+    return x_next
 
 
 if __name__ == "__main__":

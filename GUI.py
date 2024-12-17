@@ -44,7 +44,7 @@ action = ""
 
 config_dict = read_application_config()
 
-MAX_PAST_GAMES = 30
+MAX_PAST_GAMES = 20
 
 SEARCH_NODE_LIST = config_dict["search_nodes_list"]
 SEARCH_NODE_LIST_LEN = len(SEARCH_NODE_LIST)
@@ -314,7 +314,26 @@ class Quoridor(Widget):
         elif isinstance(self.agents[color], CNNAI):
             if time.time() - self.prev_act_time <= self.ai_wait_time:
                 return
-            s, _, _, v_post, _ = self.agents[color].act_and_get_pi(self.state, use_prev_tree=self.use_prev_tree)
+            
+            # colorに応じてp1かp2か判定
+            if color == 0:
+                agent_settings = self.current_agent_settings_p1
+                role = "p1"
+            else:
+                agent_settings = self.current_agent_settings_p2
+                role = "p2"
+
+            if agent_settings is not None:
+                past_games = self.past_games_dict[agent_settings][role]
+            else:
+                past_games = []
+
+            if len(past_games) >= MAX_PAST_GAMES:
+                past_games = past_games[1:]  # 一番古い要素はあとで捨てられるのでその前提で計算する
+
+            recent_move_vec = get_recent_move_distribution(past_games, self.action_history[1:])
+            print(recent_move_vec)
+            s, _, _, v_post, _ = self.agents[color].act_and_get_pi(self.state, use_prev_tree=self.use_prev_tree, recent_move_vec=recent_move_vec)
             print("score= {}, use_prev_tree={}".format(int(1000 * v_post), self.use_prev_tree))
 
             if self.graphviz_on.state == "down" and not self.state.pseudo_terminate:
@@ -344,7 +363,6 @@ class Quoridor(Widget):
         display_cui(self.state)
         self.turn += 1
         self.add_history(self.state, a)
-        #print(get_recent_move_distribution(self.past_games, self.action_history[1:]))
 
         self.prev_act_time = time.time()
         self.ai_wait_time = AI_WAIT_TIME

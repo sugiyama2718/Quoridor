@@ -14,7 +14,7 @@ from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
-from util import Glendenning2Official, Official2Glendenning
+from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample
 import ctypes
 from scipy.special import gamma
 
@@ -371,20 +371,20 @@ class BasicAI(Agent):
             x, y = color_p(state, color)
             self.discovery_arr[color, x, y] = True
 
-    def act(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
+    def act(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False, recent_move_vec=None):
         #tau = (1 + (self.tau_mult - 1) * np.power(0.5, state.turn / self.tau_decay)) * self.tau
         tau = (1 + (self.tau_mult - 1) * np.exp(- np.square((state.turn - self.tau_peak) / self.tau_decay))) * self.tau
         if return_root_tree:
-            action_id, tree = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, return_root_tree=True)
+            action_id, tree = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, return_root_tree=True, recent_move_vec=recent_move_vec)
             return action_id, tree
         else:
-            action_id, _, _, _, _ = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree)
+            action_id, _, _, _, _ = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, recent_move_vec=recent_move_vec)
             return action_id
 
-    def act_and_get_pi(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None):
+    def act_and_get_pi(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, recent_move_vec=None):
         #tau = (1 + (self.tau_mult - 1) * np.power(0.5, state.turn / self.tau_decay)) * self.tau
         tau = (1 + (self.tau_mult - 1) * np.exp(- np.square((state.turn - self.tau_peak) / self.tau_decay))) * self.tau
-        action_id, pi, v_prev, v_post, searched_node_num = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree)
+        action_id, pi, v_prev, v_post, searched_node_num = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, recent_move_vec=recent_move_vec)
         return action_id, pi, v_prev, v_post, searched_node_num
 
     def action_array(self, s):
@@ -484,7 +484,7 @@ class BasicAI(Agent):
 
         return ret
 
-    def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False, use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
+    def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False, use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False, recent_move_vec=None):
         if self.random_playouts:
             max_node = SELFPLAY_SEARCHNODES_MIN
             if random.random() < DEEP_SEARCH_P:
@@ -834,11 +834,12 @@ class BasicAI(Agent):
                 N2 = np.power(np.asarray(N2, dtype="float64"), 1. / tau)
             pi = N2 / np.sum(N2)
 
-            action = np.random.choice(len(pi), p=pi)
+            if recent_move_vec is None:
+                action = np.random.choice(len(pi), p=pi)
+            else:
+                action = adaptive_next_sample(pi, recent_move_vec, 5.0)
 
         if self.is_mimic_AI:
-            # print("mimic AI")
-
             # actionの座標を計算し、回転対称に写す。
             if self.prev_action is not None:
                 is_placewall = (self.prev_action < 128)
