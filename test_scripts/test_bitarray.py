@@ -1,3 +1,5 @@
+import sys
+sys.path.append("./")
 import numpy as np
 from bitarray import bitarray
 import time

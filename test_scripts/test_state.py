@@ -1,7 +1,9 @@
 # coding:utf-8
+import sys
+sys.path.append("./")
 from State import State, BIT_BOARD_LEN, State, State_init, set_state_by_wall, movable_array, accept_action_str, calc_dist_array, placable_array, display_cui
 import numpy as np
-import os, sys
+import os
 import ctypes
 from BasicAI import state_copy
 from Tree import *

@@ -45,8 +45,9 @@ class CNNAI(BasicAI):
     def __init__(self, color, search_nodes=1, C_puct=2, tau=1, all_parameter_zero=False, v_is_dist=False, p_is_almost_flat=False, 
     seed=0, use_estimated_V=True, V_ema_w=0.01, shortest_only=False, per_process_gpu_memory_fraction=PER_PROCESS_GPU_MEMORY_FRACTION, use_average_Q=False, random_playouts=False,
     filters=DEFAULT_FILTERS, layer_num=DEFAULT_LAYER_NUM, use_global_pooling=USE_GLOBAL_POOLING, use_self_attention=USE_SELF_ATTENTION, use_slim_head=USE_SLIM_HEAD, opponent_AI=None,
-    is_mimic_AI=False, force_opening=None, use_mix_precision=True):
-        super(CNNAI, self).__init__(color, search_nodes, C_puct, tau, use_estimated_V=use_estimated_V, V_ema_w=V_ema_w, shortest_only=shortest_only, use_average_Q=use_average_Q, random_playouts=random_playouts, is_mimic_AI=is_mimic_AI, force_opening=force_opening)
+    is_mimic_AI=False, force_opening=None, use_mix_precision=True, p_tau=1.0, post_alpha=1.0, post_beta=2.0, use_recent_move_vec=True):
+        super(CNNAI, self).__init__(color, search_nodes, C_puct, tau, use_estimated_V=use_estimated_V, V_ema_w=V_ema_w, shortest_only=shortest_only, 
+        use_average_Q=use_average_Q, random_playouts=random_playouts, is_mimic_AI=is_mimic_AI, force_opening=force_opening, post_alpha=post_alpha, post_beta=post_beta, use_recent_move_vec=use_recent_move_vec)
 
         np.random.seed(seed)
         random.seed(seed)
@@ -66,6 +67,7 @@ class CNNAI(BasicAI):
         self.use_slim_head = use_slim_head
         self.opponent_AI = opponent_AI  # tensorflowを自己対戦の２AIで共有するための変数。TODO: 非合法手がまだ出るので修正は必要。ただしGPUメモリが節約できなかったので着手していない。
         self.use_mix_precision = use_mix_precision
+        self.p_tau = p_tau
 
         if self.opponent_AI is None:
             self.init_tensorflow()
@@ -498,6 +500,8 @@ class CNNAI(BasicAI):
             if np.sum(shortest_move) > 0:  # 相手がゴールにいるせいで距離を縮められない場合などにsumが0になる
                 p_assisted = (1 - SHORTEST_P_RATIO) * p_move + SHORTEST_P_RATIO * np.sum(p_move) * shortest_move / np.sum(shortest_move)
                 p[i, 128:] = p_assisted
+            if s.turn < OPENING_TURN:
+                p[i] = np.power(p[i], self.p_tau)  # 手に多様性をもたせるためにpolicyをマイルドにする
 
         try:
             p = p / np.sum(p, axis=1).reshape((-1, 1))
@@ -569,6 +573,9 @@ class CNNAI(BasicAI):
             if np.sum(shortest_move) > 0:  # 相手がゴールにいるせいで距離を縮められない場合などにsumが0になる
                 p_assisted = (1 - SHORTEST_P_RATIO) * p_move + SHORTEST_P_RATIO * np.sum(p_move) * shortest_move / np.sum(shortest_move)
                 p[i, 128:] = p_assisted
+
+            if s.turn < OPENING_TURN:
+                p[i] = np.power(p[i], self.p_tau)  # 手に多様性をもたせるためにpolicyをマイルドにする
 
         try:
             p = p / np.sum(p, axis=1).reshape((-1, 1))

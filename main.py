@@ -26,7 +26,7 @@ from collections import OrderedDict
 from analyze_h5 import analyze_h5_main
 import shutil
 import random
-from util import get_epoch_dir_name
+from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, get_recent_move_distribution
 
 
 # agentsは初期化されてるとする
@@ -281,11 +281,15 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
 
 # 中で先手後手を順番に入れ替えている
-def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False):
+def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False, return_detail=False, 
+sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu_list_j=None):
     wins = 0.
+    sente_win_num = 0.
+    gote_win_num = 0.
     draw_num = 0
     total_time_without_endgame = 0.0
     total_turn_without_endgame = 0
+    action_lists = []
     for i in range(play_num):
         game_start_time = time.time()
         is_endgame = False
@@ -295,16 +299,29 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         AIs[1].init_prev()
         AIs[i % 2].color = 0
         AIs[1 - i % 2].color = 1
+        action_list = []
         while True:
             if display:
                 display_cui(state)
-            s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
+
+            # 各AIの過去の棋譜を適切に参照して、recent_move_vecとして渡す。過去の棋譜と重複した手を避けさせるため
+            if i % 2 == 0:
+                past_games = sente_kifu_list_i
+            else:
+                past_games = sente_kifu_list_j
+            if past_games is None:
+                recent_move_vec = None
+            else:
+                recent_move_vec = get_recent_move_distribution(past_games, action_list)
+
+            s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
-                s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
+                s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
                 a = actionid2str(state, s)
             AIs[1 - i % 2].prev_action = s
+            action_list.append(a)
 
             if not is_endgame and state.pseudo_terminate:
                 total_time_without_endgame += time.time() - game_start_time
@@ -317,13 +334,23 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
             if display:
                 display_cui(state)
 
-            s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
+            if i % 2 == 0:
+                past_games = gote_kifu_list_j
+            else:
+                past_games = gote_kifu_list_i
+            if past_games is None:
+                recent_move_vec = None
+            else:
+                recent_move_vec = get_recent_move_distribution(past_games, action_list)
+
+            s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
-                s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
+                s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
                 a = actionid2str(state, s)
             AIs[i % 2].prev_action = s
+            action_list.append(a)
 
             if not is_endgame and state.pseudo_terminate:
                 total_time_without_endgame += time.time() - game_start_time
@@ -332,27 +359,33 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
 
             if state.terminate:
                 break
+        action_lists.append(action_list)
 
         if i % 2 == 0 and state.reward == 1:
             wins += 1.
+            sente_win_num += 1.
         elif i % 2 == 1 and state.reward == -1:
             wins += 1.
+            gote_win_num += 1.
         elif state.reward == 0:
             wins += 0.5
+            sente_win_num += 0.5
+            gote_win_num += 0.5
             draw_num += 1
         if not multiprocess:
             sys.stderr.write('\r\033[K {}win/{}'.format(i + 1 - wins, i + 1))
             sys.stderr.flush()
     if not multiprocess:
         print("")
-    
     AIs[0].color = 0
     AIs[1].color = 1
 
     if display:
         print("total_time_without_endgame = {:.3f}s, time per one move = {:.3f}s".format(total_time_without_endgame, total_time_without_endgame / total_turn_without_endgame))
 
-    if return_draw:
+    if return_detail:
+        return sente_win_num, gote_win_num, draw_num, action_lists
+    elif return_draw:
         return wins, draw_num
     else:
         return wins
@@ -607,23 +640,55 @@ def evaluate_2game_process(arg_tuple):
         AI_load_name = os.path.join(get_epoch_dir_name(AI_id), AI_load_name)  # epoch500~などの場合だけ、0_1000/epoch500~にアクセスする必要がある
     AIs[1].load(os.path.join(PARAMETER_DIR, AI_load_name.format(AI_id)))
 
-    ret = evaluate(AIs, 2, multiprocess=True)
+    ret = evaluate(AIs, 2, multiprocess=True, return_detail=True)
     del AIs
     return ret
 
 
-def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", evaluate_play_num=EVALUATE_PLAY_NUM):
+def process_evaluate_data(evaluate_ret, old_AI_id, old_rate, play_num, epoch_now=-100):
+    play_num_half = play_num // 2
+    
+    kifu = []
+    for x in evaluate_ret:
+        kifu.extend(x[3])
+
+    save_dir = os.path.join(EVAL_DETAIL_DIR, str(epoch_now))
+    os.makedirs(save_dir, exist_ok=True)
+
+    MAX_DEPTH = 20
+
+    kifu_tree_p1, statevec2node_p1 = generate_opening_tree([x for i, x in enumerate(kifu) if i % 2 == 0], MAX_DEPTH)
+    save_tree_graph(kifu_tree_p1, statevec2node_p1, os.path.join(save_dir, f"p1_{old_AI_id}_sente"))
+    compute_contributions(kifu_tree_p1, statevec2node_p1, len([x for i, x in enumerate(kifu) if i % 2 == 0]), MAX_DEPTH)
+
+    kifu_tree_p2, statevec2node_p2 = generate_opening_tree([x for i, x in enumerate(kifu) if i % 2 == 1], MAX_DEPTH)
+    save_tree_graph(kifu_tree_p2, statevec2node_p2, os.path.join(save_dir, f"p2_{old_AI_id}_sente"))
+    compute_contributions(kifu_tree_p2, statevec2node_p2, len([x for i, x in enumerate(kifu) if i % 2 == 1]), MAX_DEPTH)
+
+    print(f"graph saved at {save_dir}")
+
+    gote_win_num_total = play_num_half - sum([x[0] for x in evaluate_ret])  # 最新パラメータからみた先手での勝数
+    sente_win_num_total = play_num_half - sum([x[1] for x in evaluate_ret])
+    new_ai_win_num = sente_win_num_total + gote_win_num_total
+    print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.1f}%, sente win {}/{} ({:.1f}%), gote win {}/{} ({:.1f}%)".format(
+        old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num * 100,
+        sente_win_num_total, play_num_half, sente_win_num_total / play_num_half * 100,
+        gote_win_num_total, play_num_half, gote_win_num_total / play_num_half * 100))
+    return new_ai_win_num
+
+
+def evaluate_and_calc_rate(AI_id_list, AI_rate_list, AI_load_name="post.ckpt", evaluate_play_num=EVALUATE_PLAY_NUM, epoch_now=-100):
     play_num = evaluate_play_num // len(AI_id_list) // 2 * 2
     win_num_list = []
     for old_AI_id, old_rate in zip(AI_id_list, AI_rate_list):
         play_num_half = play_num // 2
-        wait_time_list = [(x - min(h5_list)) * 3 if x < PROCESS_NUM else 0 for x in range(play_num_half)]
+        wait_time_list = [x * 3 if x < PROCESS_NUM else 0 for x in range(play_num_half)]
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[(old_AI_id, search_nodes, j * 10000 % (2**30), AI_load_name, j % GPU_NUM, wait_time) for j, wait_time in enumerate(wait_time_list)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
-        new_ai_win_num = play_num - sum(ret)
+
+        new_ai_win_num = process_evaluate_data(ret, old_AI_id, old_rate, play_num, epoch_now)
         win_num_list.append(new_ai_win_num)
-        print("new AI vs {} (rate={:.3f}) : {}/{}, win rate={:.3f}".format(old_AI_id, old_rate, new_ai_win_num, play_num, new_ai_win_num / play_num))
     
     return calc_rate(play_num, np.array(AI_rate_list), np.array(win_num_list)), win_num_list
 
@@ -718,6 +783,7 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
 
     if restart:
         initial_epoch, AI_id_list, AI_rate_list, new_rate, load_AI_id, loss_dict, valid_loss = pickle.load(open(restart_filename, "rb"))
+        #initial_epoch -= 1
         print("retrain: {}, {}, {}, {}, {}, {}".format(initial_epoch, AI_id_list, AI_rate_list, new_rate, load_AI_id, loss_dict, valid_loss))
 
     print("epoch num in pool = {}".format(POOL_EPOCH_NUM))
@@ -774,7 +840,7 @@ def learn(search_nodes, restart=False, skip_first_selfplay=False, restart_filena
         # --------evaluation---------
         if epoch % EVALUATION_EPOCH_NUM == 0:
             start = time.time()
-            new_rate, win_num_list = evaluate_and_calc_rate(AI_id_list, AI_rate_list)
+            new_rate, win_num_list = evaluate_and_calc_rate(AI_id_list, AI_rate_list, epoch_now=epoch)
 
             win_num_dir = os.path.join(TRAIN_LOG_DIR, "win_num")
             os.makedirs(win_num_dir, exist_ok=True)
@@ -921,19 +987,22 @@ if __name__ == '__main__':
     elif sys.argv[1] == "evaluate":
         def evaluate_2game_process(seed):
             # 先後で２試合して勝利数を返す
-            AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=seed), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=seed, use_average_Q=True)]
+            epoch1 = 4740
+            epoch2 = 11700
+            AIs = [CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed), CNNAI(1, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed)]
             #AIs[0].load(os.path.join("backup/221219/train_results/parameter/", "epoch680.ckpt"))
-            AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(120), "epoch120.ckpt"))
-            AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(120), "epoch120.ckpt"))
-            ret = evaluate(AIs, 2, multiprocess=True, display=True)
+            AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch1), f"epoch{epoch1}.ckpt"))
+            AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch2), f"epoch{epoch2}.ckpt"))
+            ret = evaluate(AIs, 2, multiprocess=True, display=False, return_detail=True)
             del AIs
             return ret
-        play_num = 4
+        play_num = 100
         play_num_half = play_num // 2
-        with Pool(processes=1) as p:
+        with Pool(processes=4) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])
             ret = list(tqdm(imap, total=play_num_half, file=sys.stdout))
-        print(sum(ret), play_num - sum(ret))
+        
+        new_ai_win_num = process_evaluate_data(ret, -100, -100, play_num)  # この中で各種情報がprintされる
         
     elif sys.argv[1] == "multiprocess_test":
         np.random.seed(0)

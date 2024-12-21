@@ -14,8 +14,9 @@ from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
-from util import Glendenning2Official, Official2Glendenning
+from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample
 import ctypes
+from scipy.special import gamma
 
 num2str = {0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i"}
 
@@ -67,6 +68,20 @@ def get_state_vec_from_tree(tree):
     if tree.state_vec is None:
         tree.state_vec = get_state_vec(tree.s)
     return tree.state_vec
+
+
+def beta_pdf(x, alpha, beta):
+    # ベータ関数 B(alpha,beta) = Gamma(alpha)*Gamma(beta)/Gamma(alpha+beta)
+    B = (gamma(alpha)*gamma(beta))/gamma(alpha+beta)
+    return (x**(alpha-1) * (1 - x)**(beta-1)) / B
+
+def weighted_by_beta(p, alpha, beta):
+    # pは確率分布、shape=(n,), sum(p)=1
+    # ベータ分布PDF + pで重み付け。pを足すのはp=1で重み0を回避するため
+    w = beta_pdf(p, alpha, beta) + p
+    pw = p * w
+    p_new = pw / np.sum(pw)
+    return p_new
 
 
 def display_parameter(x):
@@ -287,7 +302,7 @@ def calc_next_state(x):
 
 class BasicAI(Agent):
     def __init__(self, color, search_nodes=1, C_puct=5, tau=1, n_parallel=N_PARALLEL, virtual_loss_n=1, use_estimated_V=True, V_ema_w=0.01, 
-                 shortest_only=False, use_average_Q=False, random_playouts=False, tau_mult=2, tau_decay=6, is_mimic_AI=False, tau_peak=6, force_opening=None):
+                 shortest_only=False, use_average_Q=False, random_playouts=False, tau_mult=2, tau_decay=6, is_mimic_AI=False, tau_peak=6, force_opening=None, post_alpha=1.0, post_beta=2.0, use_recent_move_vec=True):
         super(BasicAI, self).__init__(color)
         self.search_nodes = search_nodes
         self.C_puct = C_puct
@@ -306,6 +321,9 @@ class BasicAI(Agent):
         self.is_mimic_AI = is_mimic_AI  # 指定された後手AIは、先手を追い越すまでの間、回転対称になるように先手の手を真似する
         self.tau_peak = tau_peak  # ランダム性を一番高くするターン数。初手に壁置くのを読むのは無駄だが、向かい合ったときにいろいろな壁の起き方をするのは有意義だろうという考え
         self.force_opening = force_opening
+        self.post_alpha = post_alpha  # 事後分布に対するベータ分布による変換のパラメータ。中くらいの確率値の手を強調する目的。
+        self.post_beta = post_beta
+        self.use_recent_move_vec = use_recent_move_vec
 
     def init_prev(self, state=None):
         # 試合前に毎回実行
@@ -354,20 +372,20 @@ class BasicAI(Agent):
             x, y = color_p(state, color)
             self.discovery_arr[color, x, y] = True
 
-    def act(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
+    def act(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False, recent_move_vec=None):
         #tau = (1 + (self.tau_mult - 1) * np.power(0.5, state.turn / self.tau_decay)) * self.tau
         tau = (1 + (self.tau_mult - 1) * np.exp(- np.square((state.turn - self.tau_peak) / self.tau_decay))) * self.tau
         if return_root_tree:
-            action_id, tree = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, return_root_tree=True)
+            action_id, tree = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, return_root_tree=True, recent_move_vec=recent_move_vec)
             return action_id, tree
         else:
-            action_id, _, _, _, _ = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree)
+            action_id, _, _, _, _ = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, recent_move_vec=recent_move_vec)
             return action_id
 
-    def act_and_get_pi(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None):
+    def act_and_get_pi(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, recent_move_vec=None):
         #tau = (1 + (self.tau_mult - 1) * np.power(0.5, state.turn / self.tau_decay)) * self.tau
         tau = (1 + (self.tau_mult - 1) * np.exp(- np.square((state.turn - self.tau_peak) / self.tau_decay))) * self.tau
-        action_id, pi, v_prev, v_post, searched_node_num = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree)
+        action_id, pi, v_prev, v_post, searched_node_num = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, recent_move_vec=recent_move_vec)
         return action_id, pi, v_prev, v_post, searched_node_num
 
     def action_array(self, s):
@@ -467,7 +485,7 @@ class BasicAI(Agent):
 
         return ret
 
-    def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False, use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False):
+    def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False, use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False, recent_move_vec=None):
         if self.random_playouts:
             max_node = SELFPLAY_SEARCHNODES_MIN
             if random.random() < DEEP_SEARCH_P:
@@ -806,16 +824,23 @@ class BasicAI(Agent):
             if np.any(use_shortest):
                 N2[128:] = move_N * use_shortest
 
+            N2_sum = np.sum(N2)
+            pi_prev = N2 / N2_sum
+            pi_prev = pi_prev * 0.999  # ベータ分布の変換ですべてが0にならないように対策
+            N2 = N2_sum * weighted_by_beta(pi_prev, self.post_alpha, self.post_beta)
+
             if tau == 0:
                 N2 = N2 * (N2 == np.max(N2))
             else:
                 N2 = np.power(np.asarray(N2, dtype="float64"), 1. / tau)
             pi = N2 / np.sum(N2)
-            action = np.random.choice(len(pi), p=pi)
+
+            if recent_move_vec is not None and self.use_recent_move_vec:
+                action = adaptive_next_sample(pi, recent_move_vec, 5.0)
+            else:
+                action = np.random.choice(len(pi), p=pi)
 
         if self.is_mimic_AI:
-            # print("mimic AI")
-
             # actionの座標を計算し、回転対称に写す。
             if self.prev_action is not None:
                 is_placewall = (self.prev_action < 128)

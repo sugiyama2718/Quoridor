@@ -1,3 +1,5 @@
+import sys
+sys.path.append("./")
 from BasicAI import calc_optimal_move_by_DP
 from State import State, State_init
 from main import normal_play

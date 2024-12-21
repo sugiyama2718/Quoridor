@@ -1,3 +1,5 @@
+import sys
+sys.path.append("./")
 from State import State, State_init, State, movable_array, set_state_by_wall, display_cui
 import numpy as np
 import os

@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
                     all_kifu_list.extend(kifu_list)
 
-        opening_tree, statevec2node = generate_opening_tree(target_epoch, all_kifu_list, max_depth)
+        opening_tree, statevec2node = generate_opening_tree(all_kifu_list, max_depth, target_epoch)
 
         for opening_name, target_opening in target_opening_data:
             state, state_vec, _ = get_normalized_state(list(map(Official2Glendenning, target_opening)))

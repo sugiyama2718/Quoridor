@@ -55,8 +55,8 @@ TRAIN_FILE_NUM_PER_EPOCH = TRAIN_ARRAY_SIZE / (POOL_EPOCH_NUM * GAME_NUM_IN_H5) 
 EVALUATION_EPOCH_NUM = EVALUATION_CYCLE // TRAIN_CYCLE
 SAVE_H5_NUM = POOL_EPOCH_NUM * 4
 
-SELFPLAY_SEARCHNODES_MIN = 300
-SELFPLAY_SEARCHNODES_MAX = 1500
+SELFPLAY_SEARCHNODES_MIN = 500
+SELFPLAY_SEARCHNODES_MAX = 2500
 DEEP_SEARCH_P = 0.15  # 深い探索を実施する確率
 DEEP_TH = 0.5  # prev_v, post_vにどれだけ差があれば深い探索にするか
 EVALUATION_SEARCHNODES = 1000
@@ -72,6 +72,7 @@ TRAIN_LOG_DIR = "train_results/train_log"
 PARAMETER_DIR = "train_results/parameter"
 KIFU_DIR = "train_results/kifu"
 JOSEKI_DIR = "train_results/joseki"
+EVAL_DETAIL_DIR = "train_results/eval_detail"
 
 EPOCH_DIR_UNIT = 1000  # 何epochごとにディレクトリを作成するか
 SAVE_CYCLE = 5  # 何epochごとに保存するか
@@ -107,7 +108,7 @@ ATTENTION_VEC_LEN = 32  # DEFAULT_FILTERSの約数にする
 
 USE_GLOBAL_POOLING = False
 USE_VALID = True
-LEARNING_RATE = 1e-2
+LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-4
 EPSILON = 1e-7
 EMA_DECAY = 3e-4
@@ -129,12 +130,14 @@ MIMIC_AI_RATIO = 0.02  # 自己対戦においてmimic AIにする割合
 FORCE_OPENING_RATE = 0.04  # 探索してほしい定跡をやる割合
 FORCE_OPENING_LIST = [  # Official notation
     ["e2", "e8", "e3", "e7", "e4", "e6", "a3h"],
-    ["e2", "e8", "e3", "e7", "e4", "e6", "d3h", "c6h", "d5v"],
     ["e2", "e8", "e3", "e7", "e4", "e6", "d3h", "c6h", "e6v"],
     ["e2", "e8", "e3", "e7", "e4", "d4v"]
-]
+] + [["e2", "e8", "e3", "e7", "e4", "e6", "d3h", "c6h", "d5v"]] * 1
 
 SHORTEST_P_RATIO = 0.15  # 最短路の向きにPを高める割合
+OPENING_TURN = 20  # 何ターンを前半とみなすか
+
+MAX_PAST_GAMES = 20  # 過去の棋譜をいくつ覚えるか
 
 V_REGULARIZER = 0.1
 P_REGULARIZER = 0.01
