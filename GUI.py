@@ -51,6 +51,10 @@ SEARCH_NODE_LIST_LEN = len(SEARCH_NODE_LIST)
 TAU_LIST = [0.16 * i for i in range(5)]
 DEFAULT_SEARCH_NODE_INDEX = 6
 DEFAULT_TAU_INDEX = 2
+P_TAU = config_dict["p_tau"]
+POST_ALPHA = config_dict["post_alpha"]
+POST_BETA = config_dict["post_beta"]
+C_PUCT = config_dict["C_puct"]
 
 AI_WAIT_TIME = 0.1  # AIが考え始めるまでに待機する時間[s]
 UNDO_WAIT_TIME = 1.0  # 対AIのときにundoを2⃣回押しやすくするために待つ時間を増やす
@@ -453,13 +457,13 @@ class Quoridor(Widget):
             # humanが1pの場合
             if self.teban_1p.state == "down":
                 agent1 = GUIHuman(0)
-                agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes, self.tau, self.level, seed=int(time.time()))
+                agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes, self.tau, self.level, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
                 # AIは2p側
                 self.current_agent_settings_p1 = None
                 self.current_agent_settings_p2 = (self.mode, self.level, self.tau, self.search_nodes)
             else:
                 # humanが2pの場合
-                agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes, self.tau, self.level, seed=int(time.time()))
+                agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes, self.tau, self.level, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
                 agent2 = GUIHuman(1)
                 # AIは1p側
                 self.current_agent_settings_p1 = (self.mode, self.level, self.tau, self.search_nodes)
@@ -467,8 +471,8 @@ class Quoridor(Widget):
 
         elif self.mode == AI_AI_MODE:
             # AI vs AI
-            agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes_1p, self.tau_1p, self.level_1p, seed=int(time.time()))
-            agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes_2p, self.tau_2p, self.level_2p, seed=int(time.time()))
+            agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes_1p, self.tau_1p, self.level_1p, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
+            agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes_2p, self.tau_2p, self.level_2p, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
 
             # p1側のAI設定
             self.current_agent_settings_p1 = (self.mode, self.level_1p, self.tau_1p, self.search_nodes_1p)
@@ -481,13 +485,13 @@ class Quoridor(Widget):
             if self.training_game_num % 2 == 0:
                 self.training_color = 0
                 agent1 = GUIHuman(0)
-                agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()))
+                agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
                 # AIはp2側
                 self.current_agent_settings_p1 = None
                 self.current_agent_settings_p2 = (self.mode, training_index, 0.32, training_search_nodes)
             else:
                 self.training_color = 1
-                agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()))
+                agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
                 agent2 = GUIHuman(1)
                 # AIはp1側
                 self.current_agent_settings_p1 = (self.mode, training_index, 0.32, training_search_nodes)
@@ -523,10 +527,10 @@ class Quoridor(Widget):
             if self.training_game_num % 2 == 0:
                 self.training_color = 0
                 agent1 = GUIHuman(0)
-                agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()))
+                agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
             else:
                 self.training_color = 1
-                agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()))
+                agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
                 agent2 = GUIHuman(1)
 
             training_info_text = "You are "
