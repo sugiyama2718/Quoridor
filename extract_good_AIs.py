@@ -20,9 +20,12 @@ tf.get_logger().setLevel(logging.ERROR)
 SIGMA = 1.5
 RANDOM_EPSILON = 1e-5  # 同スコアのものにランダム性を加える目的
 EPSILON = 1e-10
-FIX_EPOCH_LIST = [60, 61, 63, 65, 75, 81, 91, 130, 175, 215, 285, 325, 465, 775]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
+FIX_EPOCH_LIST = []
+#FIX_EPOCH_LIST = [60, 61, 63, 65, 75, 81, 91, 130, 175, 215, 285, 325, 465, 775]  # eliminationの対象から外す 既にGUIでtraining用AIとして使用しているものなどを指定
 EPOCH_CYCLE = 100
 MAX_DEPTH = 20
+LATEST_RANGE = 1000
+SURVIVE_NUM = 3
 
 # AIのデフォルトパラメータを設定
 default_C_puct = 2.0
@@ -76,7 +79,7 @@ def calc_match_score_arr(N_arr, r_arr):
 
 
 def evaluate_2game_process_2id(arg_tuple):
-    arg_i, arg_j, ai_param_i, ai_param_j, seed, wait_time = arg_tuple
+    arg_i, arg_j, ai_param_i, ai_param_j, sente_kifu_list_i, sente_kifu_list_j, gote_kifu_list_i, gote_kifu_list_j, seed, wait_time = arg_tuple
 
     import time
     time.sleep(wait_time)
@@ -94,7 +97,10 @@ def evaluate_2game_process_2id(arg_tuple):
             seed=seed,
             C_puct=ai_param_i['C_puct'],
             tau=ai_param_i['tau'],
-            p_tau=ai_param_i['p_tau']
+            p_tau=ai_param_i['p_tau'],
+            post_alpha=ai_param_i['post_alpha'],
+            post_beta=ai_param_i['post_beta'],
+            use_recent_move_vec=ai_param_i['use_recent_move_vec']
         )
     else:
         AI1 = CNNAI(
@@ -103,7 +109,10 @@ def evaluate_2game_process_2id(arg_tuple):
             seed=seed,
             C_puct=ai_param_i['C_puct'],
             tau=ai_param_i['tau'],
-            p_tau=ai_param_i['p_tau']
+            p_tau=ai_param_i['p_tau'],
+            post_alpha=ai_param_i['post_alpha'],
+            post_beta=ai_param_i['post_beta'],
+            use_recent_move_vec=ai_param_i['use_recent_move_vec']
         )
         AI1.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(ai_param_i['AI_id']), "epoch{}.ckpt".format(ai_param_i['AI_id'])))
 
@@ -117,7 +126,10 @@ def evaluate_2game_process_2id(arg_tuple):
             seed=seed,
             C_puct=ai_param_j['C_puct'],
             tau=ai_param_j['tau'],
-            p_tau=ai_param_j['p_tau']
+            p_tau=ai_param_j['p_tau'],
+            post_alpha=ai_param_j['post_alpha'],
+            post_beta=ai_param_j['post_beta'],
+            use_recent_move_vec=ai_param_j['use_recent_move_vec']
         )
     else:
         AI2 = CNNAI(
@@ -126,13 +138,17 @@ def evaluate_2game_process_2id(arg_tuple):
             seed=seed,
             C_puct=ai_param_j['C_puct'],
             tau=ai_param_j['tau'],
-            p_tau=ai_param_j['p_tau']
+            p_tau=ai_param_j['p_tau'],
+            post_alpha=ai_param_j['post_alpha'],
+            post_beta=ai_param_j['post_beta'],
+            use_recent_move_vec=ai_param_j['use_recent_move_vec']
         )
         AI2.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(ai_param_j['AI_id']), "epoch{}.ckpt".format(ai_param_j['AI_id'])))
 
     AIs = [AI1, AI2]
 
-    ret = evaluate(AIs, 2, multiprocess=True, return_detail=True)
+    ret = evaluate(AIs, 2, multiprocess=True, return_detail=True, 
+    sente_kifu_list_i=sente_kifu_list_i, sente_kifu_list_j=sente_kifu_list_j, gote_kifu_list_i=gote_kifu_list_i, gote_kifu_list_j=gote_kifu_list_j)
     del AIs
     return ret, arg_i, arg_j
 
@@ -223,22 +239,42 @@ if __name__ == "__main__":
             'config_id': config_counter,  # 内部識別用ID
             'AI_id': AI_id,
             'search_nodes': SEARCHNODES_FOR_EXTRACT,
-            'C_puct': default_C_puct,
+            'C_puct': 2.5,
             'tau': default_tau,
-            'p_tau': 0.7
+            'p_tau': 0.7,
+            'post_alpha': 2.0,
+            'post_beta': 5.0,
+            'use_recent_move_vec': True
         }
         ai_parameters.append(ai_param)
         config_counter += 1
 
-    # 実験: tauを0.32に変更したバージョンも追加
-    for AI_id in AI_id_list:
+    # 実験: 
+    for AI_id in AI_id_list[-8:]:
         ai_param = {
             'config_id': config_counter,  # 内部識別用ID
             'AI_id': AI_id,
-            'search_nodes': SEARCHNODES_FOR_EXTRACT,
+            'search_nodes': 1000,
             'C_puct': 2.5,
             'tau': default_tau,
-            'p_tau': 0.7
+            'p_tau': 0.7,
+            'post_alpha': 2.0,
+            'post_beta': 5.0,
+            'use_recent_move_vec': True
+        }
+        ai_parameters.append(ai_param)
+        config_counter += 1
+    for AI_id in AI_id_list[-8:]:
+        ai_param = {
+            'config_id': config_counter,  # 内部識別用ID
+            'AI_id': AI_id,
+            'search_nodes': 2000,
+            'C_puct': 2.5,
+            'tau': default_tau,
+            'p_tau': 0.7,
+            'post_alpha': 2.0,
+            'post_beta': 5.0,
+            'use_recent_move_vec': True
         }
         ai_parameters.append(ai_param)
         config_counter += 1
@@ -285,7 +321,9 @@ if __name__ == "__main__":
             wait_time_list[i] = i
         for k, (i, j) in enumerate(matches):
             # ここでai_parameters[i], ai_parameters[j]を渡す
-            args.append((i, j, ai_parameters[i], ai_parameters[j], (k + total_game_num) * 10000, wait_time_list[k]))
+            args.append((i, j, ai_parameters[i], ai_parameters[j], 
+            action_lists_sente_dict[i][-MAX_PAST_GAMES:], action_lists_sente_dict[j][-MAX_PAST_GAMES:], action_lists_gote_dict[i][-MAX_PAST_GAMES:], action_lists_gote_dict[j][-MAX_PAST_GAMES:], 
+            (k + total_game_num) * 10000, wait_time_list[k]))
 
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process_2id, iterable=args)
@@ -377,6 +415,9 @@ if __name__ == "__main__":
             "C_puct": [param['C_puct'] for param in survived_ai_params],
             "tau": [param['tau'] for param in survived_ai_params],
             "p_tau": [param['p_tau'] for param in survived_ai_params],
+            "post_alpha": [param['post_alpha'] for param in survived_ai_params],
+            "post_beta": [param['post_beta'] for param in survived_ai_params],
+            "use_recent_move_vec": [param['use_recent_move_vec'] for param in survived_ai_params],
             "rate": estimated_r_arr[survived_list],
             "sente_win_num": sente_win_nums,
             "gote_win_num": gote_win_nums,
@@ -397,13 +438,15 @@ if __name__ == "__main__":
         plt.legend()
         plt.savefig(os.path.join(save_dir, "estimated_rate_graph.png"))
 
+        # elimination処理内
         if total_game_num // ELIMINATE_STEP > eliminate_count and eliminate_count < ELIMINATE_NUM:
-            rate_class = np.floor(estimated_r_arr / RATE_DIV).astype(int)
-            class_counter = Counter(rate_class)
-
             print("--- elimination ---")
             print("cand num = {}, diff num = {}".format(cand_num, diff_num))
+
+            rate_class = np.floor(estimated_r_arr / RATE_DIV).astype(int)
+            class_counter = Counter(rate_class)
             increment_dict = {}
+
             for cls in class_counter.keys():
                 increment_dict[cls] = 0
                 print("{}: {}".format(cls, cand_num + cls * diff_num))
@@ -414,6 +457,8 @@ if __name__ == "__main__":
                 leave_num = cand_num + cls * diff_num
                 if increment_dict[cls] > leave_num and ai_parameters[AI_index]['AI_id'] not in FIX_EPOCH_LIST:
                     eliminate_AI_indices.append(AI_index)
+            # 一旦ここで通常のelimination処理を行う
+            prev_survived = set(survived_list)
             all_eliminate_AI_indices_list = sorted(list(set(all_eliminate_AI_indices_list) | set(eliminate_AI_indices)))
             survived_list = sorted(list(set(range(AI_num)) - set(all_eliminate_AI_indices_list)))
             print("eliminated num = {}".format(len(all_eliminate_AI_indices_list)))
@@ -423,6 +468,30 @@ if __name__ == "__main__":
             progress = eliminate_count / (ELIMINATE_NUM - 1)
             cand_num = int(progress * END_CAND_NUM + (1 - progress) * START_CAND_NUM)
             diff_num = int(diff_num * DIFF_R)
+
+            # ここから追加のロジック
+            # 「今回新たに消されたAI（prev_survived にいて survived_list にいないもの）」
+            newly_eliminated = list(prev_survived - set(survived_list))
+
+            # 末尾範囲に該当するAIを抽出
+            max_id = max([ai_parameters[i]['AI_id'] for i in range(AI_num)])
+            latest_threshold = max_id - LATEST_RANGE
+            latest_candidates = [(i, estimated_r_arr[i]) for i in newly_eliminated if ai_parameters[i]['AI_id'] >= latest_threshold]
+
+            if len(latest_candidates) > 0:
+                # レート降順でソート
+                latest_candidates.sort(key=lambda x: x[1], reverse=True)
+
+                # SURVIVE_NUM個を残す
+                top_survivors = [x[0] for x in latest_candidates[:SURVIVE_NUM]]
+
+                # これらを復活させる
+                survived_list = sorted(list(set(survived_list) | set(top_survivors)))
+
+                # all_eliminate_AI_indices_listからも除外
+                all_eliminate_AI_indices_list = sorted(list(set(all_eliminate_AI_indices_list) - set(top_survivors)))
+
+                print(f"Exceptionally kept {len(top_survivors)} AI(s) from the tail range.")
 
         N_sum_arr = np.sum(N_arr, axis=1)
         possible_games = 2 * np.ones_like(N_sum_arr)
