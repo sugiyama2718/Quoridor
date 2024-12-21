@@ -26,7 +26,7 @@ from collections import OrderedDict
 from analyze_h5 import analyze_h5_main
 import shutil
 import random
-from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions
+from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, get_recent_move_distribution
 
 
 # agentsは初期化されてるとする
@@ -281,7 +281,8 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
 
 # 中で先手後手を順番に入れ替えている
-def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False, return_detail=False):
+def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False, return_detail=False, 
+sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu_list_j=None):
     wins = 0.
     sente_win_num = 0.
     gote_win_num = 0.
@@ -302,11 +303,22 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
         while True:
             if display:
                 display_cui(state)
-            s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
+
+            # 各AIの過去の棋譜を適切に参照して、recent_move_vecとして渡す。過去の棋譜と重複した手を避けさせるため
+            if i % 2 == 0:
+                past_games = sente_kifu_list_i
+            else:
+                past_games = sente_kifu_list_j
+            if past_games is None:
+                recent_move_vec = None
+            else:
+                recent_move_vec = get_recent_move_distribution(past_games, action_list)
+
+            s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
-                s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state)
+                s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
                 a = actionid2str(state, s)
             AIs[1 - i % 2].prev_action = s
             action_list.append(a)
@@ -322,11 +334,20 @@ def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False
             if display:
                 display_cui(state)
 
-            s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
+            if i % 2 == 0:
+                past_games = gote_kifu_list_j
+            else:
+                past_games = gote_kifu_list_i
+            if past_games is None:
+                recent_move_vec = None
+            else:
+                recent_move_vec = get_recent_move_distribution(past_games, action_list)
+
+            s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
-                s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state)
+                s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
                 a = actionid2str(state, s)
             AIs[i % 2].prev_action = s
             action_list.append(a)
