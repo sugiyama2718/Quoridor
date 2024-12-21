@@ -37,14 +37,12 @@ import pickle
 from util import Glendenning2Official, RECORDS_PATH, get_recent_move_distribution
 from datetime import datetime
 from engine_util import prepare_AI
-from config import read_application_config
+from config import read_application_config, MAX_PAST_GAMES
 
 touched = False
 action = ""
 
 config_dict = read_application_config()
-
-MAX_PAST_GAMES = 20
 
 SEARCH_NODE_LIST = config_dict["search_nodes_list"]
 SEARCH_NODE_LIST_LEN = len(SEARCH_NODE_LIST)

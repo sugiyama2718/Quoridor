@@ -77,8 +77,8 @@ def beta_pdf(x, alpha, beta):
 
 def weighted_by_beta(p, alpha, beta):
     # pは確率分布、shape=(n,), sum(p)=1
-    # ベータ分布PDFで重み付け
-    w = beta_pdf(p, alpha, beta)
+    # ベータ分布PDF + pで重み付け。pを足すのはp=1で重み0を回避するため
+    w = beta_pdf(p, alpha, beta) + p
     pw = p * w
     p_new = pw / np.sum(pw)
     return p_new
@@ -302,7 +302,7 @@ def calc_next_state(x):
 
 class BasicAI(Agent):
     def __init__(self, color, search_nodes=1, C_puct=5, tau=1, n_parallel=N_PARALLEL, virtual_loss_n=1, use_estimated_V=True, V_ema_w=0.01, 
-                 shortest_only=False, use_average_Q=False, random_playouts=False, tau_mult=2, tau_decay=6, is_mimic_AI=False, tau_peak=6, force_opening=None, post_alpha=1.0, post_beta=1.0):
+                 shortest_only=False, use_average_Q=False, random_playouts=False, tau_mult=2, tau_decay=6, is_mimic_AI=False, tau_peak=6, force_opening=None, post_alpha=1.0, post_beta=2.0, use_recent_move_vec=True):
         super(BasicAI, self).__init__(color)
         self.search_nodes = search_nodes
         self.C_puct = C_puct
@@ -323,6 +323,7 @@ class BasicAI(Agent):
         self.force_opening = force_opening
         self.post_alpha = post_alpha  # 事後分布に対するベータ分布による変換のパラメータ。中くらいの確率値の手を強調する目的。
         self.post_beta = post_beta
+        self.use_recent_move_vec = use_recent_move_vec
 
     def init_prev(self, state=None):
         # 試合前に毎回実行
@@ -834,10 +835,10 @@ class BasicAI(Agent):
                 N2 = np.power(np.asarray(N2, dtype="float64"), 1. / tau)
             pi = N2 / np.sum(N2)
 
-            if recent_move_vec is None:
-                action = np.random.choice(len(pi), p=pi)
-            else:
+            if recent_move_vec is not None and self.use_recent_move_vec:
                 action = adaptive_next_sample(pi, recent_move_vec, 5.0)
+            else:
+                action = np.random.choice(len(pi), p=pi)
 
         if self.is_mimic_AI:
             # actionの座標を計算し、回転対称に写す。

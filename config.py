@@ -137,6 +137,8 @@ FORCE_OPENING_LIST = [  # Official notation
 SHORTEST_P_RATIO = 0.15  # 最短路の向きにPを高める割合
 OPENING_TURN = 20  # 何ターンを前半とみなすか
 
+MAX_PAST_GAMES = 20  # 過去の棋譜をいくつ覚えるか
+
 V_REGULARIZER = 0.1
 P_REGULARIZER = 0.01
 
