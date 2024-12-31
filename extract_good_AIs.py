@@ -79,6 +79,39 @@ def calc_match_score_arr(N_arr, r_arr):
 
 
 def evaluate_2game_process_2id(arg_tuple):
+    """
+    Evaluates two games between two AI configurations with specified parameters and returns the results.
+
+    Args:
+        arg_tuple (tuple): A tuple containing the following elements:
+            arg_i (int): The index of the first AI in the current match.
+            arg_j (int): The index of the second AI in the current match.
+            ai_param_i (dict): Parameters for the first AI, including search nodes, C_puct, tau, and other configurations.
+            ai_param_j (dict): Parameters for the second AI, similar to `ai_param_i`.
+            sente_kifu_list_i (list): A list of move sequences where the first AI plays as sente (first mover).
+            sente_kifu_list_j (list): A list of move sequences where the second AI plays as sente.
+            gote_kifu_list_i (list): A list of move sequences where the first AI plays as gote (second mover).
+            gote_kifu_list_j (list): A list of move sequences where the second AI plays as gote.
+            seed (int): A seed value for random operations to ensure reproducibility.
+            wait_time (float): A delay time in seconds to stagger the process execution.
+
+    Returns:
+        tuple: A tuple containing:
+            - ret (dict): A dictionary with the evaluation results, including:
+                - `sente_win_num`: The number of games won by the first AI as sente.
+                - `gote_win_num`: The number of games won by the second AI as sente.
+                - `draw_num`: The number of drawn games.
+                - `action_lists`: Detailed move sequences for both games.
+            - arg_i (int): The index of the first AI.
+            - arg_j (int): The index of the second AI.
+
+    Notes:
+        - This function is intended to be used in a multiprocessing pool, where `arg_tuple` is passed as a single argument.
+        - AI configurations are instantiated using the `CNNAI` class from the `CNNAI` module.
+        - The evaluation logic relies on the `evaluate` function from the `main` module.
+        - The function loads pretrained models for the specified AI configurations if `AI_id` is not -1.
+        - Detailed move sequences are stored and can be used for further analysis or logging.
+    """
     arg_i, arg_j, ai_param_i, ai_param_j, sente_kifu_list_i, sente_kifu_list_j, gote_kifu_list_i, gote_kifu_list_j, seed, wait_time = arg_tuple
 
     import time
