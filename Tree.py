@@ -89,45 +89,67 @@ class OpeningTree:
         self.p1_win_num = None
         self.p2_win_num = None
         self.selfplay_epoch = None
-        self.game_num = None
+        self.game_num = None  # 全体で行われた試合数。ノードによらない値
 
         self.comment = None
         self.name = None
         self.is_display = False
 
+        self.mcts_result_vec = None  # MCTS探索結果ベクトル (整数ベクトル)
+        self.search_count_vec = None  # 各ノードの探索数ベクトル (整数ベクトル)
+        # 注意: search_count_vecとvisited_numは意味が重複しています。visited_num = sum(search_count_vec)という関係がある。
+
     def to_dict(self):
+        """
+        ノード情報を辞書形式に変換するメソッド。
+        """
         ret = {}
-        ret["fvec"] = [int(x) for x in self.fvec]  # jsonにするときにリストになっている必要があるため。また、numpyのint32型というのがpythonのintとは別なのでこれも変換する
+        ret["fvec"] = [int(x) for x in self.fvec]  # jsonにするときにリストになっている必要があるため。
         ret["children"] = {}
 
+        # 子ノードの再帰処理
         for k, v in self.children.items():
             if isinstance(v, OpeningTree):
                 ret["children"][k] = v.to_dict()
             else:
                 ret["children"][k] = [int(x) for x in v]  # 共有ノードの状態ベクトル
 
+        # その他の属性を辞書に追加
         vars_dict = copy.copy(self.__dict__)
         del vars_dict["fvec"]
         del vars_dict["children"]
         for k, v in vars_dict.items():
             if v is not None:
-                ret[k] = v
+                if isinstance(v, list):
+                    ret[k] = [int(x) for x in v]  # 整数ベクトルに変換
+                else:
+                    ret[k] = v
 
         return ret
 
     def __lt__(self, other):  # heap用
+        """
+        比較メソッド: visited_numで比較する。
+        """
         return self.visited_num < other.visited_num
 
 
 def load_dict_to_opening_tree(json_dict):
+    """
+    辞書形式のデータからOpeningTreeオブジェクトを復元するメソッド。
+    """
     fvec = tuple(json_dict["fvec"])
     ret = OpeningTree(fvec)
 
     omit_list = ["fvec", "children"]
     for k, v in json_dict.items():
         if k not in omit_list:
-            setattr(ret, k, v)
+            if isinstance(v, list):
+                setattr(ret, k, [int(x) for x in v])  # 整数ベクトルに変換して設定
+            else:
+                setattr(ret, k, v)
 
+    # 子ノードの再帰処理
     for k, v in json_dict["children"].items():
         if isinstance(v, dict):
             ret.children[k] = load_dict_to_opening_tree(v)

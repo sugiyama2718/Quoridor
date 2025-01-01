@@ -101,6 +101,119 @@ def get_normalized_state(action_list):
         return mirror_state, mirror_state_vec, True
 
 
+########################################################
+# OpeningTree構築・更新の共通ロジック
+########################################################
+def _build_opening_tree_core(
+    opening_tree,
+    statevec2node,
+    kifu_list,
+    max_depth,
+    target_epoch=None,
+    disable_tqdm=False
+):
+    """
+    OpeningTreeとstatevec2nodeに対し、kifu_list(複数ゲーム)を反映させる。
+    左右対称局面は同一視する。既存のノードがあれば再利用し、なければ追加する。
+
+    Parameters
+    ----------
+    opening_tree : OpeningTree
+        すでに初期化済みのOpeningTreeのrootノード
+    statevec2node : dict
+        state_vecをキーにOpeningTreeノードを紐づけた辞書
+    kifu_list : list of list[str]
+        反映させたい棋譜のリスト (アクション文字列のリスト)
+    max_depth : int
+        何手目まで定跡木に登録するか
+    target_epoch : int or None
+        optional
+    disable_tqdm : bool
+        Trueならプログレスバーを表示しない
+
+    Returns
+    -------
+    opening_tree, statevec2node (更新後)
+    """
+
+    if opening_tree.game_num is None:
+        opening_tree.game_num = 0
+    opening_tree.game_num += len(kifu_list)
+    opening_tree.selfplay_epoch = target_epoch
+
+    for action_list in tqdm(kifu_list, disable=disable_tqdm):
+        # (1) 状態を用意
+        state = State()
+        State_init(state)
+        mirror_state = State()
+        State_init(mirror_state)
+
+        # (2) アクションの左右対称
+        normalized_action_list, _ = get_normalized_action_list(action_list)
+        mirror_action_list = list(map(mirror_action, action_list))
+
+        node = opening_tree
+        path_nodes = [node]
+
+        for depth, (action_str, mirror_action_str, normalized_action_str) in enumerate(
+            zip(action_list, mirror_action_list, normalized_action_list)
+        ):
+            # 実際に手を進める
+            accept_action_str(state, action_str, check_placable=False, calc_placable_array=False, check_movable=False)
+            accept_action_str(mirror_state, mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
+
+            # (3) 局面比較
+            state_vec = tuple(feature_int(state).flatten())
+            mirror_state_vec = tuple(feature_int(mirror_state).flatten())
+
+            if state_vec <= mirror_state_vec:
+                normalized_state = state
+            else:
+                normalized_state = mirror_state
+
+            if depth <= max_depth:
+                # (4) アクション文字列を公式表記に変換してkeyにする
+                key = Glendenning2Official(normalized_action_str)
+
+                # まだ登録されていなければ追加
+                if key not in node.children:
+                    child_candidate = get_opening_node_from_state(normalized_state, statevec2node)
+                    node.children[key] = child_candidate
+
+                    # 新規に生成された場合のみOpeningTreeとして初期化
+                    if isinstance(child_candidate, OpeningTree):
+                        if child_candidate.visited_num is None:
+                            child_candidate.visited_num = 0
+                        if child_candidate.p1_win_num is None:
+                            child_candidate.p1_win_num = 0
+                        if child_candidate.p2_win_num is None:
+                            child_candidate.p2_win_num = 0
+                        child_candidate.selfplay_epoch = target_epoch
+
+                # move_to_childで必ずOpeningTreeを取得して遷移
+                node = move_to_child(node, key, statevec2node)
+                path_nodes.append(node)
+
+        # (5) 勝敗を簡易判定（例：手数が奇数なら先手勝ち）
+        is_sente_win = 1 if (len(action_list) % 2 == 1) else -1
+
+        # (6) 経路上のノードに visited_num, p1_win_num / p2_win_num を加算
+        for n in path_nodes:
+            if n.visited_num is None:
+                n.visited_num = 0
+            n.visited_num += 1
+            if is_sente_win == 1:
+                if n.p1_win_num is None:
+                    n.p1_win_num = 0
+                n.p1_win_num += 1
+            else:
+                if n.p2_win_num is None:
+                    n.p2_win_num = 0
+                n.p2_win_num += 1
+
+    return opening_tree, statevec2node
+
+
 def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_tqdm=False):
     statevec2node = {}
     add_state = State()
@@ -160,6 +273,22 @@ def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_t
             else:
                 node.p2_win_num += 1
                 
+    return opening_tree, statevec2node
+
+########################################################
+# 差分更新用の新関数
+########################################################
+def update_opening_tree_with_new_kifu(opening_tree, statevec2node,
+                                      new_kifu_list, max_depth,
+                                      target_epoch=None, disable_tqdm=False):
+    """
+    既存のopening_treeとstatevec2nodeに対して、新しい棋譜(new_kifu_list)だけを処理して差分更新する。
+    """
+    _build_opening_tree_core(opening_tree, statevec2node,
+                             kifu_list=new_kifu_list,
+                             max_depth=max_depth,
+                             target_epoch=target_epoch,
+                             disable_tqdm=disable_tqdm)
     return opening_tree, statevec2node
 
 
@@ -421,6 +550,15 @@ def adaptive_next_sample(p, counts, beta=1.0, random_state=None):
     x_next = rng.choice(N, p=q)
     
     return x_next
+
+
+def load_statevec2node(tree):
+    statevec2node = {}
+    statevec2node[tree.fvec] = tree
+    for child in tree.children.values():
+        if isinstance(child, OpeningTree):
+            load_statevec2node(child)
+    return statevec2node
 
 
 if __name__ == "__main__":
