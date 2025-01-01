@@ -45,7 +45,7 @@ class CNNAI(BasicAI):
     def __init__(self, color, search_nodes=1, C_puct=2, tau=1, all_parameter_zero=False, v_is_dist=False, p_is_almost_flat=False, 
     seed=0, use_estimated_V=True, V_ema_w=0.01, shortest_only=False, per_process_gpu_memory_fraction=PER_PROCESS_GPU_MEMORY_FRACTION, use_average_Q=False, random_playouts=False,
     filters=DEFAULT_FILTERS, layer_num=DEFAULT_LAYER_NUM, use_global_pooling=USE_GLOBAL_POOLING, use_self_attention=USE_SELF_ATTENTION, use_slim_head=USE_SLIM_HEAD, opponent_AI=None,
-    is_mimic_AI=False, force_opening=None, use_mix_precision=True, p_tau=1.0, post_alpha=1.0, post_beta=2.0, use_recent_move_vec=True):
+    is_mimic_AI=False, force_opening=None, use_mix_precision=True, p_tau=1.0, post_alpha=1.0, post_beta=2.0, use_recent_move_vec=True, opening_tree_path=None):
         super(CNNAI, self).__init__(color, search_nodes, C_puct, tau, use_estimated_V=use_estimated_V, V_ema_w=V_ema_w, shortest_only=shortest_only, 
         use_average_Q=use_average_Q, random_playouts=random_playouts, is_mimic_AI=is_mimic_AI, force_opening=force_opening, post_alpha=post_alpha, post_beta=post_beta, use_recent_move_vec=use_recent_move_vec)
 
@@ -68,9 +68,16 @@ class CNNAI(BasicAI):
         self.opponent_AI = opponent_AI  # tensorflowを自己対戦の２AIで共有するための変数。TODO: 非合法手がまだ出るので修正は必要。ただしGPUメモリが節約できなかったので着手していない。
         self.use_mix_precision = use_mix_precision
         self.p_tau = p_tau
+        self.opening_tree_path = opening_tree_path
 
         if self.opponent_AI is None:
             self.init_tensorflow()
+
+        if opening_tree_path is not None:
+            self.init_opening_tree()
+
+    def init_opening_tree(self):
+        pass
 
     def init_tensorflow(self):
         # tensorflowの準備

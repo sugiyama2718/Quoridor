@@ -72,6 +72,7 @@ TRAIN_LOG_DIR = "train_results/train_log"
 PARAMETER_DIR = "train_results/parameter"
 KIFU_DIR = "train_results/kifu"
 JOSEKI_DIR = "train_results/joseki"
+AI_JOSEKI_DIR = "train_results/ai_joseki"
 EVAL_DETAIL_DIR = "train_results/eval_detail"
 
 EPOCH_DIR_UNIT = 1000  # 何epochごとにディレクトリを作成するか

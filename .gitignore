@@ -1,0 +1,5 @@
+*.h5
+*.pyc
+__pycache__/
+train_results/
+past_eval_results/

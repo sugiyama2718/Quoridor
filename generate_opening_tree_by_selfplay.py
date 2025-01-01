@@ -114,10 +114,11 @@ def main():
     print("\nAll cycles finished.")
     print(f"Total kifu count: {len(all_kifu_list_global)}")
 
-    opening_tree2, statevec2node2 = generate_opening_tree(all_kifu_list_global, MAX_DEPTH)
+    os.makedirs(AI_JOSEKI_DIR, exist_ok=True)
 
-    save_tree_graph(opening_tree, statevec2node, "test_opening_tree")
-    save_tree_graph(opening_tree2, statevec2node2, "test_opening_tree2")
+    save_tree_graph(opening_tree, statevec2node, os.path.join(AI_JOSEKI_DIR, "opening_tree_graph"))
+    with open(os.path.join(AI_JOSEKI_DIR, "opening_tree.json"), "w") as fout:
+        json.dump(opening_tree.to_dict(), fout)
 
 if __name__ == "__main__":
     main()
