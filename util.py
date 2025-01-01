@@ -552,6 +552,15 @@ def adaptive_next_sample(p, counts, beta=1.0, random_state=None):
     return x_next
 
 
+def load_statevec2node(tree):
+    statevec2node = {}
+    statevec2node[tree.fvec] = tree
+    for child in tree.children.values():
+        if isinstance(child, OpeningTree):
+            load_statevec2node(child)
+    return statevec2node
+
+
 if __name__ == "__main__":
     print(get_epoch_dir_name(0))
     print(get_epoch_dir_name(1))

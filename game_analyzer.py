@@ -37,7 +37,7 @@ from Agent import Agent
 from decimal import Decimal
 import random
 import json
-from util import Glendenning2Official, Official2Glendenning, RECORDS_PATH, mirror_action, get_normalized_action_list, get_opening_node_from_state, move_to_child, get_normalized_state
+from util import Glendenning2Official, Official2Glendenning, RECORDS_PATH, mirror_action, get_normalized_action_list, get_opening_node_from_state, move_to_child, get_normalized_state, load_statevec2node
 import math
 from Tree import OpeningTree, load_dict_to_opening_tree
 import copy
@@ -538,17 +538,11 @@ class Quoridor(Widget):
     def load_opening(self):
         print("load_opening")
 
-        def load_statevec2node(tree):
-            self.statevec2node[tree.fvec] = tree
-            for child in tree.children.values():
-                if isinstance(child, OpeningTree):
-                    load_statevec2node(child)
-
         if os.path.exists(DEFAULT_OPENING_JSONFILEPATH):
             with open(DEFAULT_OPENING_JSONFILEPATH, "r") as fin:
                 json_dict = json.load(fin)
             self.opening_tree = load_dict_to_opening_tree(json_dict)
-            load_statevec2node(self.opening_tree)
+            self.statevec2node = load_statevec2node(self.opening_tree)
 
     def save_opening_tree(self):
         with open(DEFAULT_OPENING_JSONFILEPATH, "w") as fout:
