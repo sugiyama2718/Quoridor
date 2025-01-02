@@ -96,8 +96,8 @@ class OpeningTree:
         self.is_display = False
 
         self.mcts_result_vec = None  # MCTS探索結果ベクトル (整数ベクトル)
-        self.search_count_vec = None  # 各ノードの探索数ベクトル (整数ベクトル)
-        # 注意: search_count_vecとvisited_numは意味が重複しています。visited_num = sum(search_count_vec)という関係がある。
+        self.search_count_vec = None  # 各ノードの探索数ベクトル (整数ベクトル)。/2すると実際の探索数で、左右対称局面においては左右対称の手を+1ずつする
+        # 注意: 葉ノードを除きvisited_num = sum(search_count_vec) // 2という関係がある。
 
     def to_dict(self):
         """

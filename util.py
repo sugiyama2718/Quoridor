@@ -116,6 +116,11 @@ def _build_opening_tree_core(
     OpeningTreeとstatevec2nodeに対し、kifu_list(複数ゲーム)を反映させる。
     左右対称局面は同一視する。既存のノードがあれば再利用し、なければ追加する。
 
+    さらに本処理内で search_count_vec も加算する:
+      - search_count_vec[i] = 親ノードから「action i」で遷移する子ノードが
+        何回訪問されたかを示すカウンタ。
+      - 今回は経路を辿るたびに都度+1 or +2する方針。
+
     Parameters
     ----------
     opening_tree : OpeningTree
@@ -142,45 +147,63 @@ def _build_opening_tree_core(
     opening_tree.selfplay_epoch = target_epoch
 
     for action_list in tqdm(kifu_list, disable=disable_tqdm):
-        # (1) 状態を用意
+
+        # 1) 状態を用意
         state = State()
         State_init(state)
         mirror_state = State()
         State_init(mirror_state)
 
-        # (2) アクションの左右対称
+        # 2) アクションの左右対称リスト
         normalized_action_list, _ = get_normalized_action_list(action_list)
         mirror_action_list = list(map(mirror_action, action_list))
 
+        # 経路上のノードを保存 (path_nodes[0] = root)
         node = opening_tree
         path_nodes = [node]
 
-        for depth, (action_str, mirror_action_str, normalized_action_str) in enumerate(
+        # 今回の手順で使った (action_id, mirror_action_id, symmetrical, is_normal_state) を保存
+        # ただし search_count_vec の更新は「親ノード」ごとに行うため、
+        # stepごとに親ノード側を更新するために蓄えておく。
+        move_info = []
+
+        for depth, (action_str, mirror_action_str, normalized_act_str) in enumerate(
             zip(action_list, mirror_action_list, normalized_action_list)
         ):
+            # action_id, mirror_action_id を計算
+            aid = str2actionid(state, action_str)
+            maid = str2actionid(mirror_state, mirror_action_str)
+
+            # 局面比較
+            prev_state_vec = tuple(feature_int(state).flatten())
+            prev_mirror_state_vec = tuple(feature_int(mirror_state).flatten())
+
+            # 左右対称判定
+            symmetrical = (prev_state_vec == prev_mirror_state_vec)
+
             # 実際に手を進める
             accept_action_str(state, action_str, check_placable=False, calc_placable_array=False, check_movable=False)
             accept_action_str(mirror_state, mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
 
-            # (3) 局面比較
+            # 局面比較
             state_vec = tuple(feature_int(state).flatten())
             mirror_state_vec = tuple(feature_int(mirror_state).flatten())
 
+            # normalized_state
             if state_vec <= mirror_state_vec:
                 normalized_state = state
             else:
                 normalized_state = mirror_state
 
             if depth <= max_depth:
-                # (4) アクション文字列を公式表記に変換してkeyにする
-                key = Glendenning2Official(normalized_action_str)
+                # 公式表記に変換
+                key = Glendenning2Official(normalized_act_str)
 
                 # まだ登録されていなければ追加
                 if key not in node.children:
                     child_candidate = get_opening_node_from_state(normalized_state, statevec2node)
                     node.children[key] = child_candidate
 
-                    # 新規に生成された場合のみOpeningTreeとして初期化
                     if isinstance(child_candidate, OpeningTree):
                         if child_candidate.visited_num is None:
                             child_candidate.visited_num = 0
@@ -189,15 +212,20 @@ def _build_opening_tree_core(
                         if child_candidate.p2_win_num is None:
                             child_candidate.p2_win_num = 0
                         child_candidate.selfplay_epoch = target_epoch
+                        child_candidate.search_count_vec = [0] * 137  # np.arrayにしないのはjsonにするため
 
-                # move_to_childで必ずOpeningTreeを取得して遷移
+                # move_to_child で子ノードに進む
                 node = move_to_child(node, key, statevec2node)
                 path_nodes.append(node)
 
-        # (5) 勝敗を簡易判定（例：手数が奇数なら先手勝ち）
+                # ここで "move_info" に「この親ノードに対する action_id 情報」を記録する
+                # (どちらがnormalized_stateか、symmetricalかを後で使う)
+                move_info.append((aid, maid, symmetrical, prev_state_vec <= prev_mirror_state_vec))
+
+        # 手数に応じた勝敗判定（例: 奇数→先手勝ち）
         is_sente_win = 1 if (len(action_list) % 2 == 1) else -1
 
-        # (6) 経路上のノードに visited_num, p1_win_num / p2_win_num を加算
+        # 3) 経路上のノード(=訪れたノード)へ visited_num, p1_win_num/p2_win_num を加算
         for n in path_nodes:
             if n.visited_num is None:
                 n.visited_num = 0
@@ -210,6 +238,31 @@ def _build_opening_tree_core(
                 if n.p2_win_num is None:
                     n.p2_win_num = 0
                 n.p2_win_num += 1
+
+        # 4) 各ステップで「親ノードの search_count_vec」を更新
+        #    move_info[i] は path_nodes[i] → path_nodes[i+1] の手に対応。
+        for i, (aid, maid, symmetrical, is_normal) in enumerate(move_info):
+            parent_node = path_nodes[i]   # 親ノード
+            # search_count_vec の初期化
+            if parent_node.search_count_vec is None:
+                parent_node.search_count_vec = [0] * 137  # np.arrayにしないのはjsonにするため
+
+            if symmetrical:
+                # 左右対称なら、 action_id, mirror_action_id ともに +1
+                if aid != -1:
+                    parent_node.search_count_vec[aid] += 1
+                if maid != -1:
+                    parent_node.search_count_vec[maid] += 1
+            else:
+                # 非対称
+                if is_normal:
+                    # normalized_state == state の場合
+                    if aid != -1:
+                        parent_node.search_count_vec[aid] += 2
+                else:
+                    # normalized_state == mirror_state の場合
+                    if maid != -1:
+                        parent_node.search_count_vec[maid] += 2
 
     return opening_tree, statevec2node
 
@@ -559,6 +612,19 @@ def load_statevec2node(tree):
         if isinstance(child, OpeningTree):
             load_statevec2node(child)
     return statevec2node
+
+
+def traverse_opening_tree_and_print(tree, actions):
+    """treeにルートノード、actionsに空リストを最初渡す"""
+
+    print(actions)
+    print("visited num = {} , p1 win rate = {:.2f}%".format(tree.visited_num, tree.p1_win_num / tree.visited_num * 100))
+    print(sum(tree.search_count_vec))
+    print()
+
+    for key, node in tree.children.items():
+        if isinstance(node, OpeningTree):
+            traverse_opening_tree_and_print(node, actions + [key])
 
 
 if __name__ == "__main__":
