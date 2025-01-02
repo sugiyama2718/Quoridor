@@ -14,7 +14,7 @@ from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
-from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample
+from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter
 import ctypes
 from scipy.special import gamma
 
@@ -82,23 +82,6 @@ def weighted_by_beta(p, alpha, beta):
     pw = p * w
     p_new = pw / np.sum(pw)
     return p_new
-
-
-def display_parameter(x):
-    a = x[:64].reshape((8, 8))
-    b = x[64:128].reshape((8, 8))
-    c = x[128:].reshape((3, 3))
-    for y in range(8):
-        for x in range(8):
-            print("{:5}".format(a[x, y]), end="")
-        print("  ", end="")
-        for x in range(8):
-            print("{:5}".format(b[x, y]), end="")
-        print("")
-    for y in [-1, 0, 1]:
-        for x in [-1, 0, 1]:
-            print("{:5}".format(c[x, y]), end="")
-        print("")
 
 
 # 引数のgにgraphviz用のグラフを入れる。ノード共有のある木構造向け。

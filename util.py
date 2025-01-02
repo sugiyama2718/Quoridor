@@ -213,6 +213,7 @@ def _build_opening_tree_core(
                             child_candidate.p2_win_num = 0
                         child_candidate.selfplay_epoch = target_epoch
                         child_candidate.search_count_vec = [0] * 137  # np.arrayにしないのはjsonにするため
+                        child_candidate.p1_win_num_vec = [0] * 137
 
                 # move_to_child で子ノードに進む
                 node = move_to_child(node, key, statevec2node)
@@ -246,23 +247,29 @@ def _build_opening_tree_core(
             # search_count_vec の初期化
             if parent_node.search_count_vec is None:
                 parent_node.search_count_vec = [0] * 137  # np.arrayにしないのはjsonにするため
+            if parent_node.p1_win_num_vec is None:
+                parent_node.p1_win_num_vec = [0] * 137
 
             if symmetrical:
                 # 左右対称なら、 action_id, mirror_action_id ともに +1
                 if aid != -1:
                     parent_node.search_count_vec[aid] += 1
+                    parent_node.p1_win_num_vec[aid] += int(is_sente_win == 1)
                 if maid != -1:
                     parent_node.search_count_vec[maid] += 1
+                    parent_node.p1_win_num_vec[maid] += int(is_sente_win == 1)
             else:
                 # 非対称
                 if is_normal:
                     # normalized_state == state の場合
                     if aid != -1:
                         parent_node.search_count_vec[aid] += 2
+                        parent_node.p1_win_num_vec[aid] += 2 * int(is_sente_win == 1)
                 else:
                     # normalized_state == mirror_state の場合
                     if maid != -1:
                         parent_node.search_count_vec[maid] += 2
+                        parent_node.p1_win_num_vec[maid] += 2 * int(is_sente_win == 1)
 
     return opening_tree, statevec2node
 
@@ -614,12 +621,30 @@ def load_statevec2node(tree):
     return statevec2node
 
 
+def display_parameter(x):
+    a = x[:64].reshape((8, 8))
+    b = x[64:128].reshape((8, 8))
+    c = x[128:].reshape((3, 3))
+    for y in range(8):
+        for x in range(8):
+            print("{:5}".format(a[x, y]), end="")
+        print("  ", end="")
+        for x in range(8):
+            print("{:5}".format(b[x, y]), end="")
+        print("")
+    for y in [-1, 0, 1]:
+        for x in [-1, 0, 1]:
+            print("{:5}".format(c[x, y]), end="")
+        print("")
+
+
 def traverse_opening_tree_and_print(tree, actions):
     """treeにルートノード、actionsに空リストを最初渡す"""
 
     print(actions)
     print("visited num = {} , p1 win rate = {:.2f}%".format(tree.visited_num, tree.p1_win_num / tree.visited_num * 100))
-    print(sum(tree.search_count_vec))
+    display_parameter(np.asarray(tree.search_count_vec, dtype="int32"))
+    display_parameter(np.asarray(tree.p1_win_num_vec, dtype="int32"))
     print()
 
     for key, node in tree.children.items():
