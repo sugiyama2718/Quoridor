@@ -117,7 +117,7 @@ def main():
     os.makedirs(AI_JOSEKI_DIR, exist_ok=True)
 
     save_tree_graph(opening_tree, statevec2node, os.path.join(AI_JOSEKI_DIR, "opening_tree_graph"))
-    with open(os.path.join(AI_JOSEKI_DIR, "opening_tree.json"), "w") as fout:
+    with open(AI_OPENING_TREE_DEFAULT_PATH, "w") as fout:
         json.dump(opening_tree.to_dict(), fout)
 
 if __name__ == "__main__":

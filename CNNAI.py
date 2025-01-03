@@ -20,6 +20,8 @@ from tqdm import tqdm
 import math
 import json
 from pprint import pprint
+from util import load_statevec2node
+from Tree import load_dict_to_opening_tree
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -70,14 +72,20 @@ class CNNAI(BasicAI):
         self.p_tau = p_tau
         self.opening_tree_path = opening_tree_path
 
+        self.opening_tree = None
+        self.statevec2node = None
+
         if self.opponent_AI is None:
             self.init_tensorflow()
 
-        if opening_tree_path is not None:
+        if self.opening_tree_path is not None:
             self.init_opening_tree()
 
     def init_opening_tree(self):
-        pass
+        with open(self.opening_tree_path, "r") as fin:
+            json_dict = json.load(fin)
+        self.opening_tree = load_dict_to_opening_tree(json_dict)
+        self.statevec2node = load_statevec2node(self.opening_tree)
 
     def init_tensorflow(self):
         # tensorflowの準備

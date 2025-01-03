@@ -75,6 +75,8 @@ JOSEKI_DIR = "train_results/joseki"
 AI_JOSEKI_DIR = "train_results/ai_joseki"
 EVAL_DETAIL_DIR = "train_results/eval_detail"
 
+AI_OPENING_TREE_DEFAULT_PATH = os.path.join(AI_JOSEKI_DIR, "opening_tree.json")
+
 EPOCH_DIR_UNIT = 1000  # 何epochごとにディレクトリを作成するか
 SAVE_CYCLE = 5  # 何epochごとに保存するか
 SAVE_FIRST_EPOCH_NUM = 100  # 

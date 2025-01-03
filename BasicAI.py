@@ -14,7 +14,7 @@ from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
-from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample
+from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter
 import ctypes
 #from scipy.special import gamma
 
@@ -98,23 +98,6 @@ def weighted_by_beta(p, alpha, beta):
     pw = p * w
     p_new = pw / np.sum(pw)
     return p_new
-
-
-def display_parameter(x):
-    a = x[:64].reshape((8, 8))
-    b = x[64:128].reshape((8, 8))
-    c = x[128:].reshape((3, 3))
-    for y in range(8):
-        for x in range(8):
-            print("{:5}".format(a[x, y]), end="")
-        print("  ", end="")
-        for x in range(8):
-            print("{:5}".format(b[x, y]), end="")
-        print("")
-    for y in [-1, 0, 1]:
-        for x in [-1, 0, 1]:
-            print("{:5}".format(c[x, y]), end="")
-        print("")
 
 
 # 引数のgにgraphviz用のグラフを入れる。ノード共有のある木構造向け。
@@ -388,20 +371,20 @@ class BasicAI(Agent):
             x, y = color_p(state, color)
             self.discovery_arr[color, x, y] = True
 
-    def act(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False, recent_move_vec=None):
+    def act(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False, recent_move_vec=None, action_list=None):
         #tau = (1 + (self.tau_mult - 1) * np.power(0.5, state.turn / self.tau_decay)) * self.tau
         tau = (1 + (self.tau_mult - 1) * np.exp(- np.square((state.turn - self.tau_peak) / self.tau_decay))) * self.tau
         if return_root_tree:
-            action_id, tree = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, return_root_tree=True, recent_move_vec=recent_move_vec)
+            action_id, tree = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, return_root_tree=True, recent_move_vec=recent_move_vec, action_list=action_list)
             return action_id, tree
         else:
-            action_id, _, _, _, _ = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, recent_move_vec=recent_move_vec)
+            action_id, _, _, _, _ = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, recent_move_vec=recent_move_vec, action_list=action_list)
             return action_id
 
-    def act_and_get_pi(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, recent_move_vec=None):
+    def act_and_get_pi(self, state, showNQ=False, noise=0., use_prev_tree=True, opponent_prev_tree=None, recent_move_vec=None, action_list=None):
         #tau = (1 + (self.tau_mult - 1) * np.power(0.5, state.turn / self.tau_decay)) * self.tau
         tau = (1 + (self.tau_mult - 1) * np.exp(- np.square((state.turn - self.tau_peak) / self.tau_decay))) * self.tau
-        action_id, pi, v_prev, v_post, searched_node_num = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, recent_move_vec=recent_move_vec)
+        action_id, pi, v_prev, v_post, searched_node_num = self.MCTS(state, self.search_nodes, self.C_puct, tau, showNQ, noise, use_prev_tree=use_prev_tree, opponent_prev_tree=opponent_prev_tree, recent_move_vec=recent_move_vec, action_list=action_list)
         return action_id, pi, v_prev, v_post, searched_node_num
 
     def action_array(self, s):
@@ -501,7 +484,14 @@ class BasicAI(Agent):
 
         return ret
 
-    def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False, use_prev_tree=True, opponent_prev_tree=None, return_root_tree=False, recent_move_vec=None):
+    def MCTS(self, state, max_node, C_puct, tau, showNQ=False, noise=0., random_flip=False, use_prev_tree=True, opponent_prev_tree=None, 
+    return_root_tree=False, recent_move_vec=None, action_list=None):
+        """
+        MCTSによる探索を行い、次の手のaction_idと探索に関連する情報を返す。
+        引数のaction_listを与える場合は、初期局面からstateに至るまでの行動のリストを正しく格納すること。定石を利用する場合には設定が必要。
+        """
+        print("--MCTS--")
+        print(action_list)
         if self.random_playouts:
             max_node = SELFPLAY_SEARCHNODES_MIN
             if random.random() < DEEP_SEARCH_P:
@@ -840,11 +830,13 @@ class BasicAI(Agent):
             if np.any(use_shortest):
                 N2[128:] = move_N * use_shortest
 
+            # 中くらいの確率値を強調する変換を実施
             N2_sum = np.sum(N2)
             pi_prev = N2 / N2_sum
             pi_prev = pi_prev * 0.999  # ベータ分布の変換ですべてが0にならないように対策
             N2 = N2_sum * weighted_by_beta(pi_prev, self.post_alpha, self.post_beta)
 
+            # tauの値に応じて分布を急峻に変換
             if tau == 0:
                 N2 = N2 * (N2 == np.max(N2))
             else:
