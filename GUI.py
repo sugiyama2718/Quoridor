@@ -89,6 +89,13 @@ HUMAN_AI_MODE = 1
 AI_AI_MODE = 2
 TRAINING_MODE = 3
 
+CURIOSITY_LIST = [0.0, 0.32, 0.48, 0.64]
+CURIOSITY_LABELS = ["deterministic", "small", "medium", "large"]
+
+# デフォルトのスライダー位置(0~3のうちどれか)を決める
+# 例: 1 をデフォルトにして「small」とする
+DEFAULT_CURIOSITY_INDEX = 1
+
 
 class GUIHuman(Agent):
     def act(self, state, showNQ=False):
@@ -139,15 +146,15 @@ class Quoridor(Widget):
     # Human vs. AI
     search_nodes = SEARCH_NODE_LIST[DEFAULT_SEARCH_NODE_INDEX]
     level = LEVEL_NUM - 1
-    tau = TAU_LIST[DEFAULT_TAU_INDEX]
+    curiosity = CURIOSITY_LIST[DEFAULT_CURIOSITY_INDEX]
 
     # AI vs. AI
     search_nodes_1p = SEARCH_NODE_LIST[DEFAULT_SEARCH_NODE_INDEX]
     level_1p = LEVEL_NUM - 1
-    tau_1p = TAU_LIST[DEFAULT_TAU_INDEX]
+    curiosity_1p = CURIOSITY_LIST[DEFAULT_CURIOSITY_INDEX]
     search_nodes_2p = SEARCH_NODE_LIST[DEFAULT_SEARCH_NODE_INDEX]
     level_2p = LEVEL_NUM - 1
-    tau_2p = TAU_LIST[DEFAULT_TAU_INDEX]
+    curiosity_2p = CURIOSITY_LIST[DEFAULT_CURIOSITY_INDEX]
 
     # Training
     level_training = TRAINING_LEVEL_NUM - 1
@@ -334,7 +341,6 @@ class Quoridor(Widget):
                 past_games = past_games[1:]  # 一番古い要素はあとで捨てられるのでその前提で計算する
 
             recent_move_vec = get_recent_move_distribution(past_games, self.action_history[1:])
-            print(recent_move_vec)
             s, _, _, v_post, _ = self.agents[color].act_and_get_pi(self.state, use_prev_tree=self.use_prev_tree, recent_move_vec=recent_move_vec)
             print("score= {}, use_prev_tree={}".format(int(1000 * v_post), self.use_prev_tree))
 
@@ -451,50 +457,46 @@ class Quoridor(Widget):
             self.current_agent_settings_p2 = None
 
         elif self.mode == HUMAN_AI_MODE:
-            # humanとAIがいる
-            # humanが1pの場合
             if self.teban_1p.state == "down":
                 agent1 = GUIHuman(0)
-                agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes, self.tau, self.level, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
-                # AIは2p側
+                agent2 = prepare_AI(
+                    PARAMETER_PATH, 1, self.search_nodes,
+                    self.curiosity, self.level,
+                    seed=int(time.time()), p_tau=P_TAU,
+                    post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT
+                )
                 self.current_agent_settings_p1 = None
-                self.current_agent_settings_p2 = (self.mode, self.level, self.tau, self.search_nodes)
+                # モードID, level, curiosity(数値), search_nodes
+                self.current_agent_settings_p2 = (self.mode, self.level, self.curiosity, self.search_nodes)
             else:
-                # humanが2pの場合
-                agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes, self.tau, self.level, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
+                agent1 = prepare_AI(
+                    PARAMETER_PATH, 0, self.search_nodes,
+                    self.curiosity, self.level,
+                    seed=int(time.time()), p_tau=P_TAU,
+                    post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT
+                )
                 agent2 = GUIHuman(1)
-                # AIは1p側
-                self.current_agent_settings_p1 = (self.mode, self.level, self.tau, self.search_nodes)
+                self.current_agent_settings_p1 = (self.mode, self.level, self.curiosity, self.search_nodes)
                 self.current_agent_settings_p2 = None
 
         elif self.mode == AI_AI_MODE:
-            # AI vs AI
-            agent1 = prepare_AI(PARAMETER_PATH, 0, self.search_nodes_1p, self.tau_1p, self.level_1p, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
-            agent2 = prepare_AI(PARAMETER_PATH, 1, self.search_nodes_2p, self.tau_2p, self.level_2p, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
+            agent1 = prepare_AI(
+                PARAMETER_PATH, 0,
+                self.search_nodes_1p, self.curiosity_1p, self.level_1p,
+                seed=int(time.time()), p_tau=P_TAU,
+                post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT
+            )
+            agent2 = prepare_AI(
+                PARAMETER_PATH, 1,
+                self.search_nodes_2p, self.curiosity_2p, self.level_2p,
+                seed=int(time.time()), p_tau=P_TAU,
+                post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT
+            )
+            self.current_agent_settings_p1 = (self.mode, self.level_1p, self.curiosity_1p, self.search_nodes_1p)
+            self.current_agent_settings_p2 = (self.mode, self.level_2p, self.curiosity_2p, self.search_nodes_2p)
 
-            # p1側のAI設定
-            self.current_agent_settings_p1 = (self.mode, self.level_1p, self.tau_1p, self.search_nodes_1p)
-            # p2側のAI設定
-            self.current_agent_settings_p2 = (self.mode, self.level_2p, self.tau_2p, self.search_nodes_2p)
 
         elif self.mode == TRAINING_MODE:
-            # training_colorでプレイヤーが先手(p1)か後手(p2)か分かる
-            # training_index, training_search_nodesは元コードから取得済みとする
-            if self.training_game_num % 2 == 0:
-                self.training_color = 0
-                agent1 = GUIHuman(0)
-                agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
-                # AIはp2側
-                self.current_agent_settings_p1 = None
-                self.current_agent_settings_p2 = (self.mode, training_index, 0.32, training_search_nodes)
-            else:
-                self.training_color = 1
-                agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
-                agent2 = GUIHuman(1)
-                # AIはp1側
-                self.current_agent_settings_p1 = (self.mode, training_index, 0.32, training_search_nodes)
-                self.current_agent_settings_p2 = None
-
             if self.low_time.state == "down":
                 self.remaining_time = TRAINING_LOW_TIME
             elif self.high_time.state == "down":
@@ -522,14 +524,22 @@ class Quoridor(Widget):
                 random.shuffle(self.joseki_random_index_list_sente)
                 random.shuffle(self.joseki_random_index_list_gote)
 
+            # training_colorでプレイヤーが先手(p1)か後手(p2)か分かる
+            # training_index, training_search_nodesは元コードから取得済みとする
             if self.training_game_num % 2 == 0:
                 self.training_color = 0
                 agent1 = GUIHuman(0)
                 agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
+                # AIはp2側
+                self.current_agent_settings_p1 = None
+                self.current_agent_settings_p2 = (self.mode, training_index, 0.32, training_search_nodes)
             else:
                 self.training_color = 1
                 agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
                 agent2 = GUIHuman(1)
+                # AIはp1側
+                self.current_agent_settings_p1 = (self.mode, training_index, 0.32, training_search_nodes)
+                self.current_agent_settings_p2 = None
 
             training_info_text = "You are "
             random_list_index = (self.training_game_num // 2) % joseki_num
@@ -756,17 +766,22 @@ class Quoridor(Widget):
                 if column_wall[x, y]:
                     self.column_wall_colors[(7 - disp_y) * 8 + disp_x].a = 1
 
+        curiosity_label = CURIOSITY_LABELS[CURIOSITY_LIST.index(self.curiosity)]
         self.search_nodes_label.text = f"search nodes = {self.search_nodes}"
         self.level_label.text = "level = {} (epoch {})".format(self.level, epoch_list[self.level])
-        self.tau_label.text = f"randomness = {self.tau}"
+        self.tau_label.text = f"curiosity = {curiosity_label}"
 
+        # AI vs AIタブの1p
+        curiosity_label_1p = CURIOSITY_LABELS[CURIOSITY_LIST.index(self.curiosity_1p)]
         self.search_nodes_label_1p.text = f"1p search nodes = {self.search_nodes_1p}"
         self.level_label_1p.text = "1p level = {} (epoch {})".format(self.level_1p, epoch_list[self.level_1p])
-        self.tau_label_1p.text = f"1p randomness = {self.tau_1p}"
+        self.tau_label_1p.text = f"1p curiosity = {curiosity_label_1p}"
 
+        # AI vs AIタブの2p
+        curiosity_label_2p = CURIOSITY_LABELS[CURIOSITY_LIST.index(self.curiosity_2p)]
         self.search_nodes_label_2p.text = f"2p search nodes = {self.search_nodes_2p}"
         self.level_label_2p.text = "2p level = {} (epoch {})".format(self.level_2p, epoch_list[self.level_2p])
-        self.tau_label_2p.text = f"2p randomness = {self.tau_2p}"
+        self.tau_label_2p.text = f"2p curiosity = {curiosity_label_2p}"
 
         # 戦績の表示。pickle.loadが毎フレーム生じないように工夫する
         if self.training_level_label.text == "":
@@ -835,32 +850,38 @@ class Quoridor(Widget):
         #print(touch.x, touch.y)
         super(Quoridor, self).on_touch_down(touch)
 
+    # vs. AI 用
     def change_search_nodes(self, *args):
         self.search_nodes = SEARCH_NODE_LIST[int(args[1])]
 
     def change_level(self, *args):
         self.level = int(args[1])
 
-    def change_tau(self, *args):
-        self.tau = TAU_LIST[int(args[1])]
+    def change_curiosity(self, *args):
+        index = int(args[1])
+        self.curiosity = CURIOSITY_LIST[index]
 
+    # AI vs. AI: 1p用
     def change_search_nodes_1p(self, *args):
         self.search_nodes_1p = SEARCH_NODE_LIST[int(args[1])]
 
     def change_level_1p(self, *args):
         self.level_1p = int(args[1])
 
-    def change_tau_1p(self, *args):
-        self.tau_1p = TAU_LIST[int(args[1])]
+    def change_curiosity_1p(self, *args):
+        index = int(args[1])
+        self.curiosity_1p = CURIOSITY_LIST[index]
 
+    # AI vs. AI: 2p用
     def change_search_nodes_2p(self, *args):
         self.search_nodes_2p = SEARCH_NODE_LIST[int(args[1])]
 
     def change_level_2p(self, *args):
         self.level_2p = int(args[1])
 
-    def change_tau_2p(self, *args):
-        self.tau_2p = TAU_LIST[int(args[1])]
+    def change_curiosity_2p(self, *args):
+        index = int(args[1])
+        self.curiosity_2p = CURIOSITY_LIST[index]
 
     def change_level_training(self, *args):
         self.level_training = int(args[1])
@@ -916,8 +937,6 @@ class QuoridorApp(App):
         Rectangle:
             pos: (0, 0)
             size: ({dp(WINDOW_WIDTH)}, {dp(600)})
-        Color:
-            rgba: 1, 0, 0, 1
 
     canvas:
         Color:
@@ -1012,6 +1031,7 @@ class QuoridorApp(App):
         tab_width: self.width // 4
         pos: ({dp(600)}, {dp(150)})
         size: ({dp(380)}, {dp(320)})
+
         TabbedPanelItem:
             id: human_tab
             font_size: {dp(15)}
@@ -1045,6 +1065,7 @@ class QuoridorApp(App):
                     orientation: 'horizontal'
                     size_hint: 1.0, 0.8
                     
+
         TabbedPanelItem:
             id: human_ai_tab
             text: 'vs. AI'
@@ -1116,19 +1137,20 @@ class QuoridorApp(App):
                         text: "level ="
                 BoxLayout:
                     size_hint: 1.0, 0.25
-                    orientation: 'vertical'      
+                    orientation: 'vertical'
+                    # vs. AI用 Curiosityスライダー
                     Slider:
                         min: 0
-                        max: 4
-                        value: {DEFAULT_TAU_INDEX}
+                        max: 3
+                        value: {DEFAULT_CURIOSITY_INDEX}
                         step: 1
                         orientation: "horizontal"
-                        on_value: root.change_tau(*args)   
+                        on_value: root.change_curiosity(*args)   
                     Label:
                         id: tau_label
                         font_size: {dp(20)}
-                        text: "randomness ="
-                    
+                        text: "curiosity ="
+
         TabbedPanelItem:
             id: ai_ai_tab
             text: 'Watch AI game'
@@ -1169,19 +1191,20 @@ class QuoridorApp(App):
                         text: "1p level ="
                 BoxLayout:
                     size_hint: 1.0, 0.16
-                    orientation: 'vertical'      
+                    orientation: 'vertical'
+                    # AI vs. AI(1p)用 Curiosityスライダー
                     Slider:
                         min: 0
-                        max: 4
-                        value: {DEFAULT_TAU_INDEX}
+                        max: 3
+                        value: {DEFAULT_CURIOSITY_INDEX}
                         step: 1
                         cursor_size: {dp(20)},{dp(20)}
                         orientation: "horizontal"
-                        on_value: root.change_tau_1p(*args)   
+                        on_value: root.change_curiosity_1p(*args)   
                     Label:
                         id: tau_label_1p
                         font_size: {dp(15)}
-                        text: "1p randomness ="                        
+                        text: "1p curiosity ="
 
                 BoxLayout:
                     size_hint: 1.0, 0.16
@@ -1215,19 +1238,20 @@ class QuoridorApp(App):
                         text: "2p level ="
                 BoxLayout:
                     size_hint: 1.0, 0.16
-                    orientation: 'vertical'      
+                    orientation: 'vertical'
+                    # AI vs. AI(2p)用 Curiosityスライダー
                     Slider:
                         min: 0
-                        max: 4
-                        value: {DEFAULT_TAU_INDEX}
+                        max: 3
+                        value: {DEFAULT_CURIOSITY_INDEX}
                         step: 1
                         cursor_size: {dp(20)},{dp(20)}
                         orientation: "horizontal"
-                        on_value: root.change_tau_2p(*args)   
+                        on_value: root.change_curiosity_2p(*args)
                     Label:
                         id: tau_label_2p
                         font_size: {dp(15)}
-                        text: "2p randomness ="   
+                        text: "2p curiosity ="
 
         TabbedPanelItem:
             id: training_tab
@@ -1282,7 +1306,7 @@ class QuoridorApp(App):
                     id: training_info
                     font_size: {dp(18)}
                     text: "" 
-        """) 
+        """)
         #game = Builder.load_file(os.path.join(os.getcwd(), "quoridor.kv"))
         #print(type(game))
         game = Quoridor()

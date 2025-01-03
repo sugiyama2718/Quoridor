@@ -16,7 +16,7 @@ from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
 from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample
 import ctypes
-from scipy.special import gamma
+#from scipy.special import gamma
 
 num2str = {0:"a", 1:"b", 2:"c", 3:"d", 4:"e", 5:"f", 6:"g", 7:"h", 8:"i"}
 
@@ -70,10 +70,26 @@ def get_state_vec_from_tree(tree):
     return tree.state_vec
 
 
+def gamma_integer(n):
+    """Compute Gamma function for integers (n-1)!."""
+    if n <= 0:
+        raise ValueError("Gamma function is not defined for non-positive integers.")
+    result = 1
+    for i in range(1, n):
+        result *= i
+    return result
+
 def beta_pdf(x, alpha, beta):
-    # ベータ関数 B(alpha,beta) = Gamma(alpha)*Gamma(beta)/Gamma(alpha+beta)
-    B = (gamma(alpha)*gamma(beta))/gamma(alpha+beta)
-    return (x**(alpha-1) * (1 - x)**(beta-1)) / B
+    """Beta distribution PDF for integer alpha and beta."""
+    # Convert alpha and beta to integers if not already
+    alpha = int(alpha)
+    beta = int(beta)
+    
+    # Beta function B(alpha, beta) = Gamma(alpha) * Gamma(beta) / Gamma(alpha + beta)
+    B = (gamma_integer(alpha) * gamma_integer(beta)) / gamma_integer(alpha + beta)
+    
+    # Beta PDF calculation
+    return (x**(alpha - 1) * (1 - x)**(beta - 1)) / B
 
 def weighted_by_beta(p, alpha, beta):
     # pは確率分布、shape=(n,), sum(p)=1
