@@ -490,8 +490,6 @@ class BasicAI(Agent):
         MCTSによる探索を行い、次の手のaction_idと探索に関連する情報を返す。
         引数のaction_listを与える場合は、初期局面からstateに至るまでの行動のリストを正しく格納すること。定石を利用する場合には設定が必要。
         """
-        print("--MCTS--")
-        print(action_list)
         if self.random_playouts:
             max_node = SELFPLAY_SEARCHNODES_MIN
             if random.random() < DEEP_SEARCH_P:
