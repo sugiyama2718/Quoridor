@@ -37,10 +37,11 @@ def normal_play(agents, initial_state=None):
     else:
         state = initial_state
         
+    action_list = []
     while True:
         display_cui(state)
         start = time.time()
-        s = agents[0].act(state, showNQ=True)
+        s = agents[0].act(state, showNQ=True, action_list=action_list)
         end = time.time()
         if isinstance(s, int):
             a = actionid2str(state, s)
@@ -49,12 +50,13 @@ def normal_play(agents, initial_state=None):
         while not accept_action_str(state, a):
             print(a)
             print("this action is impossible")
-            s = agents[0].act(state, showNQ=True)
+            s = agents[0].act(state, showNQ=True, action_list=action_list)
             if isinstance(s, int):
                 a = actionid2str(state, s)
             else:
                 a = s
         agents[1].prev_action = s
+        action_list.append(a)
 
         # g = agents[0].get_tree_for_graphviz()
         # g.render(os.path.join("game_trees", "game_tree{}".format(state.turn)))
@@ -64,7 +66,7 @@ def normal_play(agents, initial_state=None):
         #time.sleep(0.1)
 
         display_cui(state)
-        s = agents[1].act(state, showNQ=True)
+        s = agents[1].act(state, showNQ=True, action_list=action_list)
         if isinstance(s, int):
             a = actionid2str(state, s)
         else:
@@ -72,12 +74,13 @@ def normal_play(agents, initial_state=None):
         while not accept_action_str(state, a):
             print(a)
             print("this action is impossible")
-            s = agents[1].act(state, showNQ=True)
+            s = agents[1].act(state, showNQ=True, action_list=action_list)
             if isinstance(s, int):
                 a = actionid2str(state, s)
             else:
                 a = s
         agents[0].prev_action = s
+        action_list.append(a)
 
         # g = agents[1].get_tree_for_graphviz()
         # g.render(os.path.join("game_trees", "game_tree{}".format(state.turn)))
@@ -115,11 +118,12 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
         tau = np.random.rand() * (TAU_MAX - TAU_MIN_OPENING) + TAU_MIN_OPENING
         AIs[0].tau = tau
         AIs[1].tau = tau
+        action_list = []
         while True:
             if state.turn >= 20:
                 AIs[0].tau = TAU_MIN
                 AIs[1].tau = TAU_MIN
-            s, pi, v_prev, v_post, searched_node_num = AIs[0].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[1].prev_tree)
+            s, pi, v_prev, v_post, searched_node_num = AIs[0].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[1].prev_tree, action_list=action_list)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
@@ -127,6 +131,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
                 display_cui(state)
                 exit()
             AIs[1].prev_action = s
+            action_list.append(a)
 
             pis.append(pi)
             v_prevs.append(v_prev)
@@ -153,7 +158,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
                 break
             for i, b1, b2 in [(0, False, False), (1, True, False), (2, False, True), (3, True, True)]:
                 featuress[i].append(feature_CNN(state, b1, b2))
-            s, pi, v_prev, v_post, searched_node_num = AIs[1].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[0].prev_tree)
+            s, pi, v_prev, v_post, searched_node_num = AIs[1].act_and_get_pi(state, noise=noise, showNQ=display, opponent_prev_tree=AIs[0].prev_tree, action_list=action_list)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
@@ -161,6 +166,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
                 display_cui(state)
                 exit()
             AIs[0].prev_action = s
+            action_list.append(a)
 
             pis.append(pi)
             v_prevs.append(-v_prev)  # 後手基準のvが返るので、先手基準のvに直す
@@ -314,11 +320,11 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
             else:
                 recent_move_vec = get_recent_move_distribution(past_games, action_list)
 
-            s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
+            s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
-                s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
+                s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
                 a = actionid2str(state, s)
             AIs[1 - i % 2].prev_action = s
             action_list.append(a)
@@ -343,11 +349,11 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
             else:
                 recent_move_vec = get_recent_move_distribution(past_games, action_list)
 
-            s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
+            s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
-                s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec)
+                s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
                 a = actionid2str(state, s)
             AIs[i % 2].prev_action = s
             action_list.append(a)
@@ -947,12 +953,13 @@ if __name__ == '__main__':
         # 既にあるselfplayデータを使って過学習などについて解析をする
         train_without_selfplay()
     elif sys.argv[1] == "view":
-        AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.25, seed=100)]
+        epoch = 15000
+        AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, seed=100, opening_tree_path=AI_OPENING_TREE_DEFAULT_PATH), CNNAI(1, search_nodes=search_nodes, tau=0.25, seed=100, opening_tree_path=AI_OPENING_TREE_DEFAULT_PATH)]
         #AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=100, is_mimic_AI=True)]
         # AIs[0].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
         # AIs[1].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
-        AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(3090), "epoch3090.ckpt"))
-        AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(3090), "epoch3090.ckpt"))
+        AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch), f"epoch{epoch}.ckpt"))
+        AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch), f"epoch{epoch}.ckpt"))
 
         # AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, all_parameter_zero=True, v_is_dist=True, p_is_almost_flat=True), 
         #        CNNAI(1, search_nodes=search_nodes, tau=0.25, all_parameter_zero=True, v_is_dist=True, p_is_almost_flat=True)]
@@ -987,16 +994,18 @@ if __name__ == '__main__':
     elif sys.argv[1] == "evaluate":
         def evaluate_2game_process(seed):
             # 先後で２試合して勝利数を返す
-            epoch1 = 4740
-            epoch2 = 11700
-            AIs = [CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed), CNNAI(1, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed)]
+            epoch1 = 15000
+            epoch2 = 15000
+            search_nodes_eval = 2000
+            #AIs = [CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed), CNNAI(1, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed)]
+            AIs = [CNNAI(0, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, p_tau=0.7, post_alpha=2.0, post_beta=5.0), CNNAI(1, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, p_tau=0.7, post_alpha=2.0, post_beta=5.0)]
             #AIs[0].load(os.path.join("backup/221219/train_results/parameter/", "epoch680.ckpt"))
             AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch1), f"epoch{epoch1}.ckpt"))
             AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch2), f"epoch{epoch2}.ckpt"))
             ret = evaluate(AIs, 2, multiprocess=True, display=False, return_detail=True)
             del AIs
             return ret
-        play_num = 100
+        play_num = 500
         play_num_half = play_num // 2
         with Pool(processes=4) as p:
             imap = p.imap(func=evaluate_2game_process, iterable=[j * 10000 % (2**30) for j in range(play_num_half)])

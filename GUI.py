@@ -335,7 +335,7 @@ class Quoridor(Widget):
 
             recent_move_vec = get_recent_move_distribution(past_games, self.action_history[1:])
             print(recent_move_vec)
-            s, _, _, v_post, _ = self.agents[color].act_and_get_pi(self.state, use_prev_tree=self.use_prev_tree, recent_move_vec=recent_move_vec)
+            s, _, _, v_post, _ = self.agents[color].act_and_get_pi(self.state, use_prev_tree=self.use_prev_tree, recent_move_vec=recent_move_vec, action_list=self.action_history[1:])
             print("score= {}, use_prev_tree={}".format(int(1000 * v_post), self.use_prev_tree))
 
             if self.graphviz_on.state == "down" and not self.state.pseudo_terminate:
