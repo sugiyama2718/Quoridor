@@ -14,7 +14,7 @@ from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
-from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter
+from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter, get_normalized_state
 import ctypes
 #from scipy.special import gamma
 
@@ -490,6 +490,11 @@ class BasicAI(Agent):
         MCTSによる探索を行い、次の手のaction_idと探索に関連する情報を返す。
         引数のaction_listを与える場合は、初期局面からstateに至るまでの行動のリストを正しく格納すること。定石を利用する場合には設定が必要。
         """
+
+        if self.opening_tree_path is not None:
+            assert action_list is not None, "action_list is required if you use opening tree"
+            normalized_state, normalized_state_vec, is_mirrored = get_normalized_state(action_list)
+
         if self.random_playouts:
             max_node = SELFPLAY_SEARCHNODES_MIN
             if random.random() < DEEP_SEARCH_P:

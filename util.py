@@ -86,6 +86,19 @@ def get_state_from_action_list(action_list):
 
 
 def get_normalized_state(action_list):
+    """
+    Computes the normalized state representation of a given sequence of actions.
+
+    Args:
+        action_list (list): A list of actions representing the sequence of moves in the game.
+
+    Returns:
+        tuple:
+            - state (object): The normalized state representation derived from the action sequence.
+            - state_vec (tuple): A tuple representation of the normalized state's feature vector.
+            - is_mirrored (bool): A boolean value indicating whether the mirrored state was selected 
+              (True if mirrored state was used, False otherwise).
+    """
     # Glendenning notation
     mirror_action_list = list(map(mirror_action, action_list))
 
