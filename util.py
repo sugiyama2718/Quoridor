@@ -1,13 +1,32 @@
 import os
 import graphviz
 import math
-from Tree import OpeningTree
+from Tree import OpeningTree, Tree_c
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
 from config import *
 from collections import defaultdict
 import numpy as np
 from Agent import str2actionid
+import ctypes
+
+if os.name == "nt":
+    lib = ctypes.CDLL('./State_util.dll')
+else:
+    lib = ctypes.CDLL('./State_util.so')
+
+select_action = lib.select_action
+select_action.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_float),
+                              ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int)
+select_action.restype = ctypes.c_int
+
+add_virtual_loss = lib.add_virtual_loss
+add_virtual_loss.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
+add_virtual_loss.restype = None
+
+subtract_virtual_loss = lib.subtract_virtual_loss
+subtract_virtual_loss.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
+subtract_virtual_loss.restype = None
 
 def Glendenning2Official(s):
     """
@@ -696,6 +715,60 @@ def traverse_opening_tree_and_print(tree, actions):
     for key, node in tree.children.items():
         if isinstance(node, OpeningTree):
             traverse_opening_tree_and_print(node, actions + [key])
+
+
+def MCTS_select(root_tree, C_puct, estimated_V, color):
+    t = root_tree
+    a = 0
+    nodes = []
+    actions = []
+    while True:
+        
+        if t.P is None:
+            print("!"*200)
+            print(actions)
+            assert False, "t.P is None is not expected"
+
+        # 負けノードは探索しない
+        a = select_action(t.tree_c.contents.Q_arr, t.tree_c.contents.N_arr, t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                            C_puct, estimated_V, color, t.s.turn)
+
+        nodes.append(t)
+        actions.append(a)
+
+        if a not in t.children.keys():
+            return t, a, nodes, actions, False # 葉ノードでない
+        else:
+            t = t.children[a]
+
+def select_and_get_nodess_and_actionss(root_tree, C_puct, estimated_V, color, n_parallel, max_node, virtual_loss_n):
+    nodess = []
+    actionss = []
+
+    for _ in range(min(n_parallel, max_node)):
+        _, _, nodes, actions, _ = MCTS_select(root_tree, C_puct, estimated_V, color)
+        if nodes is None:
+            break
+        nodess.append(nodes)
+        actionss.append(actions)
+
+        for node, action in zip(nodes, actions):
+            if color == node.s.turn % 2:
+                coef = -1
+            else:
+                coef = 1
+            add_virtual_loss(node.tree_c, action, virtual_loss_n, coef)
+
+    # virtual lossを元に戻す
+    for nodes, actions in zip(nodess, actionss):
+        for node, action in zip(nodes, actions):
+            if color == node.s.turn % 2:
+                coef = -1
+            else:
+                coef = 1
+            subtract_virtual_loss(node.tree_c, action, virtual_loss_n, coef)
+
+    return nodess, actionss
 
 
 if __name__ == "__main__":

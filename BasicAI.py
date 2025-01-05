@@ -14,7 +14,7 @@ from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
-from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter, get_normalized_state, load_statevec2node, traverse_opening_tree_and_print, transform_x_to_symmetric
+from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter, get_normalized_state, load_statevec2node, traverse_opening_tree_and_print, transform_x_to_symmetric, select_and_get_nodess_and_actionss
 import ctypes
 from Tree import load_dict_to_opening_tree
 
@@ -24,11 +24,6 @@ if os.name == "nt":
     lib = ctypes.CDLL('./State_util.dll')
 else:
     lib = ctypes.CDLL('./State_util.so')
-
-select_action = lib.select_action
-select_action.argtypes = (ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_float),
-                              ctypes.c_float, ctypes.c_float, ctypes.c_int, ctypes.c_int)
-select_action.restype = ctypes.c_int
 
 copy_state_c = lib.copy_state
 copy_state_c.argtypes = [ctypes.POINTER(State), ctypes.POINTER(State)]
@@ -50,13 +45,6 @@ mult_float_arr = lib.multFloatArr
 mult_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float)]
 mult_float_arr.restype = None
 
-add_virtual_loss = lib.add_virtual_loss
-add_virtual_loss.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
-add_virtual_loss.restype = None
-
-subtract_virtual_loss = lib.subtract_virtual_loss
-subtract_virtual_loss.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
-subtract_virtual_loss.restype = None
 
 def get_state_vec(state):
     # stateを固定長タプルにしてdictのkeyにするために使う。state.turnを入れているのは、turnの異なる状態を区別して無限ループを避けるため
@@ -297,31 +285,6 @@ def calc_next_state(x):
     state, action = x
     accept_action_str(state, actionid2str(state, action), check_placable=False)
     return state
-
-
-def select(root_tree, C_puct, estimated_V, color):
-    t = root_tree
-    a = 0
-    nodes = []
-    actions = []
-    while True:
-        
-        if t.P is None:
-            print("!"*200)
-            print(actions)
-            assert False, "t.P is None is not expected"
-
-        # 負けノードは探索しない
-        a = select_action(t.tree_c.contents.Q_arr, t.tree_c.contents.N_arr, t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                            C_puct, estimated_V, color, t.s.turn)
-
-        nodes.append(t)
-        actions.append(a)
-
-        if a not in t.children.keys():
-            return t, a, nodes, actions, False # 葉ノードでない
-        else:
-            t = t.children[a]
 
 
 class BasicAI(Agent):
@@ -677,32 +640,7 @@ class BasicAI(Agent):
                     return force_action_id, pi_ret, root_v, 0.0, 1  # 探索はしていないので探索後のvは0にしておく、またpolicyの学習への影響を最小限にする
 
         while node_num < max_node and root_tree.result == 0:
-            # select
-            nodess = []
-            actionss = []
-
-            for _ in range(min(self.n_parallel, max_node)):
-                _, _, nodes, actions, _ = select(root_tree, C_puct, self.estimated_V, self.color)
-                if nodes is None:
-                    break
-                nodess.append(nodes)
-                actionss.append(actions)
-
-                for node, action in zip(nodes, actions):
-                    if self.color == node.s.turn % 2:
-                        coef = -1
-                    else:
-                        coef = 1
-                    add_virtual_loss(node.tree_c, action, self.virtual_loss_n, coef)
-
-            # virtual lossを元に戻す
-            for nodes, actions in zip(nodess, actionss):
-                for node, action in zip(nodes, actions):
-                    if self.color == node.s.turn % 2:
-                        coef = -1
-                    else:
-                        coef = 1
-                    subtract_virtual_loss(node.tree_c, action, self.virtual_loss_n, coef)
+            nodess, actionss = select_and_get_nodess_and_actionss(root_tree, self.C_puct, self.estimated_V, self.color, self.n_parallel, max_node, self.virtual_loss_n)
 
             states = []
             leaf_movable_arrs = []
