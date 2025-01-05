@@ -625,12 +625,13 @@ def adaptive_next_sample(p, counts, beta=1.0, random_state=None):
     return x_next
 
 
-def load_statevec2node(tree):
-    statevec2node = {}
+def load_statevec2node(tree, statevec2node=None):
+    if statevec2node is None:
+        statevec2node = {}
     statevec2node[tree.fvec] = tree
     for child in tree.children.values():
         if isinstance(child, OpeningTree):
-            load_statevec2node(child)
+            load_statevec2node(child, statevec2node)
     return statevec2node
 
 
@@ -649,6 +650,38 @@ def display_parameter(x):
         for x in [-1, 0, 1]:
             print("{:5}".format(c[x, y]), end="")
         print("")
+
+
+def transform_x_to_symmetric(x):
+    """
+    入力配列xを左右対称に変換します。
+
+    Parameters:
+    x (numpy.ndarray): 長さ137の入力配列
+
+    Returns:
+    numpy.ndarray: 左右対称に変換された配列
+    """
+    # 入力配列の長さを確認
+    if x.size != 137:
+        raise ValueError("入力配列は長さ137である必要があります。")
+
+    # 配列を分割
+    a = x[:64].reshape((8, 8))
+    b = x[64:128].reshape((8, 8))
+    c = x[128:].reshape((3, 3))
+
+    # aとbを水平方向に反転
+    a_flipped = np.flip(a, axis=0)
+    b_flipped = np.flip(b, axis=0)
+
+    # cも水平方向に反転
+    c_flipped = np.flip(c, axis=0)
+
+    # 変換後の配列を再構築
+    x_transformed = np.concatenate([a_flipped.flatten(), b_flipped.flatten(), c_flipped.flatten()])
+
+    return x_transformed
 
 
 def traverse_opening_tree_and_print(tree, actions):

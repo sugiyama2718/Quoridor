@@ -20,8 +20,6 @@ from tqdm import tqdm
 import math
 import json
 from pprint import pprint
-from util import load_statevec2node
-from Tree import load_dict_to_opening_tree
 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
@@ -49,7 +47,7 @@ class CNNAI(BasicAI):
     filters=DEFAULT_FILTERS, layer_num=DEFAULT_LAYER_NUM, use_global_pooling=USE_GLOBAL_POOLING, use_self_attention=USE_SELF_ATTENTION, use_slim_head=USE_SLIM_HEAD, opponent_AI=None,
     is_mimic_AI=False, force_opening=None, use_mix_precision=True, p_tau=1.0, post_alpha=1.0, post_beta=2.0, use_recent_move_vec=True, opening_tree_path=None):
         super(CNNAI, self).__init__(color, search_nodes, C_puct, tau, use_estimated_V=use_estimated_V, V_ema_w=V_ema_w, shortest_only=shortest_only, 
-        use_average_Q=use_average_Q, random_playouts=random_playouts, is_mimic_AI=is_mimic_AI, force_opening=force_opening, post_alpha=post_alpha, post_beta=post_beta, use_recent_move_vec=use_recent_move_vec)
+        use_average_Q=use_average_Q, random_playouts=random_playouts, is_mimic_AI=is_mimic_AI, force_opening=force_opening, post_alpha=post_alpha, post_beta=post_beta, use_recent_move_vec=use_recent_move_vec, opening_tree_path=opening_tree_path)
 
         np.random.seed(seed)
         random.seed(seed)
@@ -70,22 +68,9 @@ class CNNAI(BasicAI):
         self.opponent_AI = opponent_AI  # tensorflowを自己対戦の２AIで共有するための変数。TODO: 非合法手がまだ出るので修正は必要。ただしGPUメモリが節約できなかったので着手していない。
         self.use_mix_precision = use_mix_precision
         self.p_tau = p_tau
-        self.opening_tree_path = opening_tree_path
-
-        self.opening_tree = None
-        self.statevec2node = None
 
         if self.opponent_AI is None:
             self.init_tensorflow()
-
-        if self.opening_tree_path is not None:
-            self.init_opening_tree()
-
-    def init_opening_tree(self):
-        with open(self.opening_tree_path, "r") as fin:
-            json_dict = json.load(fin)
-        self.opening_tree = load_dict_to_opening_tree(json_dict)
-        self.statevec2node = load_statevec2node(self.opening_tree)
 
     def init_tensorflow(self):
         # tensorflowの準備
