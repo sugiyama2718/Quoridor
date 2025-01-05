@@ -299,6 +299,31 @@ def calc_next_state(x):
     return state
 
 
+def select(root_tree, C_puct, estimated_V, color):
+    t = root_tree
+    a = 0
+    nodes = []
+    actions = []
+    while True:
+        
+        if t.P is None:
+            print("!"*200)
+            print(actions)
+            assert False, "t.P is None is not expected"
+
+        # 負けノードは探索しない
+        a = select_action(t.tree_c.contents.Q_arr, t.tree_c.contents.N_arr, t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                            C_puct, estimated_V, color, t.s.turn)
+
+        nodes.append(t)
+        actions.append(a)
+
+        if a not in t.children.keys():
+            return t, a, nodes, actions, False # 葉ノードでない
+        else:
+            t = t.children[a]
+
+
 class BasicAI(Agent):
     def __init__(self, color, search_nodes=1, C_puct=5, tau=1, n_parallel=N_PARALLEL, virtual_loss_n=1, use_estimated_V=True, V_ema_w=0.01, 
                  shortest_only=False, use_average_Q=False, random_playouts=False, tau_mult=2, tau_decay=6, is_mimic_AI=False, tau_peak=6, force_opening=None, post_alpha=1.0, post_beta=2.0, use_recent_move_vec=True, opening_tree_path=None):
@@ -434,29 +459,7 @@ class BasicAI(Agent):
 
         return ret
 
-    def select(self, root_tree, C_puct):
-        t = root_tree
-        a = 0
-        nodes = []
-        actions = []
-        while True:
-            
-            if t.P is None:
-                print("!"*200)
-                print(actions)
-                assert False, "t.P is None is not expected"
 
-            # 負けノードは探索しない
-            a = select_action(t.tree_c.contents.Q_arr, t.tree_c.contents.N_arr, t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                              C_puct, self.estimated_V, self.color, t.s.turn)
-
-            nodes.append(t)
-            actions.append(a)
-
-            if a not in t.children.keys():
-                return t, a, nodes, actions, False # 葉ノードでない
-            else:
-                t = t.children[a]
 
     def calc_leaf_movable_arr(self, root_state, actions):
         # stateはroot、actionsはMCTSのleafまでの道のりを想定。actionsはどれも合法手とする。
@@ -679,7 +682,7 @@ class BasicAI(Agent):
             actionss = []
 
             for _ in range(min(self.n_parallel, max_node)):
-                _, _, nodes, actions, _ = self.select(root_tree, C_puct)
+                _, _, nodes, actions, _ = select(root_tree, C_puct, self.estimated_V, self.color)
                 if nodes is None:
                     break
                 nodess.append(nodes)
