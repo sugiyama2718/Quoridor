@@ -470,10 +470,10 @@ class BasicAI(Agent):
         引数のaction_listを与える場合は、初期局面からstateに至るまでの行動のリストを正しく格納すること。定石を利用する場合には設定が必要。
         """
 
+        opening_node = None
         if self.opening_tree_path is not None:
             assert action_list is not None, "action_list is required if you use opening tree"
             normalized_state, normalized_state_vec, is_mirrored = get_normalized_state(action_list)
-            opening_node = None
             if normalized_state_vec in self.statevec2node.keys():
                 opening_node = self.statevec2node[normalized_state_vec]
 
