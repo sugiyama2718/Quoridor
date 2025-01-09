@@ -286,9 +286,11 @@ def _build_opening_tree_core(
                 # 左右対称なら、 action_id, mirror_action_id ともに +1
                 if aid != -1:
                     parent_node.search_count_vec[aid] += 1
+                    parent_node.tree_c.contents.N_arr[aid] += 1
                     parent_node.p1_win_num_vec[aid] += int(is_sente_win == 1)
                 if maid != -1:
                     parent_node.search_count_vec[maid] += 1
+                    parent_node.tree_c.contents.N_arr[maid] += 1
                     parent_node.p1_win_num_vec[maid] += int(is_sente_win == 1)
             else:
                 # 非対称
@@ -296,11 +298,13 @@ def _build_opening_tree_core(
                     # normalized_state == state の場合
                     if aid != -1:
                         parent_node.search_count_vec[aid] += 2
+                        parent_node.tree_c.contents.N_arr[aid] += 2
                         parent_node.p1_win_num_vec[aid] += 2 * int(is_sente_win == 1)
                 else:
                     # normalized_state == mirror_state の場合
                     if maid != -1:
                         parent_node.search_count_vec[maid] += 2
+                        parent_node.tree_c.contents.N_arr[maid] += 2
                         parent_node.p1_win_num_vec[maid] += 2 * int(is_sente_win == 1)
 
     return opening_tree, statevec2node
@@ -367,9 +371,7 @@ def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_t
                 
     return opening_tree, statevec2node
 
-########################################################
-# 差分更新用の新関数
-########################################################
+
 def update_opening_tree_with_new_kifu(opening_tree, statevec2node,
                                       new_kifu_list, max_depth,
                                       target_epoch=None, disable_tqdm=False):
@@ -719,27 +721,37 @@ def traverse_opening_tree_and_print(tree, actions):
 
 def MCTS_select(root_tree, C_puct, estimated_V, color):
     t = root_tree
-    a = 0
     nodes = []
     actions = []
+
     while True:
-        
+        # t.P が None なら異常終了(従来通り)
         if t.P is None:
             print("!"*200)
             print(actions)
             assert False, "t.P is None is not expected"
 
-        # 負けノードは探索しない
-        a = select_action(t.tree_c.contents.Q_arr, t.tree_c.contents.N_arr, t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                            C_puct, estimated_V, color, t.s.turn)
+        # select_action は既存のC拡張関数を想定
+        # t.get_turn() で手番を取得し、子ノードには t.move_to_child(a) で移動
+        a = select_action(
+            t.tree_c.contents.Q_arr,
+            t.tree_c.contents.N_arr,
+            t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            C_puct,
+            estimated_V,
+            color,
+            t.get_turn()
+        )
 
         nodes.append(t)
         actions.append(a)
 
-        if a not in t.children.keys():
-            return t, a, nodes, actions, False # 葉ノードでない
+        # 子ノードが無い場合は葉ノードとして処理を終える
+        if a not in t.children:
+            return t, a, nodes, actions, False
         else:
-            t = t.children[a]
+            t = t.move_to_child(a)
+
 
 def select_and_get_nodess_and_actionss(root_tree, C_puct, estimated_V, color, n_parallel, max_node, virtual_loss_n):
     nodess = []
