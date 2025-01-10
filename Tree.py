@@ -214,7 +214,6 @@ def load_dict_to_opening_tree(json_dict):
     # tree_c の復元
     if "tree_c" in json_dict:
         # OpeningTreeインスタンスに tree_c を新たに用意
-        ret.tree_c = Tree_c()
         tcd = json_dict["tree_c"]
         # N_arr (int配列)
         for i, val in enumerate(tcd["N_arr"]):
