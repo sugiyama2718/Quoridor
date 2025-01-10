@@ -288,10 +288,12 @@ def _build_opening_tree_core(
                     parent_node.search_count_vec[aid] += 1
                     parent_node.tree_c.contents.N_arr[aid] += 1
                     parent_node.p1_win_num_vec[aid] += int(is_sente_win == 1)
+                    parent_node.tree_c.contents.W_arr[aid] += int(is_sente_win == 1)
                 if maid != -1:
                     parent_node.search_count_vec[maid] += 1
                     parent_node.tree_c.contents.N_arr[maid] += 1
                     parent_node.p1_win_num_vec[maid] += int(is_sente_win == 1)
+                    parent_node.tree_c.contents.W_arr[maid] += int(is_sente_win == 1)
             else:
                 # 非対称
                 if is_normal:
@@ -300,12 +302,14 @@ def _build_opening_tree_core(
                         parent_node.search_count_vec[aid] += 2
                         parent_node.tree_c.contents.N_arr[aid] += 2
                         parent_node.p1_win_num_vec[aid] += 2 * int(is_sente_win == 1)
+                        parent_node.tree_c.contents.W_arr[aid] += 2 * int(is_sente_win == 1)
                 else:
                     # normalized_state == mirror_state の場合
                     if maid != -1:
                         parent_node.search_count_vec[maid] += 2
                         parent_node.tree_c.contents.N_arr[maid] += 2
                         parent_node.p1_win_num_vec[maid] += 2 * int(is_sente_win == 1)
+                        parent_node.tree_c.contents.W_arr[maid] += 2 * int(is_sente_win == 1)
 
     return opening_tree, statevec2node
 
@@ -710,8 +714,11 @@ def traverse_opening_tree_and_print(tree, actions):
 
     print(actions)
     print("visited num = {} , p1 win rate = {:.2f}%".format(tree.visited_num, tree.p1_win_num / tree.visited_num * 100))
-    display_parameter(np.asarray(tree.search_count_vec, dtype="int32"))
-    display_parameter(np.asarray(tree.p1_win_num_vec, dtype="int32"))
+    # display_parameter(np.asarray(tree.search_count_vec, dtype="int32"))
+    # display_parameter(np.asarray(tree.p1_win_num_vec, dtype="int32"))
+    if tree.tree_c is not None:
+        display_parameter(np.asarray(tree.tree_c.contents.N_arr, dtype="int32"))
+        display_parameter(np.asarray(tree.tree_c.contents.W_arr, dtype="int32"))
     print()
 
     for key, node in tree.children.items():
