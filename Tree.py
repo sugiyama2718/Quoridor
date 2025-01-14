@@ -4,6 +4,7 @@ import copy
 import ctypes
 import os
 from abc import ABC, abstractmethod
+from Agent import actionid2str_statevec
 
 if os.name == "nt":
     lib = ctypes.CDLL('./State_util.dll')
@@ -29,22 +30,43 @@ delete_tree = lib.deleteTree
 delete_tree.argtypes = [ctypes.POINTER(Tree_c)]
 
 
+def mirror_action(a):
+    if len(a) == 2:
+        last_letter = "i"
+    else:
+        last_letter = "h"
+    # 文字をUnicodeコードポイントに変換
+    code = ord(a[0])
+
+    # 平均値を求め、それを基準に入れ替えを行う
+    mid = (ord('a') + ord(last_letter)) / 2
+    new_code = int(mid - (code - mid))
+
+    # 新しいコードポイントを文字に戻す
+    return chr(new_code) + a[1:]
+
+
 class BaseTree(ABC):
     def __init__(self):
         # MCTS_selectで直接アクセスする属性はここで共通的に持つことにする
         self.P = None
         self.tree_c = None
-        self.children = {}         # 子ノード(辞書)
+        self.children = {}  # Tree: action_id -> Tree, OpeningTree: action_str -> Tree  OpeningTreeでは正規化を行う都合でaction_strで実装した
         self.P_without_loss = None
 
     @abstractmethod
     def get_turn(self):
-        """ 現在の手番を返す。Treeでは s.turn を返し、OpeningTreeでは後で実装する。 """
+        """ 現在の手番を返す """
         pass
 
     @abstractmethod
     def move_to_child(self, a):
-        """ 子ノードに移動して返す。Tree では self.children[a]、OpeningTree でも同様を予定。 """
+        """ 子ノードに移動して返す"""
+        pass
+
+    @abstractmethod
+    def have_child(self, a):
+        """ aを子ノードとして持っているか"""
         pass
 
 
@@ -55,7 +77,6 @@ class Tree(BaseTree):
     def __init__(self, s, p=None, v=None, result=0, optimal_action=None):
         super().__init__()
         action_n = 137
-        self.children = {}
         self.s = s
         self.P = p
         self.V = v
@@ -100,12 +121,16 @@ class Tree(BaseTree):
 
     def move_to_child(self, a):
         return self.children[a]
+
+    def have_child(self, a):
+        return a in self.children.keys()
     
 class OpeningTree(BaseTree):
     # json等で保存できるフォーマットにする。
     def __init__(self, fvec):
         super().__init__()
         self.fvec = fvec
+        self.turn = None
         
         self.score = None
         self.search_nodes = None
@@ -127,7 +152,9 @@ class OpeningTree(BaseTree):
         # 注意: 葉ノードを除きvisited_num = sum(search_count_vec) // 2という関係がある。
         self.p1_win_num_vec = None
 
-        self.tree_c = create_tree()
+        self.tree_c = create_tree()  # OpeningTreeではwとして先手勝利数、QとしてはＮが少ないうちは0に近い値を取るような計算式を採用
+
+        self.statevec2node = None  # あるstatevec2nodeへの参照を代入して参照できるようにする
 
     def __del__(self):
         delete_tree(self.tree_c)
@@ -152,6 +179,7 @@ class OpeningTree(BaseTree):
         vars_dict = copy.copy(self.__dict__)
         del vars_dict["fvec"]
         del vars_dict["children"]
+        del vars_dict["statevec2node"]  # statevec2nodeは参照用の一時的な変数なので保存しない
 
         # tree_c も抜き出して別途保存する
         # 今回、children フィールドは保存しないで N_arr, W_arr, Q_arr のみ保存する
@@ -174,6 +202,8 @@ class OpeningTree(BaseTree):
             if v is not None:
                 if isinstance(v, list):
                     ret[k] = [int(x) for x in v]  # 整数ベクトルに変換
+                elif isinstance(v, np.ndarray):
+                    ret[k] = v.astype(float).tolist()  # numpy arrayをfloatのリストに変換
                 else:
                     ret[k] = v
 
@@ -186,13 +216,37 @@ class OpeningTree(BaseTree):
         return self.visited_num < other.visited_num
 
     def get_turn(self):
-        # 後で実装する想定。今は仮に0を返すだけ
-        return 0
+        if self.turn is None:
+            return 0
+        else:
+            return self.turn
 
     def move_to_child(self, a):
-        # 後で実装する想定。とりあえず self.children[a] を返すだけ
-        return self.children[a]
+        s = actionid2str_statevec(self.fvec, a)
+        s_mirror = mirror_action(s)
+        if s in self.children.keys():
+            normalized_s = s
+        elif s_mirror in self.children.keys():
+            normalized_s = s_mirror
+        else:
+            assert False, "have_childがTrueなことを想定"
+        return move_to_child(self, normalized_s, self.statevec2node)
 
+    def have_child(self, a):
+        s = actionid2str_statevec(self.fvec, a)
+        s_mirror = mirror_action(s)
+        return (s in self.children.keys()) or (s_mirror in self.children.keys())
+
+
+def move_to_child(node, key, statevec2node):
+    if key not in node.children.keys():
+        return None
+    
+    if isinstance(node.children[key], OpeningTree):
+        node = node.children[key]
+    else:
+        node = statevec2node[tuple(node.children[key])]  # node.children[key]がstate_vecになっている
+    return node
 
 
 def load_dict_to_opening_tree(json_dict):

@@ -1,7 +1,7 @@
 import os
 import graphviz
 import math
-from Tree import OpeningTree, Tree_c
+from Tree import OpeningTree, Tree_c, move_to_child, mirror_action
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
 from config import *
@@ -45,22 +45,6 @@ def Official2Glendenning(s):
     return Glendenning2Official(s)
 
 
-def mirror_action(a):
-    if len(a) == 2:
-        last_letter = "i"
-    else:
-        last_letter = "h"
-    # 文字をUnicodeコードポイントに変換
-    code = ord(a[0])
-
-    # 平均値を求め、それを基準に入れ替えを行う
-    mid = (ord('a') + ord(last_letter)) / 2
-    new_code = int(mid - (code - mid))
-
-    # 新しいコードポイントを文字に戻す
-    return chr(new_code) + a[1:]
-
-
 def get_normalized_action_list(action_list):
     # 左右対称を同一視した行動列を返す。行動の正規化だけでは、行動順序の異なる左右対称で同一局面を同一視できないケースがあるが、無駄な枝を作らなくて良い効果がある。
     mirror_action_list = list(map(mirror_action, action_list))
@@ -83,17 +67,6 @@ def get_opening_node_from_state(state, statevec2node):
         ret = OpeningTree(state_vec)
         statevec2node[state_vec] = ret
     return ret
-
-
-def move_to_child(node, key, statevec2node):
-    if key not in node.children.keys():
-        return None
-    
-    if isinstance(node.children[key], OpeningTree):
-        node = node.children[key]
-    else:
-        node = statevec2node[tuple(node.children[key])]  # node.children[key]がstate_vecになっている
-    return node
 
 
 def get_state_from_action_list(action_list):
@@ -131,6 +104,11 @@ def get_normalized_state(action_list):
         return state, state_vec, False
     else:
         return mirror_state, mirror_state_vec, True
+
+def calc_Q(N, W):
+    N_plus = N + 6
+    W_plus = W + 3
+    return 2 * (W_plus / N_plus - 0.5)
 
 
 ########################################################
@@ -177,6 +155,7 @@ def _build_opening_tree_core(
         opening_tree.game_num = 0
     opening_tree.game_num += len(kifu_list)
     opening_tree.selfplay_epoch = target_epoch
+    opening_tree.statevec2node = statevec2node
 
     for action_list in tqdm(kifu_list, disable=disable_tqdm):
 
@@ -246,6 +225,10 @@ def _build_opening_tree_core(
                         child_candidate.selfplay_epoch = target_epoch
                         child_candidate.search_count_vec = [0] * 137  # np.arrayにしないのはjsonにするため
                         child_candidate.p1_win_num_vec = [0] * 137
+                        child_candidate.P = np.array([1/137] * 137)
+                        child_candidate.P_without_loss = np.array([1/137] * 137)
+                        child_candidate.turn = normalized_state.turn
+                        child_candidate.statevec2node = statevec2node
 
                 # move_to_child で子ノードに進む
                 node = move_to_child(node, key, statevec2node)
@@ -289,11 +272,13 @@ def _build_opening_tree_core(
                     parent_node.tree_c.contents.N_arr[aid] += 1
                     parent_node.p1_win_num_vec[aid] += int(is_sente_win == 1)
                     parent_node.tree_c.contents.W_arr[aid] += int(is_sente_win == 1)
+                    parent_node.tree_c.contents.Q_arr[aid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
                 if maid != -1:
                     parent_node.search_count_vec[maid] += 1
                     parent_node.tree_c.contents.N_arr[maid] += 1
                     parent_node.p1_win_num_vec[maid] += int(is_sente_win == 1)
                     parent_node.tree_c.contents.W_arr[maid] += int(is_sente_win == 1)
+                    parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
             else:
                 # 非対称
                 if is_normal:
@@ -303,6 +288,7 @@ def _build_opening_tree_core(
                         parent_node.tree_c.contents.N_arr[aid] += 2
                         parent_node.p1_win_num_vec[aid] += 2 * int(is_sente_win == 1)
                         parent_node.tree_c.contents.W_arr[aid] += 2 * int(is_sente_win == 1)
+                        parent_node.tree_c.contents.Q_arr[aid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
                 else:
                     # normalized_state == mirror_state の場合
                     if maid != -1:
@@ -310,70 +296,39 @@ def _build_opening_tree_core(
                         parent_node.tree_c.contents.N_arr[maid] += 2
                         parent_node.p1_win_num_vec[maid] += 2 * int(is_sente_win == 1)
                         parent_node.tree_c.contents.W_arr[maid] += 2 * int(is_sente_win == 1)
+                        parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
 
     return opening_tree, statevec2node
 
 
 def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_tqdm=False):
+    """
+    初回など、空のOpeningTreeを作って、all_kifu_listを1からビルドする。
+    """
+    # 空の statevec2node
     statevec2node = {}
-    add_state = State()
-    State_init(add_state)
-    opening_tree = get_opening_node_from_state(add_state, statevec2node)
-    opening_tree.visited_num = 0
-    opening_tree.p1_win_num = 0
-    opening_tree.p2_win_num = 0
-    opening_tree.selfplay_epoch = target_epoch
-    opening_tree.game_num = len(all_kifu_list)
 
-    # 定跡木の作成
-    for action_list in tqdm(all_kifu_list, disable=disable_tqdm):
-        state = State()
-        State_init(state)
-        mirror_state = State()
-        State_init(mirror_state)
+    # ルートとして初期局面用のノードを作成
+    init_state = State()
+    State_init(init_state)
+    root_node = get_opening_node_from_state(init_state, statevec2node)
+    # 初期化
+    root_node.visited_num = 0
+    root_node.p1_win_num = 0
+    root_node.p2_win_num = 0
+    root_node.game_num = 0
+    root_node.selfplay_epoch = target_epoch
+    root_node.P = np.array([1/137] * 137)
+    root_node.P_without_loss = np.array([1/137] * 137)
 
-        normalized_action_list, _ = get_normalized_action_list(action_list)
-        mirror_action_list = list(map(mirror_action, action_list))
+    # まとめて構築
+    _build_opening_tree_core(root_node, statevec2node,
+                             kifu_list=all_kifu_list,
+                             max_depth=max_depth,
+                             target_epoch=target_epoch,
+                             disable_tqdm=disable_tqdm)
 
-        node = opening_tree
-        path = [node]
-
-        for action_str, mirror_action_str, normalized_action_str, depth in zip(action_list, mirror_action_list, normalized_action_list, range(len(action_list))):
-            accept_action_str(state, action_str, check_placable=False, calc_placable_array=False, check_movable=False)
-            accept_action_str(mirror_state, mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
-
-            state_vec = tuple(feature_int(state).flatten())
-            mirror_state_vec = tuple(feature_int(mirror_state).flatten())
-
-            if state_vec <= mirror_state_vec:
-                normalized_state = state
-            else:
-                normalized_state = mirror_state
-
-            if depth <= max_depth:
-                key = Glendenning2Official(normalized_action_str)
-                if key not in node.children.keys():
-                    node.children[key] = get_opening_node_from_state(normalized_state, statevec2node)
-                    if isinstance(node.children[key], OpeningTree):
-                        node.children[key].visited_num = 0
-                        node.children[key].p1_win_num = 0
-                        node.children[key].p2_win_num = 0
-                        node.children[key].selfplay_epoch = target_epoch
-                        node.children[key].game_num = len(all_kifu_list)
-
-                node = move_to_child(node, key, statevec2node)
-                path.append(node)
-
-        is_sente_win = state.turn % 2  # 引き分けは極めて稀なので考慮しない。
-
-        for node in path:
-            node.visited_num += 1
-            if is_sente_win:
-                node.p1_win_num += 1
-            else:
-                node.p2_win_num += 1
-                
-    return opening_tree, statevec2node
+    return root_node, statevec2node
 
 
 def update_opening_tree_with_new_kifu(opening_tree, statevec2node,
@@ -717,8 +672,8 @@ def traverse_opening_tree_and_print(tree, actions):
     # display_parameter(np.asarray(tree.search_count_vec, dtype="int32"))
     # display_parameter(np.asarray(tree.p1_win_num_vec, dtype="int32"))
     if tree.tree_c is not None:
-        display_parameter(np.asarray(tree.tree_c.contents.N_arr, dtype="int32"))
-        display_parameter(np.asarray(tree.tree_c.contents.W_arr, dtype="int32"))
+        #display_parameter(np.asarray(tree.tree_c.contents.N_arr, dtype="int32"))
+        display_parameter(np.asarray(np.array(tree.tree_c.contents.Q_arr) * 1000, dtype="int32"))
     print()
 
     for key, node in tree.children.items():
@@ -738,7 +693,6 @@ def MCTS_select(root_tree, C_puct, estimated_V, color):
             print(actions)
             assert False, "t.P is None is not expected"
 
-        # select_action は既存のC拡張関数を想定
         # t.get_turn() で手番を取得し、子ノードには t.move_to_child(a) で移動
         a = select_action(
             t.tree_c.contents.Q_arr,
@@ -754,7 +708,7 @@ def MCTS_select(root_tree, C_puct, estimated_V, color):
         actions.append(a)
 
         # 子ノードが無い場合は葉ノードとして処理を終える
-        if a not in t.children:
+        if not t.have_child(a):
             return t, a, nodes, actions, False
         else:
             t = t.move_to_child(a)
