@@ -102,6 +102,7 @@ def evaluate_2game_process_2id(arg_tuple):
                 - `gote_win_num`: The number of games won by the second AI as sente.
                 - `draw_num`: The number of drawn games.
                 - `action_lists`: Detailed move sequences for both games.
+                - 'pi_lists'
             - arg_i (int): The index of the first AI.
             - arg_j (int): The index of the second AI.
 
@@ -180,7 +181,7 @@ def evaluate_2game_process_2id(arg_tuple):
 
     AIs = [AI1, AI2]
 
-    ret = evaluate(AIs, 2, multiprocess=True, return_detail=True, 
+    ret = evaluate(AIs, 2, multiprocess=True, return_pi_lists=True, 
     sente_kifu_list_i=sente_kifu_list_i, sente_kifu_list_j=sente_kifu_list_j, gote_kifu_list_i=gote_kifu_list_i, gote_kifu_list_j=gote_kifu_list_j)
     del AIs
     return ret, arg_i, arg_j
@@ -363,7 +364,7 @@ if __name__ == "__main__":
             ret = list(tqdm(imap, total=len(matches)))
 
         for evaluate_ret, i, j in ret:
-            sente_win_num, gote_win_num, draw_num, action_lists = evaluate_ret
+            sente_win_num, gote_win_num, draw_num, action_lists, _ = evaluate_ret
             win_num_total = sente_win_num + gote_win_num
             n_arr[i, j] += win_num_total
             N_arr[i, j] += 2

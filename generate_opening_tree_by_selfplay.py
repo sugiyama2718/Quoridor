@@ -14,14 +14,14 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import argparse
 import logging
-from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, update_opening_tree_with_new_kifu
+from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, update_opening_tree_with_new_kifu, MCTS_select
 tf.get_logger().setLevel(logging.ERROR)
 
 from extract_good_AIs import evaluate_2game_process_2id
 
 def selfplay_cycle(
-    opening_tree,       # <--- 変更: 既に作成済みのOpeningTreeを受け取る
-    statevec2node,      # <--- 同上
+    opening_tree,
+    statevec2node,
     ai_param,
     process_num=4,
     game_num_per_process=2,
@@ -53,9 +53,11 @@ def selfplay_cycle(
 
     # 2) 棋譜リスト取得
     new_kifu_list = []
+    pi_lists = []
     for (eval_result, _, _) in results:
-        (_, _, _, kifu_list) = eval_result
+        (_, _, _, kifu_list, pi_list) = eval_result
         new_kifu_list.extend(kifu_list)
+        pi_lists.extend(pi_list)
 
     # 3) OpeningTreeを差分更新
     opening_tree, statevec2node = update_opening_tree_with_new_kifu(
@@ -65,6 +67,9 @@ def selfplay_cycle(
         max_depth=max_depth
     )
 
+    _, _, _, actions, _ = MCTS_select(opening_tree, 2.0, 0, 0)
+    print(actions)
+
     return opening_tree, statevec2node, new_kifu_list
 
 
@@ -72,9 +77,10 @@ def main():
     ai_param = {
         'config_id': 0,
         'AI_id': 15000,
-        'search_nodes': 1000,
+        'search_nodes': 500,
         'C_puct': 2.5,
-        'tau': 0.32,
+        #'tau': 0.32,
+        'tau': 0.64,
         'p_tau': 0.7,
         'post_alpha': 2.0,
         'post_beta': 5.0,
@@ -84,7 +90,7 @@ def main():
     PROCESS_NUM = 4
     GAME_NUM_PER_PROCESS = 2
     CYCLE_NUM = 3
-    MAX_DEPTH = 20
+    MAX_DEPTH = 200  # AI向け定石なので、必要があればいくらでも深く探索させたい
 
     # --- 初回だけ generate_opening_tree(空リストで良いなら空でOK) ---
     opening_tree, statevec2node = generate_opening_tree(
