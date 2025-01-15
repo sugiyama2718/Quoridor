@@ -287,7 +287,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
 
 # 中で先手後手を順番に入れ替えている
-def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False, return_detail=False, 
+def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False, return_detail=False, return_pi_lists=False,
 sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu_list_j=None):
     wins = 0.
     sente_win_num = 0.
@@ -296,6 +296,7 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
     total_time_without_endgame = 0.0
     total_turn_without_endgame = 0
     action_lists = []
+    pi_lists = []
     for i in range(play_num):
         game_start_time = time.time()
         is_endgame = False
@@ -306,6 +307,7 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
         AIs[i % 2].color = 0
         AIs[1 - i % 2].color = 1
         action_list = []
+        pi_list = []
         while True:
             if display:
                 display_cui(state)
@@ -328,6 +330,7 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
                 a = actionid2str(state, s)
             AIs[1 - i % 2].prev_action = s
             action_list.append(a)
+            pi_list.append(pi)
 
             if not is_endgame and state.pseudo_terminate:
                 total_time_without_endgame += time.time() - game_start_time
@@ -357,6 +360,7 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
                 a = actionid2str(state, s)
             AIs[i % 2].prev_action = s
             action_list.append(a)
+            pi_list.append(pi)
 
             if not is_endgame and state.pseudo_terminate:
                 total_time_without_endgame += time.time() - game_start_time
@@ -366,6 +370,7 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
             if state.terminate:
                 break
         action_lists.append(action_list)
+        pi_lists.append(pi_list)
 
         if i % 2 == 0 and state.reward == 1:
             wins += 1.
@@ -389,7 +394,9 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
     if display:
         print("total_time_without_endgame = {:.3f}s, time per one move = {:.3f}s".format(total_time_without_endgame, total_time_without_endgame / total_turn_without_endgame))
 
-    if return_detail:
+    if return_pi_lists:
+        return sente_win_num, gote_win_num, draw_num, action_lists, pi_lists
+    elif return_detail:
         return sente_win_num, gote_win_num, draw_num, action_lists
     elif return_draw:
         return wins, draw_num
