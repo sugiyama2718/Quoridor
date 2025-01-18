@@ -324,6 +324,8 @@ class BasicAI(Agent):
             json_dict = json.load(fin)
         self.opening_tree = load_dict_to_opening_tree(json_dict)
         self.statevec2node = load_statevec2node(self.opening_tree)
+        # traverse_opening_tree_and_print(self.opening_tree, [])
+        # exit()
 
     def init_prev(self, state=None):
         # 試合前に毎回実行
@@ -799,8 +801,8 @@ class BasicAI(Agent):
             # 定石ノードが存在した場合はそれを反映
             if opening_node is not None:
                 print("is_mirrored", is_mirrored)
-                search_count_vec = np.array(opening_node.search_count_vec)
-                p1_win_num_vec = np.array(opening_node.p1_win_num_vec)
+                search_count_vec = np.array(opening_node.tree_c.contents.N_arr)
+                p1_win_num_vec = np.array(opening_node.tree_c.contents.W_arr)
                 
                 if is_mirrored:
                     search_count_vec = transform_x_to_symmetric(search_count_vec)
@@ -809,10 +811,10 @@ class BasicAI(Agent):
                 p2_win_num_vec = search_count_vec - p1_win_num_vec
 
                 my_color_vec = p1_win_num_vec if self.color == 0 else p2_win_num_vec
-                # print("search_count_vec")
-                # display_parameter(search_count_vec)
-                # print("my_color_vec")
-                # display_parameter(my_color_vec)
+                print("search_count_vec")
+                display_parameter(search_count_vec)
+                print("my_color_vec")
+                display_parameter(my_color_vec)
 
                 N2 += OPENING_TREE_COEF * my_color_vec
 

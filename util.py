@@ -7,7 +7,7 @@ from State import State, State_init, accept_action_str, feature_int
 from config import *
 from collections import defaultdict
 import numpy as np
-from Agent import str2actionid
+from Agent import str2actionid, actionid2str_statevec
 import ctypes
 
 if os.name == "nt":
@@ -111,8 +111,8 @@ def _build_opening_tree_core(
     OpeningTreeとstatevec2nodeに対し、kifu_list(複数ゲーム)を反映させる。
     左右対称局面は同一視する。既存のノードがあれば再利用し、なければ追加する。
 
-    さらに本処理内で search_count_vec も加算する:
-      - search_count_vec[i] = 親ノードから「action i」で遷移する子ノードが
+    さらに本処理内で tree_c.contents.N_arr も加算する:
+      - tree_c.contents.N_arr[i] = 親ノードから「action i」で遷移する子ノードが
         何回訪問されたかを示すカウンタ。
       - 今回は経路を辿るたびに都度+1 or +2する方針。
 
@@ -165,7 +165,7 @@ def _build_opening_tree_core(
         path_nodes = [node]
 
         # 今回の手順で使った (action_id, mirror_action_id, symmetrical, is_normal_state) を保存
-        # ただし search_count_vec の更新は「親ノード」ごとに行うため、
+        # ただし tree_c.contents.N_arr の更新は「親ノード」ごとに行うため、
         # stepごとに親ノード側を更新するために蓄えておく。
         move_info = []
 
@@ -217,8 +217,6 @@ def _build_opening_tree_core(
                         if child_candidate.p2_win_num is None:
                             child_candidate.p2_win_num = 0
                         child_candidate.selfplay_epoch = target_epoch
-                        child_candidate.search_count_vec = [0] * 137  # np.arrayにしないのはjsonにするため
-                        child_candidate.p1_win_num_vec = [0] * 137
                         child_candidate.P = np.array(normalized_pi, dtype=np.float32)
                         child_candidate.P_without_loss = np.array(normalized_pi, dtype=np.float32)
                         child_candidate.turn = normalized_state.turn
@@ -250,28 +248,19 @@ def _build_opening_tree_core(
                     n.p2_win_num = 0
                 n.p2_win_num += 1
 
-        # 4) 各ステップで「親ノードの search_count_vec」を更新
+        # 4) 各ステップで「親ノードの tree_c.contents.N_arr」を更新
         #    move_info[i] は path_nodes[i] → path_nodes[i+1] の手に対応。
         for i, (aid, maid, symmetrical, is_normal) in enumerate(move_info):
             parent_node = path_nodes[i]   # 親ノード
-            # search_count_vec の初期化
-            if parent_node.search_count_vec is None:
-                parent_node.search_count_vec = [0] * 137  # np.arrayにしないのはjsonにするため
-            if parent_node.p1_win_num_vec is None:
-                parent_node.p1_win_num_vec = [0] * 137
 
             if symmetrical:
                 # 左右対称なら、 action_id, mirror_action_id ともに +1
                 if aid != -1:
-                    parent_node.search_count_vec[aid] += 1
                     parent_node.tree_c.contents.N_arr[aid] += 1
-                    parent_node.p1_win_num_vec[aid] += int(is_sente_win == 1)
                     parent_node.tree_c.contents.W_arr[aid] += int(is_sente_win == 1)
                     parent_node.tree_c.contents.Q_arr[aid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
                 if maid != -1:
-                    parent_node.search_count_vec[maid] += 1
                     parent_node.tree_c.contents.N_arr[maid] += 1
-                    parent_node.p1_win_num_vec[maid] += int(is_sente_win == 1)
                     parent_node.tree_c.contents.W_arr[maid] += int(is_sente_win == 1)
                     parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
             else:
@@ -279,17 +268,13 @@ def _build_opening_tree_core(
                 if is_normal:
                     # normalized_state == state の場合
                     if aid != -1:
-                        parent_node.search_count_vec[aid] += 2
                         parent_node.tree_c.contents.N_arr[aid] += 2
-                        parent_node.p1_win_num_vec[aid] += 2 * int(is_sente_win == 1)
                         parent_node.tree_c.contents.W_arr[aid] += 2 * int(is_sente_win == 1)
                         parent_node.tree_c.contents.Q_arr[aid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
                 else:
                     # normalized_state == mirror_state の場合
                     if maid != -1:
-                        parent_node.search_count_vec[maid] += 2
                         parent_node.tree_c.contents.N_arr[maid] += 2
-                        parent_node.p1_win_num_vec[maid] += 2 * int(is_sente_win == 1)
                         parent_node.tree_c.contents.W_arr[maid] += 2 * int(is_sente_win == 1)
                         parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
 
@@ -676,8 +661,6 @@ def traverse_opening_tree_and_print(tree, actions):
 
     print(actions)
     print("visited num = {} , p1 win rate = {:.2f}%".format(tree.visited_num, tree.p1_win_num / tree.visited_num * 100))
-    # display_parameter(np.asarray(tree.search_count_vec, dtype="int32"))
-    # display_parameter(np.asarray(tree.p1_win_num_vec, dtype="int32"))
     if tree.tree_c is not None:
         #display_parameter(np.asarray(tree.tree_c.contents.N_arr, dtype="int32"))
         display_parameter(np.asarray(np.array(tree.tree_c.contents.Q_arr) * 1000, dtype="int32"))
@@ -686,6 +669,44 @@ def traverse_opening_tree_and_print(tree, actions):
     for key, node in tree.children.items():
         if isinstance(node, OpeningTree):
             traverse_opening_tree_and_print(node, actions + [key])
+
+
+def remove_nodes_below_threshold(tree, statevec2node, threshold=1):
+    """treeにルートノード、"""
+
+    del_list = []
+    for key, v in tree.children.items():
+        if isinstance(v, OpeningTree):
+            remove_nodes_below_threshold(v, statevec2node, threshold)
+
+        child = move_to_child(tree, key, statevec2node)
+        if child.visited_num <= threshold:
+            del_list.append(key)
+
+    for key in del_list:
+        del tree.children[key]
+
+
+# def remove_nodes_below_threshold(tree, threshold=2):
+#     """treeにルートノード、"""
+#     for action_id, n in enumerate(tree.tree_c.contents.N_arr):
+#         if n == 0:  # 子ノードが存在しない
+#             continue
+        
+#         action_str = actionid2str_statevec(tree.fvec, action_id)
+#         action_str = Glendenning2Official(action_str)
+#         action_str_mirror = mirror_action(action_str)
+#         if action_str in tree.children.keys():
+#             normalized_s = action_str
+#         elif action_str_mirror in tree.children.keys():
+#             normalized_s = action_str_mirror
+#         else:
+#             continue
+
+#         if n <= threshold:
+#             del tree.children[normalized_s]
+#         elif isinstance(tree.children[normalized_s], OpeningTree):
+#             remove_nodes_below_threshold(tree.children[normalized_s])
 
 
 def MCTS_select(root_tree, C_puct, estimated_V, color):

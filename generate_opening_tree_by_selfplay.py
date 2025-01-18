@@ -14,7 +14,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import argparse
 import logging
-from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, update_opening_tree_with_new_kifu, MCTS_select
+from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, update_opening_tree_with_new_kifu, MCTS_select, remove_nodes_below_threshold
 tf.get_logger().setLevel(logging.ERROR)
 from State import State, accept_action_str, State_init
 from Tree import Glendenning2Official
@@ -27,7 +27,6 @@ def selfplay_cycle(
     statevec2node,
     ai_param,
     process_num=4,
-    game_num_per_process=2,
     max_depth=20
 ):
     """
@@ -71,14 +70,15 @@ def selfplay_cycle(
         pi_lists=pi_lists
     )
 
-    _, _, _, actions, _ = MCTS_select(opening_tree, 10000.0, 0, 0)
-    s = State()
-    State_init(s)
-    for action in actions:
-        action_str = actionid2str(s, action)
-        print(Glendenning2Official(action_str), end=", ")
-        accept_action_str(s, action_str)
-    print()
+    _, _, _, actions, _ = MCTS_select(opening_tree, 100.0, 0, 0)
+    print(actions)
+    # s = State()
+    # State_init(s)
+    # for action in actions:
+    #     action_str = actionid2str(s, action)
+    #     print(Glendenning2Official(action_str), end=", ")
+    #     accept_action_str(s, action_str)
+    # print()
     return opening_tree, statevec2node, new_kifu_list
 
 
@@ -97,7 +97,6 @@ def main():
     }
 
     PROCESS_NUM = 4
-    GAME_NUM_PER_PROCESS = 2
     CYCLE_NUM = 3
     MAX_DEPTH = 200  # AI向け定石なので、必要があればいくらでも深く探索させたい
 
@@ -117,7 +116,6 @@ def main():
             statevec2node,
             ai_param,
             process_num=PROCESS_NUM,
-            game_num_per_process=GAME_NUM_PER_PROCESS,
             max_depth=MAX_DEPTH
         )
 
@@ -128,6 +126,8 @@ def main():
 
     print("\nAll cycles finished.")
     print(f"Total kifu count: {len(all_kifu_list_global)}")
+
+    remove_nodes_below_threshold(opening_tree, statevec2node)
 
     os.makedirs(AI_JOSEKI_DIR, exist_ok=True)
 

@@ -165,11 +165,11 @@ class OpeningTree(BaseTree):
         self.is_display = False
 
         self.mcts_result_vec = None  # MCTS探索結果ベクトル (整数ベクトル)
-        self.search_count_vec = None  # 各ノードの探索数ベクトル (整数ベクトル)。/2すると実際の探索数で、左右対称局面においては左右対称の手を+1ずつする
-        # 注意: 葉ノードを除きvisited_num = sum(search_count_vec) // 2という関係がある。
-        self.p1_win_num_vec = None
 
-        self.tree_c = create_tree()  # OpeningTreeではwとして先手勝利数、QとしてはＮが少ないうちは0に近い値を取るような計算式を採用
+        # OpeningTreeではw_arrとして先手勝利数*2、QとしてはＮが少ないうちは0に近い値を取るような計算式を採用
+        # N_arr: 各ノードの探索数ベクトル (整数ベクトル)。/2すると実際の探索数で、左右対称局面においては左右対称の手を+1ずつする
+        self.tree_c = create_tree()  
+
 
         self.statevec2node = None  # あるstatevec2nodeへの参照を代入して参照できるようにする
 
