@@ -30,6 +30,23 @@ delete_tree = lib.deleteTree
 delete_tree.argtypes = [ctypes.POINTER(Tree_c)]
 
 
+def Glendenning2Official(s):
+    """
+    cf. https://quoridorstrats.wordpress.com/notation/
+    """
+
+    n = int(s[1])
+
+    if len(s) == 2:  # move
+        ret = s[0] + str(10 - n)
+    else:  # wall
+        ret = s[0] + str(9 - n) + s[2]
+    return ret
+
+def Official2Glendenning(s):
+    return Glendenning2Official(s)
+
+
 def mirror_action(a):
     if len(a) == 2:
         last_letter = "i"
@@ -223,6 +240,7 @@ class OpeningTree(BaseTree):
 
     def move_to_child(self, a):
         s = actionid2str_statevec(self.fvec, a)
+        s = Glendenning2Official(s)
         s_mirror = mirror_action(s)
         if s in self.children.keys():
             normalized_s = s
@@ -234,6 +252,7 @@ class OpeningTree(BaseTree):
 
     def have_child(self, a):
         s = actionid2str_statevec(self.fvec, a)
+        s = Glendenning2Official(s)
         s_mirror = mirror_action(s)
         return (s in self.children.keys()) or (s_mirror in self.children.keys())
 

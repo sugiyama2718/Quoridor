@@ -16,6 +16,9 @@ import argparse
 import logging
 from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, update_opening_tree_with_new_kifu, MCTS_select
 tf.get_logger().setLevel(logging.ERROR)
+from State import State, accept_action_str, State_init
+from Tree import Glendenning2Official
+from Agent import actionid2str
 
 from extract_good_AIs import evaluate_2game_process_2id
 
@@ -64,12 +67,18 @@ def selfplay_cycle(
         opening_tree,
         statevec2node,
         new_kifu_list,
-        max_depth=max_depth
+        max_depth=max_depth,
+        pi_lists=pi_lists
     )
 
-    _, _, _, actions, _ = MCTS_select(opening_tree, 2.0, 0, 0)
-    print(actions)
-
+    _, _, _, actions, _ = MCTS_select(opening_tree, 10000.0, 0, 0)
+    s = State()
+    State_init(s)
+    for action in actions:
+        action_str = actionid2str(s, action)
+        print(Glendenning2Official(action_str), end=", ")
+        accept_action_str(s, action_str)
+    print()
     return opening_tree, statevec2node, new_kifu_list
 
 

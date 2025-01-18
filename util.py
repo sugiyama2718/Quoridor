@@ -1,7 +1,7 @@
 import os
 import graphviz
 import math
-from Tree import OpeningTree, Tree_c, move_to_child, mirror_action
+from Tree import OpeningTree, Tree_c, move_to_child, mirror_action, Glendenning2Official, Official2Glendenning
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
 from config import *
@@ -27,22 +27,6 @@ add_virtual_loss.restype = None
 subtract_virtual_loss = lib.subtract_virtual_loss
 subtract_virtual_loss.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
 subtract_virtual_loss.restype = None
-
-def Glendenning2Official(s):
-    """
-    cf. https://quoridorstrats.wordpress.com/notation/
-    """
-
-    n = int(s[1])
-
-    if len(s) == 2:  # move
-        ret = s[0] + str(10 - n)
-    else:  # wall
-        ret = s[0] + str(9 - n) + s[2]
-    return ret
-
-def Official2Glendenning(s):
-    return Glendenning2Official(s)
 
 
 def get_normalized_action_list(action_list):
@@ -120,7 +104,8 @@ def _build_opening_tree_core(
     kifu_list,
     max_depth,
     target_epoch=None,
-    disable_tqdm=False
+    disable_tqdm=False,
+    pi_lists=None
 ):
     """
     OpeningTreeとstatevec2nodeに対し、kifu_list(複数ゲーム)を反映させる。
@@ -145,6 +130,7 @@ def _build_opening_tree_core(
         optional
     disable_tqdm : bool
         Trueならプログレスバーを表示しない
+    pi_lists: list of list[str] or None
 
     Returns
     -------
@@ -157,7 +143,12 @@ def _build_opening_tree_core(
     opening_tree.selfplay_epoch = target_epoch
     opening_tree.statevec2node = statevec2node
 
-    for action_list in tqdm(kifu_list, disable=disable_tqdm):
+    for action_list, pi_list in tqdm(
+        zip(kifu_list, pi_lists if pi_lists is not None else [None] * len(kifu_list)),
+        disable=disable_tqdm
+    ):
+        if pi_list is None:
+            pi_list = [None] * len(action_list)
 
         # 1) 状態を用意
         state = State()
@@ -178,8 +169,8 @@ def _build_opening_tree_core(
         # stepごとに親ノード側を更新するために蓄えておく。
         move_info = []
 
-        for depth, (action_str, mirror_action_str, normalized_act_str) in enumerate(
-            zip(action_list, mirror_action_list, normalized_action_list)
+        for depth, (action_str, mirror_action_str, normalized_act_str, pi) in enumerate(
+            zip(action_list[:-1], mirror_action_list[:-1], normalized_action_list[:-1], pi_list[1:])  # piは子ノードに対して割り当てるのでaction_listと一つずらす
         ):
             # action_id, mirror_action_id を計算
             aid = str2actionid(state, action_str)
@@ -203,8 +194,11 @@ def _build_opening_tree_core(
             # normalized_state
             if state_vec <= mirror_state_vec:
                 normalized_state = state
+                normalized_pi = pi
             else:
                 normalized_state = mirror_state
+                normalized_pi = pi
+                #normalized_pi = transform_x_to_symmetric(pi)
 
             if depth <= max_depth:
                 # 公式表記に変換
@@ -225,10 +219,11 @@ def _build_opening_tree_core(
                         child_candidate.selfplay_epoch = target_epoch
                         child_candidate.search_count_vec = [0] * 137  # np.arrayにしないのはjsonにするため
                         child_candidate.p1_win_num_vec = [0] * 137
-                        child_candidate.P = np.array([1/137] * 137)
-                        child_candidate.P_without_loss = np.array([1/137] * 137)
+                        child_candidate.P = np.array(normalized_pi, dtype=np.float32)
+                        child_candidate.P_without_loss = np.array(normalized_pi, dtype=np.float32)
                         child_candidate.turn = normalized_state.turn
                         child_candidate.statevec2node = statevec2node
+                        #print(key, child_candidate.P_without_loss)
 
                 # move_to_child で子ノードに進む
                 node = move_to_child(node, key, statevec2node)
@@ -301,7 +296,7 @@ def _build_opening_tree_core(
     return opening_tree, statevec2node
 
 
-def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_tqdm=False):
+def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_tqdm=False, pi_lists=None):
     """
     初回など、空のOpeningTreeを作って、all_kifu_listを1からビルドする。
     """
@@ -318,30 +313,42 @@ def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_t
     root_node.p2_win_num = 0
     root_node.game_num = 0
     root_node.selfplay_epoch = target_epoch
-    root_node.P = np.array([1/137] * 137)
-    root_node.P_without_loss = np.array([1/137] * 137)
+    if pi_lists is None:
+        root_node.P = np.array([1/137] * 137, dtype=np.float32)
+        root_node.P_without_loss = np.array([1/137] * 137, dtype=np.float32)
+    else:
+        root_node.P = np.array(pi_lists[0][0], dtype=np.float32)
+        root_node.P_without_loss = np.array(pi_lists[0][0], dtype=np.float32)
 
     # まとめて構築
     _build_opening_tree_core(root_node, statevec2node,
                              kifu_list=all_kifu_list,
                              max_depth=max_depth,
                              target_epoch=target_epoch,
-                             disable_tqdm=disable_tqdm)
+                             disable_tqdm=disable_tqdm,
+                             pi_lists=pi_lists)
 
     return root_node, statevec2node
 
 
 def update_opening_tree_with_new_kifu(opening_tree, statevec2node,
                                       new_kifu_list, max_depth,
-                                      target_epoch=None, disable_tqdm=False):
+                                      target_epoch=None, disable_tqdm=False, pi_lists=None):
     """
     既存のopening_treeとstatevec2nodeに対して、新しい棋譜(new_kifu_list)だけを処理して差分更新する。
     """
+
+    # 初回ではpi_listsを与えられなかったことを想定し、rootだけは改めてPを設定する
+    if pi_lists is not None:
+        opening_tree.P = np.array(pi_lists[0][0], dtype=np.float32)
+        opening_tree.P_without_loss = np.array(pi_lists[0][0], dtype=np.float32)
+
     _build_opening_tree_core(opening_tree, statevec2node,
                              kifu_list=new_kifu_list,
                              max_depth=max_depth,
                              target_epoch=target_epoch,
-                             disable_tqdm=disable_tqdm)
+                             disable_tqdm=disable_tqdm,
+                             pi_lists=pi_lists)
     return opening_tree, statevec2node
 
 
