@@ -14,7 +14,7 @@ from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
-from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter, get_normalized_state, load_statevec2node, traverse_opening_tree_and_print, transform_x_to_symmetric, select_and_get_nodess_and_actionss
+from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter, get_normalized_state, load_statevec2node, traverse_opening_tree_and_print, transform_x_to_symmetric, select_and_get_nodess_and_actionss, get_normalized_action_list
 import ctypes
 from Tree import load_dict_to_opening_tree
 
@@ -475,7 +475,8 @@ class BasicAI(Agent):
         opening_node = None
         if self.opening_tree_path is not None:
             assert action_list is not None, "action_list is required if you use opening tree"
-            normalized_state, normalized_state_vec, is_mirrored = get_normalized_state(action_list)
+            normalized_state, normalized_state_vec, _ = get_normalized_state(action_list)
+            normalized_action_list, is_mirrored = get_normalized_action_list(action_list)
             if normalized_state_vec in self.statevec2node.keys():
                 opening_node = self.statevec2node[normalized_state_vec]
 
@@ -800,7 +801,6 @@ class BasicAI(Agent):
 
             # 定石ノードが存在した場合はそれを反映
             if opening_node is not None:
-                print("is_mirrored", is_mirrored)
                 search_count_vec = np.array(opening_node.tree_c.contents.N_arr)
                 p1_win_num_vec = np.array(opening_node.tree_c.contents.W_arr)
                 
@@ -811,10 +811,10 @@ class BasicAI(Agent):
                 p2_win_num_vec = search_count_vec - p1_win_num_vec
 
                 my_color_vec = p1_win_num_vec if self.color == 0 else p2_win_num_vec
-                print("search_count_vec")
-                display_parameter(search_count_vec)
-                print("my_color_vec")
-                display_parameter(my_color_vec)
+                # print("search_count_vec")
+                # display_parameter(search_count_vec)
+                # print("my_color_vec")
+                # display_parameter(my_color_vec)
 
                 N2 += OPENING_TREE_COEF * my_color_vec
 

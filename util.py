@@ -1,7 +1,7 @@
 import os
 import graphviz
 import math
-from Tree import OpeningTree, Tree_c, move_to_child, mirror_action, Glendenning2Official, Official2Glendenning
+from Tree import OpeningTree, Tree_c, move_to_child, mirror_action, Glendenning2Official, Official2Glendenning, get_normalized_action_list
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
 from config import *
@@ -27,15 +27,6 @@ add_virtual_loss.restype = None
 subtract_virtual_loss = lib.subtract_virtual_loss
 subtract_virtual_loss.argtypes = [ctypes.POINTER(Tree_c), ctypes.c_int, ctypes.c_int, ctypes.c_int]
 subtract_virtual_loss.restype = None
-
-
-def get_normalized_action_list(action_list):
-    # 左右対称を同一視した行動列を返す。行動の正規化だけでは、行動順序の異なる左右対称で同一局面を同一視できないケースがあるが、無駄な枝を作らなくて良い効果がある。
-    mirror_action_list = list(map(mirror_action, action_list))
-    if action_list <= mirror_action_list:
-        return action_list, False
-    else:
-        return mirror_action_list, True
 
 
 RECORDS_PATH = "records"
@@ -157,7 +148,7 @@ def _build_opening_tree_core(
         State_init(mirror_state)
 
         # 2) アクションの左右対称リスト
-        normalized_action_list, _ = get_normalized_action_list(action_list)
+        normalized_action_list, is_normalized_action_list = get_normalized_action_list(action_list)
         mirror_action_list = list(map(mirror_action, action_list))
 
         # 経路上のノードを保存 (path_nodes[0] = root)
@@ -197,8 +188,8 @@ def _build_opening_tree_core(
                 normalized_pi = pi
             else:
                 normalized_state = mirror_state
-                normalized_pi = pi
-                #normalized_pi = transform_x_to_symmetric(pi)
+                #normalized_pi = pi
+                normalized_pi = transform_x_to_symmetric(pi) if pi is not None else None
 
             if depth <= max_depth:
                 # 公式表記に変換
@@ -262,21 +253,19 @@ def _build_opening_tree_core(
                 if maid != -1:
                     parent_node.tree_c.contents.N_arr[maid] += 1
                     parent_node.tree_c.contents.W_arr[maid] += int(is_sente_win == 1)
-                    parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
+                    parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[maid], parent_node.tree_c.contents.W_arr[maid])
             else:
                 # 非対称
-                if is_normal:
-                    # normalized_state == state の場合
+                if not is_normalized_action_list:
                     if aid != -1:
                         parent_node.tree_c.contents.N_arr[aid] += 2
                         parent_node.tree_c.contents.W_arr[aid] += 2 * int(is_sente_win == 1)
                         parent_node.tree_c.contents.Q_arr[aid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
                 else:
-                    # normalized_state == mirror_state の場合
                     if maid != -1:
                         parent_node.tree_c.contents.N_arr[maid] += 2
                         parent_node.tree_c.contents.W_arr[maid] += 2 * int(is_sente_win == 1)
-                        parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
+                        parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[maid], parent_node.tree_c.contents.W_arr[maid])
 
     return opening_tree, statevec2node
 
@@ -627,14 +616,14 @@ def display_parameter(x):
 def transform_x_to_symmetric(x):
     """
     入力配列xを左右対称に変換します。
-
+    (display_parameterでの表示結果が左右反転になるようにする)
+    
     Parameters:
     x (numpy.ndarray): 長さ137の入力配列
 
     Returns:
     numpy.ndarray: 左右対称に変換された配列
     """
-    # 入力配列の長さを確認
     if x.size != 137:
         raise ValueError("入力配列は長さ137である必要があります。")
 
@@ -643,15 +632,22 @@ def transform_x_to_symmetric(x):
     b = x[64:128].reshape((8, 8))
     c = x[128:].reshape((3, 3))
 
-    # aとbを水平方向に反転
+    # a, b は display_parameter 内で「for x in range(8)」という順序で横方向を走るので、
+    # axis=0 で flip すれば左右反転が正しく実現できる
     a_flipped = np.flip(a, axis=0)
     b_flipped = np.flip(b, axis=0)
 
-    # cも水平方向に反転
-    c_flipped = np.flip(c, axis=0)
+    # c は display_parameter が x ∈ [-1,0,1] ⇒ (2,0,1) の順で横方向を走る特殊ループなので、
+    # 単純に np.flip(c, axis=0) すると、表示結果が期待する左右反転にはならない。
+    # そこでインデックスを明示的に並べ替える。
+    c_flipped = c[[0, 2, 1], :]
 
     # 変換後の配列を再構築
-    x_transformed = np.concatenate([a_flipped.flatten(), b_flipped.flatten(), c_flipped.flatten()])
+    x_transformed = np.concatenate([
+        a_flipped.flatten(),
+        b_flipped.flatten(),
+        c_flipped.flatten()
+    ])
 
     return x_transformed
 
@@ -736,10 +732,10 @@ def MCTS_select(root_tree, C_puct, estimated_V, color):
         actions.append(a)
 
         # 子ノードが無い場合は葉ノードとして処理を終える
-        if not t.have_child(a):
+        if not t.have_child(a, actions, nodes):
             return t, a, nodes, actions, False
         else:
-            t = t.move_to_child(a)
+            t = t.move_to_child(a, actions, nodes)
 
 
 def select_and_get_nodess_and_actionss(root_tree, C_puct, estimated_V, color, n_parallel, max_node, virtual_loss_n):
@@ -754,7 +750,7 @@ def select_and_get_nodess_and_actionss(root_tree, C_puct, estimated_V, color, n_
         actionss.append(actions)
 
         for node, action in zip(nodes, actions):
-            if color == node.s.turn % 2:
+            if color == node.get_turn() % 2:
                 coef = -1
             else:
                 coef = 1
@@ -763,7 +759,7 @@ def select_and_get_nodess_and_actionss(root_tree, C_puct, estimated_V, color, n_
     # virtual lossを元に戻す
     for nodes, actions in zip(nodess, actionss):
         for node, action in zip(nodes, actions):
-            if color == node.s.turn % 2:
+            if color == node.get_turn() % 2:
                 coef = -1
             else:
                 coef = 1

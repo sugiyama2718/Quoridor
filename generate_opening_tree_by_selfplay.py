@@ -14,7 +14,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import argparse
 import logging
-from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, update_opening_tree_with_new_kifu, MCTS_select, remove_nodes_below_threshold
+from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, update_opening_tree_with_new_kifu, MCTS_select, remove_nodes_below_threshold, select_and_get_nodess_and_actionss
 tf.get_logger().setLevel(logging.ERROR)
 from State import State, accept_action_str, State_init
 from Tree import Glendenning2Official
@@ -35,6 +35,17 @@ def selfplay_cycle(
       2) 得られた棋譜(=new_kifu_list)を元に、OpeningTreeを差分更新
       3) 更新後のOpeningTreeと全棋譜リストを返す
     """
+    nodess, actionss = select_and_get_nodess_and_actionss(opening_tree, 100.0, 0, 0, process_num, process_num, 1)
+    for actions in actionss:
+        print(actions)
+        s = State()
+        State_init(s)
+        for action in actions:
+            action_str = actionid2str(s, action)
+            print(Glendenning2Official(action_str), end=", ")
+            accept_action_str(s, action_str)
+        print()
+
     # 1) 自己対戦
     args_list = []
     for idx in range(process_num):
@@ -70,15 +81,6 @@ def selfplay_cycle(
         pi_lists=pi_lists
     )
 
-    _, _, _, actions, _ = MCTS_select(opening_tree, 100.0, 0, 0)
-    print(actions)
-    # s = State()
-    # State_init(s)
-    # for action in actions:
-    #     action_str = actionid2str(s, action)
-    #     print(Glendenning2Official(action_str), end=", ")
-    #     accept_action_str(s, action_str)
-    # print()
     return opening_tree, statevec2node, new_kifu_list
 
 

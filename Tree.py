@@ -30,6 +30,15 @@ delete_tree = lib.deleteTree
 delete_tree.argtypes = [ctypes.POINTER(Tree_c)]
 
 
+def get_normalized_action_list(action_list):
+    # 左右対称を同一視した行動列を返す。行動の正規化だけでは、行動順序の異なる左右対称で同一局面を同一視できないケースがあるが、無駄な枝を作らなくて良い効果がある。
+    mirror_action_list = list(map(mirror_action, action_list))
+    if action_list <= mirror_action_list:
+        return action_list, False
+    else:
+        return mirror_action_list, True
+
+
 def Glendenning2Official(s):
     """
     cf. https://quoridorstrats.wordpress.com/notation/
@@ -77,12 +86,12 @@ class BaseTree(ABC):
         pass
 
     @abstractmethod
-    def move_to_child(self, a):
+    def move_to_child(self, a, actions, nodes):
         """ 子ノードに移動して返す"""
         pass
 
     @abstractmethod
-    def have_child(self, a):
+    def have_child(self, a, actions, nodes):
         """ aを子ノードとして持っているか"""
         pass
 
@@ -136,10 +145,10 @@ class Tree(BaseTree):
     def get_turn(self):
         return self.s.turn
 
-    def move_to_child(self, a):
+    def move_to_child(self, a, actions, nodes):
         return self.children[a]
 
-    def have_child(self, a):
+    def have_child(self, a, actions, nodes):
         return a in self.children.keys()
     
 class OpeningTree(BaseTree):
@@ -238,23 +247,21 @@ class OpeningTree(BaseTree):
         else:
             return self.turn
 
-    def move_to_child(self, a):
-        s = actionid2str_statevec(self.fvec, a)
-        s = Glendenning2Official(s)
-        s_mirror = mirror_action(s)
-        if s in self.children.keys():
-            normalized_s = s
-        elif s_mirror in self.children.keys():
-            normalized_s = s_mirror
-        else:
-            assert False, "have_childがTrueなことを想定"
-        return move_to_child(self, normalized_s, self.statevec2node)
+    def move_to_child(self, a, actions, nodes):
+        s = get_normalized_official_s(actions, nodes)
+        return move_to_child(self, s, self.statevec2node)
 
-    def have_child(self, a):
-        s = actionid2str_statevec(self.fvec, a)
-        s = Glendenning2Official(s)
-        s_mirror = mirror_action(s)
-        return (s in self.children.keys()) or (s_mirror in self.children.keys())
+    def have_child(self, a, actions, nodes):
+        s = get_normalized_official_s(actions, nodes)
+        return s in self.children.keys()
+
+
+def get_normalized_official_s(actions, nodes):
+    action_list = []
+    for action_id, node in zip(actions, nodes):
+        action_list.append(actionid2str_statevec(node.fvec, action_id))
+    normalized_action_list, is_mirrored = get_normalized_action_list(action_list)
+    return Glendenning2Official(normalized_action_list[-1])
 
 
 def move_to_child(node, key, statevec2node):

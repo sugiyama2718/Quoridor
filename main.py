@@ -961,7 +961,10 @@ if __name__ == '__main__':
         train_without_selfplay()
     elif sys.argv[1] == "view":
         epoch = 15000
-        AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, seed=100, opening_tree_path=AI_OPENING_TREE_DEFAULT_PATH), CNNAI(1, search_nodes=search_nodes, tau=0.25, seed=100, opening_tree_path=AI_OPENING_TREE_DEFAULT_PATH)]
+        #opening_tree_path = os.path.join(AI_JOSEKI_DIR, "250119_independent", "opening_tree.json")
+        opening_tree_path = AI_OPENING_TREE_DEFAULT_PATH
+        AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, seed=100, opening_tree_path=opening_tree_path), 
+        CNNAI(1, search_nodes=search_nodes, tau=0.25, seed=100, opening_tree_path=opening_tree_path)]
         #AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=100, is_mimic_AI=True)]
         # AIs[0].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
         # AIs[1].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
@@ -1003,9 +1006,13 @@ if __name__ == '__main__':
             # 先後で２試合して勝利数を返す
             epoch1 = 15000
             epoch2 = 15000
-            search_nodes_eval = 2000
+            search_nodes_eval = 500
+            opening_tree_path = os.path.join(AI_JOSEKI_DIR, "250119_independent", "opening_tree.json")
+            #opening_tree_path = AI_OPENING_TREE_DEFAULT_PATH
+            AIs = [CNNAI(0, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, p_tau=0.7, post_alpha=2.0, post_beta=5.0), 
+            CNNAI(1, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, opening_tree_path=opening_tree_path, p_tau=0.7, post_alpha=2.0, post_beta=5.0)]
             #AIs = [CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed), CNNAI(1, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed)]
-            AIs = [CNNAI(0, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, p_tau=0.7, post_alpha=2.0, post_beta=5.0), CNNAI(1, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, p_tau=0.7, post_alpha=2.0, post_beta=5.0)]
+            #AIs = [CNNAI(0, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, p_tau=0.7, post_alpha=2.0, post_beta=5.0), CNNAI(1, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, p_tau=0.7, post_alpha=2.0, post_beta=5.0)]
             #AIs[0].load(os.path.join("backup/221219/train_results/parameter/", "epoch680.ckpt"))
             AIs[0].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch1), f"epoch{epoch1}.ckpt"))
             AIs[1].load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(epoch2), f"epoch{epoch2}.ckpt"))
