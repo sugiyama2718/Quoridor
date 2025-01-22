@@ -35,10 +35,14 @@ def selfplay_cycle(
       2) 得られた棋譜(=new_kifu_list)を元に、OpeningTreeを差分更新
       3) 更新後のOpeningTreeと全棋譜リストを返す
     """
+    game_num = process_num * 2
+    # print(list(opening_tree.tree_c.contents.N_arr))
+    # print(list(opening_tree.tree_c.contents.Q_arr))
+    # print(opening_tree.P)
     if opening_tree.P is None:
-        actionss = [[130]] * process_num  # 初期局面の場合のみ、"e2"に対応するidで仮に埋める
+        actionss = [[]] * game_num  # 初期局面の場合のみ、空リストで埋める
     else:
-        _, actionss = select_and_get_nodess_and_actionss(opening_tree, 100.0, 0, 0, process_num, process_num, 1)
+        _, actionss = select_and_get_nodess_and_actionss(opening_tree, 10.0, 0, 0, game_num, game_num, 1)
     for actions in actionss:
         print(actions)
         s = State()
@@ -57,7 +61,8 @@ def selfplay_cycle(
             0, 0, ai_param, ai_param,
             [], [], [], [],
             seed_val,
-            0.0
+            0.0,
+            actionss[idx*2:idx*2+2]
         )
         args_list.append(args)
 
@@ -102,7 +107,7 @@ def main():
     }
 
     PROCESS_NUM = 4
-    CYCLE_NUM = 3
+    CYCLE_NUM = 25
     MAX_DEPTH = 200  # AI向け定石なので、必要があればいくらでも深く探索させたい
 
     # --- 初回だけ generate_opening_tree(空リストで良いなら空でOK) ---

@@ -185,11 +185,16 @@ def _build_opening_tree_core(
             # normalized_state
             if state_vec <= mirror_state_vec:
                 normalized_state = state
-                normalized_pi = pi
+                #normalized_pi = pi
             else:
                 normalized_state = mirror_state
-                normalized_pi = pi  # こちらの方が正解かも
+                #normalized_pi = pi  # こちらの方が正解かも
                 #normalized_pi = transform_x_to_symmetric(pi) if pi is not None else None
+
+            if is_normalized_action_list:
+                normalized_pi = pi
+            else:
+                normalized_pi = transform_x_to_symmetric(pi) if pi is not None else None
 
             if depth <= max_depth:
                 # 公式表記に変換
@@ -310,7 +315,7 @@ def update_opening_tree_with_new_kifu(opening_tree, statevec2node,
     """
 
     # 初回ではpi_listsを与えられなかったことを想定し、rootだけは改めてPを設定する
-    if pi_lists is not None:
+    if pi_lists is not None and opening_tree.P is None:
         opening_tree.P = np.array(pi_lists[0][0], dtype=np.float32)
         opening_tree.P_without_loss = np.array(pi_lists[0][0], dtype=np.float32)
 

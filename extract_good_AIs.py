@@ -94,6 +94,7 @@ def evaluate_2game_process_2id(arg_tuple):
             gote_kifu_list_j (list): A list of move sequences where the second AI plays as gote.
             seed (int): A seed value for random operations to ensure reproducibility.
             wait_time (float): A delay time in seconds to stagger the process execution.
+            opening_actionss (list of list)
 
     Returns:
         tuple: A tuple containing:
@@ -113,7 +114,7 @@ def evaluate_2game_process_2id(arg_tuple):
         - The function loads pretrained models for the specified AI configurations if `AI_id` is not -1.
         - Detailed move sequences are stored and can be used for further analysis or logging.
     """
-    arg_i, arg_j, ai_param_i, ai_param_j, sente_kifu_list_i, sente_kifu_list_j, gote_kifu_list_i, gote_kifu_list_j, seed, wait_time = arg_tuple
+    arg_i, arg_j, ai_param_i, ai_param_j, sente_kifu_list_i, sente_kifu_list_j, gote_kifu_list_i, gote_kifu_list_j, seed, wait_time, opening_actionss = arg_tuple
 
     import time
     time.sleep(wait_time)
@@ -182,7 +183,7 @@ def evaluate_2game_process_2id(arg_tuple):
     AIs = [AI1, AI2]
 
     ret = evaluate(AIs, 2, multiprocess=True, return_pi_lists=True, 
-    sente_kifu_list_i=sente_kifu_list_i, sente_kifu_list_j=sente_kifu_list_j, gote_kifu_list_i=gote_kifu_list_i, gote_kifu_list_j=gote_kifu_list_j)
+    sente_kifu_list_i=sente_kifu_list_i, sente_kifu_list_j=sente_kifu_list_j, gote_kifu_list_i=gote_kifu_list_i, gote_kifu_list_j=gote_kifu_list_j, opening_actionss=opening_actionss)
     del AIs
     return ret, arg_i, arg_j
 
@@ -357,7 +358,7 @@ if __name__ == "__main__":
             # ここでai_parameters[i], ai_parameters[j]を渡す
             args.append((i, j, ai_parameters[i], ai_parameters[j], 
             action_lists_sente_dict[i][-MAX_PAST_GAMES:], action_lists_sente_dict[j][-MAX_PAST_GAMES:], action_lists_gote_dict[i][-MAX_PAST_GAMES:], action_lists_gote_dict[j][-MAX_PAST_GAMES:], 
-            (k + total_game_num) * 10000, wait_time_list[k]))
+            (k + total_game_num) * 10000, wait_time_list[k], []))
 
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process_2id, iterable=args)

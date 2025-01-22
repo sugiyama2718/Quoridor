@@ -288,7 +288,7 @@ def generate_data(AIs, play_num, noise=NOISE, display=False, equal_draw=False, i
 
 # 中で先手後手を順番に入れ替えている
 def evaluate(AIs, play_num, return_draw=False, multiprocess=False, display=False, return_detail=False, return_pi_lists=False,
-sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu_list_j=None):
+sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu_list_j=None, opening_actionss=None):
     wins = 0.
     sente_win_num = 0.
     gote_win_num = 0.
@@ -297,7 +297,9 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
     total_turn_without_endgame = 0
     action_lists = []
     pi_lists = []
-    for i in range(play_num):
+    if opening_actionss is None:
+        opening_actionss = [[]] * play_num
+    for i, opening_actions in enumerate(opening_actionss):
         game_start_time = time.time()
         is_endgame = False
         state = State()
@@ -322,11 +324,15 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
             else:
                 recent_move_vec = get_recent_move_distribution(past_games, action_list)
 
-            s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
+            if state.turn < len(opening_actions):
+                s = opening_actions[state.turn]
+                pi = None
+            else:
+                s, pi, _, _, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
-                s, pi, v_prev, v_post, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
+                s, pi, _, _, _ = AIs[i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
                 a = actionid2str(state, s)
             AIs[1 - i % 2].prev_action = s
             action_list.append(a)
@@ -352,11 +358,15 @@ sente_kifu_list_i=None, sente_kifu_list_j=None, gote_kifu_list_i=None, gote_kifu
             else:
                 recent_move_vec = get_recent_move_distribution(past_games, action_list)
 
-            s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
+            if state.turn < len(opening_actions):
+                s = opening_actions[state.turn]
+                pi = None
+            else:
+                s, pi, _, _, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
             a = actionid2str(state, s)
             while not accept_action_str(state, a):
                 print("this action is impossible")
-                s, pi, v_prev, v_post, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
+                s, pi, _, _, _ = AIs[1 - i % 2].act_and_get_pi(state, recent_move_vec=recent_move_vec, action_list=action_list)
                 a = actionid2str(state, s)
             AIs[i % 2].prev_action = s
             action_list.append(a)
