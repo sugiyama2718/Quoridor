@@ -188,8 +188,8 @@ def _build_opening_tree_core(
                 normalized_pi = pi
             else:
                 normalized_state = mirror_state
-                #normalized_pi = pi
-                normalized_pi = transform_x_to_symmetric(pi) if pi is not None else None
+                normalized_pi = pi  # こちらの方が正解かも
+                #normalized_pi = transform_x_to_symmetric(pi) if pi is not None else None
 
             if depth <= max_depth:
                 # 公式表記に変換
@@ -287,10 +287,7 @@ def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_t
     root_node.p2_win_num = 0
     root_node.game_num = 0
     root_node.selfplay_epoch = target_epoch
-    if pi_lists is None:
-        root_node.P = np.array([1/137] * 137, dtype=np.float32)
-        root_node.P_without_loss = np.array([1/137] * 137, dtype=np.float32)
-    else:
+    if pi_lists is not None:
         root_node.P = np.array(pi_lists[0][0], dtype=np.float32)
         root_node.P_without_loss = np.array(pi_lists[0][0], dtype=np.float32)
 
