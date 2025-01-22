@@ -35,7 +35,10 @@ def selfplay_cycle(
       2) 得られた棋譜(=new_kifu_list)を元に、OpeningTreeを差分更新
       3) 更新後のOpeningTreeと全棋譜リストを返す
     """
-    nodess, actionss = select_and_get_nodess_and_actionss(opening_tree, 100.0, 0, 0, process_num, process_num, 1)
+    if opening_tree.P is None:
+        actionss = [[130]] * process_num  # 初期局面の場合のみ、"e2"に対応するidで仮に埋める
+    else:
+        _, actionss = select_and_get_nodess_and_actionss(opening_tree, 100.0, 0, 0, process_num, process_num, 1)
     for actions in actionss:
         print(actions)
         s = State()
