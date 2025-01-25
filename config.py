@@ -143,6 +143,9 @@ OPENING_TURN = 20  # 何ターンを前半とみなすか
 MAX_PAST_GAMES = 20  # 過去の棋譜をいくつ覚えるか
 
 OPENING_TREE_COEF = 2.0  # 定石中の勝利を何回の探索分にするか
+OPENING_P_ALPHA = 2.0
+OPENING_P_BETA = 5.0
+OPENING_P_TAU = 0.48
 
 V_REGULARIZER = 0.1
 P_REGULARIZER = 0.01

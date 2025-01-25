@@ -4,7 +4,8 @@ import copy
 import ctypes
 import os
 from abc import ABC, abstractmethod
-from Agent import actionid2str_statevec
+from Agent import actionid2str_statevec, actionid2str
+from State import State, State_init, accept_action_str, feature_int
 
 if os.name == "nt":
     lib = ctypes.CDLL('./State_util.dll')
@@ -256,12 +257,62 @@ class OpeningTree(BaseTree):
         return s in self.children.keys()
 
 
+def get_state_from_action_list(action_list):
+    state = State()
+    State_init(state)
+    for a in action_list:
+        accept_action_str(state, a)
+    return state
+
+
+def get_normalized_state(action_list):
+    """
+    Computes the normalized state representation of a given sequence of actions.
+
+    Args:
+        action_list (list): A list of actions representing the sequence of moves in the game.
+
+    Returns:
+        tuple:
+            - state (object): The normalized state representation derived from the action sequence.
+            - state_vec (tuple): A tuple representation of the normalized state's feature vector.
+            - is_mirrored (bool): A boolean value indicating whether the mirrored state was selected 
+              (True if mirrored state was used, False otherwise).
+    """
+    # Glendenning notation
+    mirror_action_list = list(map(mirror_action, action_list))
+
+    state = get_state_from_action_list(action_list)
+    mirror_state = get_state_from_action_list(mirror_action_list)
+
+    state_vec = tuple(feature_int(state).flatten())
+    mirror_state_vec = tuple(feature_int(mirror_state).flatten())
+
+    if state_vec <= mirror_state_vec:
+        return state, state_vec, False
+    else:
+        return mirror_state, mirror_state_vec, True
+
+
 def get_normalized_official_s(actions, nodes):
     action_list = []
+    Glendenning_action_list = []
     for action_id, node in zip(actions, nodes):
-        action_list.append(actionid2str_statevec(node.fvec, action_id))
+        action_str = actionid2str_statevec(node.fvec, action_id)
+        action_list.append(Glendenning2Official(action_str))
+        Glendenning_action_list.append(action_str)
+
+    if len(Glendenning_action_list) >= 1:
+        _, _, current_is_mirrored = get_normalized_state(Glendenning_action_list[:-1])  # 一つ前の状態が反転状態なら、Pなども反転しているので、今回の手は反転する必要がある。
+    else:
+        current_is_mirrored = False
     normalized_action_list, is_mirrored = get_normalized_action_list(action_list)
-    return Glendenning2Official(normalized_action_list[-1])
+    ret = normalized_action_list[-1]
+    #ret = Glendenning2Official(action_list[-1])
+    if current_is_mirrored:
+        ret = mirror_action(ret)
+    #print(action_list, normalized_action_list, current_is_mirrored, is_mirrored, ret)
+    return ret
 
 
 def move_to_child(node, key, statevec2node):

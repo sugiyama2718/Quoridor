@@ -1,7 +1,7 @@
 import os
 import graphviz
 import math
-from Tree import OpeningTree, Tree_c, move_to_child, mirror_action, Glendenning2Official, Official2Glendenning, get_normalized_action_list
+from Tree import OpeningTree, Tree_c, move_to_child, mirror_action, Glendenning2Official, Official2Glendenning, get_normalized_action_list, get_normalized_state, get_state_from_action_list
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
 from config import *
@@ -43,42 +43,6 @@ def get_opening_node_from_state(state, statevec2node):
         statevec2node[state_vec] = ret
     return ret
 
-
-def get_state_from_action_list(action_list):
-    state = State()
-    State_init(state)
-    for a in action_list:
-        accept_action_str(state, a)
-    return state
-
-
-def get_normalized_state(action_list):
-    """
-    Computes the normalized state representation of a given sequence of actions.
-
-    Args:
-        action_list (list): A list of actions representing the sequence of moves in the game.
-
-    Returns:
-        tuple:
-            - state (object): The normalized state representation derived from the action sequence.
-            - state_vec (tuple): A tuple representation of the normalized state's feature vector.
-            - is_mirrored (bool): A boolean value indicating whether the mirrored state was selected 
-              (True if mirrored state was used, False otherwise).
-    """
-    # Glendenning notation
-    mirror_action_list = list(map(mirror_action, action_list))
-
-    state = get_state_from_action_list(action_list)
-    mirror_state = get_state_from_action_list(mirror_action_list)
-
-    state_vec = tuple(feature_int(state).flatten())
-    mirror_state_vec = tuple(feature_int(mirror_state).flatten())
-
-    if state_vec <= mirror_state_vec:
-        return state, state_vec, False
-    else:
-        return mirror_state, mirror_state_vec, True
 
 def calc_Q(N, W):
     N_plus = N + 6
@@ -185,16 +149,16 @@ def _build_opening_tree_core(
             # normalized_state
             if state_vec <= mirror_state_vec:
                 normalized_state = state
-                #normalized_pi = pi
+                normalized_pi = pi
             else:
                 normalized_state = mirror_state
                 #normalized_pi = pi  # こちらの方が正解かも
-                #normalized_pi = transform_x_to_symmetric(pi) if pi is not None else None
-
-            if is_normalized_action_list:
-                normalized_pi = pi
-            else:
                 normalized_pi = transform_x_to_symmetric(pi) if pi is not None else None
+
+            # if is_normalized_action_list:
+            #     normalized_pi = pi
+            # else:
+            #     normalized_pi = transform_x_to_symmetric(pi) if pi is not None else None
 
             if depth <= max_depth:
                 # 公式表記に変換
@@ -213,8 +177,14 @@ def _build_opening_tree_core(
                         if child_candidate.p2_win_num is None:
                             child_candidate.p2_win_num = 0
                         child_candidate.selfplay_epoch = target_epoch
-                        child_candidate.P = np.array(normalized_pi, dtype=np.float32)
-                        child_candidate.P_without_loss = np.array(normalized_pi, dtype=np.float32)
+                        if normalized_pi is None:
+                            child_candidate.P = None
+                            child_candidate.P_without_loss = None
+                        else:
+                            P = update_array_with_beta(normalized_pi, OPENING_P_ALPHA, OPENING_P_BETA)
+                            P = np.power(P, 1. / OPENING_P_TAU)
+                            child_candidate.P = np.array(P, dtype=np.float32)
+                            child_candidate.P_without_loss = np.array(P, dtype=np.float32)
                         child_candidate.turn = normalized_state.turn
                         child_candidate.statevec2node = statevec2node
                         #print(key, child_candidate.P_without_loss)
@@ -685,35 +655,13 @@ def remove_nodes_below_threshold(tree, statevec2node, threshold=1):
         del tree.children[key]
 
 
-# def remove_nodes_below_threshold(tree, threshold=2):
-#     """treeにルートノード、"""
-#     for action_id, n in enumerate(tree.tree_c.contents.N_arr):
-#         if n == 0:  # 子ノードが存在しない
-#             continue
-        
-#         action_str = actionid2str_statevec(tree.fvec, action_id)
-#         action_str = Glendenning2Official(action_str)
-#         action_str_mirror = mirror_action(action_str)
-#         if action_str in tree.children.keys():
-#             normalized_s = action_str
-#         elif action_str_mirror in tree.children.keys():
-#             normalized_s = action_str_mirror
-#         else:
-#             continue
-
-#         if n <= threshold:
-#             del tree.children[normalized_s]
-#         elif isinstance(tree.children[normalized_s], OpeningTree):
-#             remove_nodes_below_threshold(tree.children[normalized_s])
-
-
 def MCTS_select(root_tree, C_puct, estimated_V, color):
     t = root_tree
     nodes = []
     actions = []
 
     while True:
-        # t.P が None なら異常終了(従来通り)
+        # t.P が None なら異常終了
         if t.P is None:
             print("!"*200)
             print(actions)
@@ -732,6 +680,9 @@ def MCTS_select(root_tree, C_puct, estimated_V, color):
 
         nodes.append(t)
         actions.append(a)
+
+        # if isinstance(root_tree, OpeningTree):
+        #     print(a, actions, t.have_child(a, actions, nodes))
 
         # 子ノードが無い場合は葉ノードとして処理を終える
         if not t.have_child(a, actions, nodes):
@@ -768,6 +719,61 @@ def select_and_get_nodess_and_actionss(root_tree, C_puct, estimated_V, color, n_
             subtract_virtual_loss(node.tree_c, action, virtual_loss_n, coef)
 
     return nodess, actionss
+
+
+def gamma_integer(n):
+    """Compute Gamma function for integers (n-1)!."""
+    if n <= 0:
+        raise ValueError("Gamma function is not defined for non-positive integers.")
+    result = 1
+    for i in range(1, n):
+        result *= i
+    return result
+
+def beta_pdf(x, alpha, beta):
+    """Beta distribution PDF for integer alpha and beta."""
+    # Convert alpha and beta to integers if not already
+    alpha = int(alpha)
+    beta = int(beta)
+    
+    # Beta function B(alpha, beta) = Gamma(alpha) * Gamma(beta) / Gamma(alpha + beta)
+    B = (gamma_integer(alpha) * gamma_integer(beta)) / gamma_integer(alpha + beta)
+    
+    # Beta PDF calculation
+    return (x**(alpha - 1) * (1 - x)**(beta - 1)) / B
+
+def weighted_by_beta(p, alpha, beta):
+    # pは確率分布、shape=(n,), sum(p)=1
+    # ベータ分布PDF + pで重み付け。pを足すのはp=1で重み0を回避するため
+    w = beta_pdf(p, alpha, beta) + p
+    pw = p * w
+    p_new = pw / np.sum(pw)
+    return p_new
+
+
+def update_array_with_beta(N2, alpha, beta):
+    """
+    N2配列をベータ分布に基づいて変換する関数。
+    
+    Parameters:
+        N2 (numpy.ndarray): 入力配列。
+        alpha (float): ベータ分布のパラメータα。
+        beta (float): ベータ分布のパラメータβ。
+    
+    Returns:
+        numpy.ndarray: 更新されたN2配列。
+    """
+    # N2の合計
+    N2_sum = np.sum(N2)
+    
+    # 前回のpiを計算し、0で割るリスクを回避
+    pi_prev = N2 / N2_sum
+    pi_prev = pi_prev * 0.999  # ベータ分布の変換ですべてが0にならないように調整
+
+    # N2を更新
+    updated_N2 = N2_sum * weighted_by_beta(pi_prev, alpha, beta)
+    
+    return updated_N2
 
 
 if __name__ == "__main__":

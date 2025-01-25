@@ -14,11 +14,11 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import argparse
 import logging
-from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, update_opening_tree_with_new_kifu, MCTS_select, remove_nodes_below_threshold, select_and_get_nodess_and_actionss
+from util import get_epoch_dir_name, generate_opening_tree, save_tree_graph, compute_contributions, update_opening_tree_with_new_kifu, MCTS_select, remove_nodes_below_threshold, select_and_get_nodess_and_actionss, get_normalized_action_list, mirror_action, update_array_with_beta
 tf.get_logger().setLevel(logging.ERROR)
-from State import State, accept_action_str, State_init
+from State import State, accept_action_str, State_init, feature_int
 from Tree import Glendenning2Official
-from Agent import actionid2str
+from Agent import actionid2str, str2actionid
 
 from extract_good_AIs import evaluate_2game_process_2id
 
@@ -43,15 +43,21 @@ def selfplay_cycle(
         actionss = [[]] * game_num  # 初期局面の場合のみ、空リストで埋める
     else:
         _, actionss = select_and_get_nodess_and_actionss(opening_tree, 10.0, 0, 0, game_num, game_num, 1)
+
     for actions in actionss:
-        print(actions)
         s = State()
         State_init(s)
+        is_success = True
         for action in actions:
             action_str = actionid2str(s, action)
-            print(Glendenning2Official(action_str), end=", ")
-            accept_action_str(s, action_str)
+            is_success = is_success and accept_action_str(s, action_str)
+            official_str = Glendenning2Official(action_str)
+            print(official_str, end=", ")
+
         print()
+        if not is_success:
+            print("contains illegal move!!!")
+            
 
     # 1) 自己対戦
     args_list = []
@@ -107,7 +113,7 @@ def main():
     }
 
     PROCESS_NUM = 4
-    CYCLE_NUM = 25
+    CYCLE_NUM = 50
     MAX_DEPTH = 200  # AI向け定石なので、必要があればいくらでも深く探索させたい
 
     # --- 初回だけ generate_opening_tree(空リストで良いなら空でOK) ---

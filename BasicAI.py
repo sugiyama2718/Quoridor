@@ -14,7 +14,7 @@ from pprint import pprint
 import random
 from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
-from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter, get_normalized_state, load_statevec2node, traverse_opening_tree_and_print, transform_x_to_symmetric, select_and_get_nodess_and_actionss, get_normalized_action_list
+from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter, get_normalized_state, load_statevec2node, traverse_opening_tree_and_print, transform_x_to_symmetric, select_and_get_nodess_and_actionss, get_normalized_action_list, update_array_with_beta
 import ctypes
 from Tree import load_dict_to_opening_tree
 
@@ -56,36 +56,6 @@ def get_state_vec_from_tree(tree):
     if tree.state_vec is None:
         tree.state_vec = get_state_vec(tree.s)
     return tree.state_vec
-
-
-def gamma_integer(n):
-    """Compute Gamma function for integers (n-1)!."""
-    if n <= 0:
-        raise ValueError("Gamma function is not defined for non-positive integers.")
-    result = 1
-    for i in range(1, n):
-        result *= i
-    return result
-
-def beta_pdf(x, alpha, beta):
-    """Beta distribution PDF for integer alpha and beta."""
-    # Convert alpha and beta to integers if not already
-    alpha = int(alpha)
-    beta = int(beta)
-    
-    # Beta function B(alpha, beta) = Gamma(alpha) * Gamma(beta) / Gamma(alpha + beta)
-    B = (gamma_integer(alpha) * gamma_integer(beta)) / gamma_integer(alpha + beta)
-    
-    # Beta PDF calculation
-    return (x**(alpha - 1) * (1 - x)**(beta - 1)) / B
-
-def weighted_by_beta(p, alpha, beta):
-    # pは確率分布、shape=(n,), sum(p)=1
-    # ベータ分布PDF + pで重み付け。pを足すのはp=1で重み0を回避するため
-    w = beta_pdf(p, alpha, beta) + p
-    pw = p * w
-    p_new = pw / np.sum(pw)
-    return p_new
 
 
 # 引数のgにgraphviz用のグラフを入れる。ノード共有のある木構造向け。
@@ -794,10 +764,7 @@ class BasicAI(Agent):
                 N2[128:] = move_N * use_shortest
 
             # 中くらいの確率値を強調する変換を実施
-            N2_sum = np.sum(N2)
-            pi_prev = N2 / N2_sum
-            pi_prev = pi_prev * 0.999  # ベータ分布の変換ですべてが0にならないように対策
-            N2 = N2_sum * weighted_by_beta(pi_prev, self.post_alpha, self.post_beta)
+            N2 = update_array_with_beta(N2, self.post_alpha, self.post_beta)
 
             # 定石ノードが存在した場合はそれを反映
             if opening_node is not None:
