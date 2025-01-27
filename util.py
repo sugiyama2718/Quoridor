@@ -1,7 +1,7 @@
 import os
 import graphviz
 import math
-from Tree import OpeningTree, Tree_c, move_to_child, mirror_action, Glendenning2Official, Official2Glendenning, get_normalized_action_list, get_normalized_state, get_state_from_action_list
+from Tree import OpeningTree, Tree_c, move_to_child, mirror_action, Glendenning2Official, Official2Glendenning, get_normalized_action_list, get_normalized_state, get_state_from_action_list, get_flipped_index, transform_x_to_symmetric
 from tqdm import tqdm
 from State import State, State_init, accept_action_str, feature_int
 from config import *
@@ -196,6 +196,7 @@ def _build_opening_tree_core(
                 # ここで "move_info" に「この親ノードに対する action_id 情報」を記録する
                 # (どちらがnormalized_stateか、symmetricalかを後で使う)
                 move_info.append((aid, maid, symmetrical, prev_state_vec <= prev_mirror_state_vec))
+                #move_info.append((aid, maid, symmetrical, state_vec <= mirror_state_vec))
 
         # 手数に応じた勝敗判定（例: 奇数→先手勝ち）
         is_sente_win = 1 if (len(action_list) % 2 == 1) else -1
@@ -231,7 +232,7 @@ def _build_opening_tree_core(
                     parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[maid], parent_node.tree_c.contents.W_arr[maid])
             else:
                 # 非対称
-                if not is_normalized_action_list:
+                if is_normal:
                     if aid != -1:
                         parent_node.tree_c.contents.N_arr[aid] += 2
                         parent_node.tree_c.contents.W_arr[aid] += 2 * int(is_sente_win == 1)
@@ -583,45 +584,6 @@ def display_parameter(x):
         for x in [-1, 0, 1]:
             print("{:5}".format(c[x, y]), end="")
         print("")
-
-
-def transform_x_to_symmetric(x):
-    """
-    入力配列xを左右対称に変換します。
-    (display_parameterでの表示結果が左右反転になるようにする)
-    
-    Parameters:
-    x (numpy.ndarray): 長さ137の入力配列
-
-    Returns:
-    numpy.ndarray: 左右対称に変換された配列
-    """
-    if x.size != 137:
-        raise ValueError("入力配列は長さ137である必要があります。")
-
-    # 配列を分割
-    a = x[:64].reshape((8, 8))
-    b = x[64:128].reshape((8, 8))
-    c = x[128:].reshape((3, 3))
-
-    # a, b は display_parameter 内で「for x in range(8)」という順序で横方向を走るので、
-    # axis=0 で flip すれば左右反転が正しく実現できる
-    a_flipped = np.flip(a, axis=0)
-    b_flipped = np.flip(b, axis=0)
-
-    # c は display_parameter が x ∈ [-1,0,1] ⇒ (2,0,1) の順で横方向を走る特殊ループなので、
-    # 単純に np.flip(c, axis=0) すると、表示結果が期待する左右反転にはならない。
-    # そこでインデックスを明示的に並べ替える。
-    c_flipped = c[[0, 2, 1], :]
-
-    # 変換後の配列を再構築
-    x_transformed = np.concatenate([
-        a_flipped.flatten(),
-        b_flipped.flatten(),
-        c_flipped.flatten()
-    ])
-
-    return x_transformed
 
 
 def traverse_opening_tree_and_print(tree, actions):

@@ -75,7 +75,7 @@ def selfplay_cycle(
             is_mirrored = (state_vec > mirror_state_vec)
 
             official_str = Glendenning2Official(action_str)
-            print(official_str, int(is_mirrored), end=", ")
+            print(official_str, end=", ")
             #print(official_str, end=", ")
 
             prev_is_mirrored = is_mirrored

@@ -294,24 +294,125 @@ def get_normalized_state(action_list):
         return mirror_state, mirror_state_vec, True
 
 
-def get_normalized_official_s(actions, nodes):
-    action_list = []
-    Glendenning_action_list = []
-    for action_id, node in zip(actions, nodes):
-        action_str = actionid2str_statevec(node.fvec, action_id)
-        action_list.append(Glendenning2Official(action_str))
-        Glendenning_action_list.append(action_str)
+def transform_x_to_symmetric(x):
+    """
+    入力配列xを左右対称に変換します。
+    (display_parameterでの表示結果が左右反転になるようにする)
+    
+    Parameters:
+    x (numpy.ndarray): 長さ137の入力配列
 
-    if len(Glendenning_action_list) >= 1:
-        _, _, current_is_mirrored = get_normalized_state(Glendenning_action_list[:-1])  # 一つ前の状態が反転状態なら、Pなども反転しているので、今回の手は反転する必要がある。
+    Returns:
+    numpy.ndarray: 左右対称に変換された配列
+    """
+    if x.size != 137:
+        raise ValueError("入力配列は長さ137である必要があります。")
+
+    # 配列を分割
+    a = x[:64].reshape((8, 8))
+    b = x[64:128].reshape((8, 8))
+    c = x[128:].reshape((3, 3))
+
+    # a, b は display_parameter 内で「for x in range(8)」という順序で横方向を走るので、
+    # axis=0 で flip すれば左右反転が正しく実現できる
+    a_flipped = np.flip(a, axis=0)
+    b_flipped = np.flip(b, axis=0)
+
+    # c は display_parameter が x ∈ [-1,0,1] ⇒ (2,0,1) の順で横方向を走る特殊ループなので、
+    # 単純に np.flip(c, axis=0) すると、表示結果が期待する左右反転にはならない。
+    # そこでインデックスを明示的に並べ替える。
+    c_flipped = c[[0, 2, 1], :]
+
+    # 変換後の配列を再構築
+    x_transformed = np.concatenate([
+        a_flipped.flatten(),
+        b_flipped.flatten(),
+        c_flipped.flatten()
+    ])
+
+    return x_transformed
+
+
+def get_flipped_index(n):
+    """
+    与えられたインデックスnに対して、左右対称に変換された配列内で1が立っているインデックスを返します。
+
+    Parameters:
+    n (int): 0から136の整数
+
+    Returns:
+    int: 変換後の配列内で1が立っているインデックス
+    """
+    if not isinstance(n, int):
+        raise TypeError("nは整数である必要があります。")
+    if not (0 <= n <= 136):
+        raise ValueError("nは0から136の範囲内である必要があります。")
+
+    # 長さ137のゼロ配列を作成し、n番目の要素を1に設定
+    x = np.zeros(137, dtype=int)
+    x[n] = 1
+
+    # 配列を左右対称に変換
+    x_transformed = transform_x_to_symmetric(x)
+
+    # 1が立っているインデックスを取得
+    flipped_indices = np.where(x_transformed == 1)[0]
+
+    if flipped_indices.size == 0:
+        raise ValueError("変換後の配列に1が見つかりません。")
+    elif flipped_indices.size > 1:
+        raise ValueError("変換後の配列に複数の1が存在します。期待されるのは単一の1です。")
+
+    return int(flipped_indices[0])
+
+
+def get_normalized_official_s(actions, nodes):
+    s = State()
+    mirror_s = State()
+    State_init(s)
+    State_init(mirror_s)
+
+    is_success = True
+    prev_is_mirrored = False
+
+    action_list = []
+    mirror_action_list = []
+    is_mirror_list = []
+
+    for action in actions:
+        if prev_is_mirrored:
+            action = get_flipped_index(action)
+        action_str = actionid2str(s, action)
+
+        mirror_action = get_flipped_index(action)
+        mirror_action_str = actionid2str(mirror_s, mirror_action)
+
+        action_list.append(action_str)
+        mirror_action_list.append(mirror_action_str)
+
+        is_success = is_success and accept_action_str(s, action_str)
+        is_success = is_success and accept_action_str(mirror_s, mirror_action_str)
+
+        state_vec = tuple(feature_int(s).flatten())
+        mirror_state_vec = tuple(feature_int(mirror_s).flatten())
+
+        is_mirrored = (state_vec > mirror_state_vec)
+        is_mirror_list.append(is_mirrored)
+        prev_is_mirrored = is_mirrored
+    
+    _, is_normalized = get_normalized_action_list(action_list)
+    if len(is_mirror_list) >= 2:
+        is_prev_mirrored = is_mirror_list[-2]
     else:
-        current_is_mirrored = False
-    normalized_action_list, is_mirrored = get_normalized_action_list(action_list)
-    ret = normalized_action_list[-1]
-    #ret = Glendenning2Official(action_list[-1])
-    if current_is_mirrored:
-        ret = mirror_action(ret)
-    #print(action_list, normalized_action_list, current_is_mirrored, is_mirrored, ret)
+        is_prev_mirrored = False
+
+    #if is_normalized == is_prev_mirrored:  # 2回反転したらもとに戻る。1回だけ反転のときは反転する。
+    if is_normalized:
+        ret = Glendenning2Official(mirror_action_list[-1])
+    else:
+        ret = Glendenning2Official(action_list[-1])
+
+    #print(action_list, mirror_action_list, is_normalized, is_prev_mirrored, ret)
     return ret
 
 
