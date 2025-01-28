@@ -445,8 +445,8 @@ class BasicAI(Agent):
         opening_node = None
         if self.opening_tree_path is not None:
             assert action_list is not None, "action_list is required if you use opening tree"
-            normalized_state, normalized_state_vec, _ = get_normalized_state(action_list)
-            normalized_action_list, is_mirrored = get_normalized_action_list(action_list)
+            normalized_state, normalized_state_vec, is_mirrored = get_normalized_state(action_list)
+            normalized_action_list, _ = get_normalized_action_list(action_list)
             if normalized_state_vec in self.statevec2node.keys():
                 opening_node = self.statevec2node[normalized_state_vec]
 
