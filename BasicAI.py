@@ -450,6 +450,10 @@ class BasicAI(Agent):
             if normalized_state_vec in self.statevec2node.keys():
                 opening_node = self.statevec2node[normalized_state_vec]
 
+            opening_N_total = int(sum(list(self.opening_tree.tree_c.contents.N_arr)))
+            opening_p1_win_total = int(sum(list(self.opening_tree.tree_c.contents.W_arr)))
+            opening_p2_win_total = opening_N_total - opening_p1_win_total
+
         if self.random_playouts:
             max_node = SELFPLAY_SEARCHNODES_MIN
             if random.random() < DEEP_SEARCH_P:
@@ -778,12 +782,13 @@ class BasicAI(Agent):
                 p2_win_num_vec = search_count_vec - p1_win_num_vec
 
                 my_color_vec = p1_win_num_vec if self.color == 0 else p2_win_num_vec
+                my_color_win_num = opening_p1_win_total if self.color == 0 else opening_p2_win_total
                 # print("search_count_vec")
                 # display_parameter(search_count_vec)
                 # print("my_color_vec")
                 # display_parameter(my_color_vec)
 
-                N2 += OPENING_TREE_COEF * my_color_vec
+                N2 += (opening_N_total / 2) / my_color_win_num * OPENING_TREE_COEF * my_color_vec  # p1, p2の勝率の差により足される量が変わらないように調整している
 
             # tauの値に応じて分布を急峻に変換
             if tau == 0:
