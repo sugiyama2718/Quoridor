@@ -616,140 +616,147 @@ class BasicAI(Agent):
                 else:
                     return force_action_id, pi_ret, root_v, 0.0, 1  # 探索はしていないので探索後のvは0にしておく、またpolicyの学習への影響を最小限にする
 
-        while node_num < max_node and root_tree.result == 0:
-            nodess, actionss = select_and_get_nodess_and_actionss(root_tree, self.C_puct, self.estimated_V, self.color, self.n_parallel, max_node, self.virtual_loss_n)
+        if opening_node is not None:  # 定石があれば探索しない
+            N_arr = opening_node.P_without_loss  # 定石には事前確率扱いで探索結果を保存しているのでこれで間違いでない
+            if is_mirrored:
+                N_arr = transform_x_to_symmetric(N_arr)
+        else:
+            while node_num < max_node and root_tree.result == 0:
+                nodess, actionss = select_and_get_nodess_and_actionss(root_tree, self.C_puct, self.estimated_V, self.color, self.n_parallel, max_node, self.virtual_loss_n)
 
-            states = []
-            leaf_movable_arrs = []
-            arrss_for_feature_CNN = []
-            for nodes, actions in zip(nodess, actionss):
-                leaf_movable_arrs.append(self.calc_leaf_movable_arr(state, actions))
-                s = state_copy(nodes[-1].s)
-                #print([self.actionid2str(node.s, action) for node, action in zip(nodes, actions)])
-                actionstr = actionid2str(s, actions[-1])
-                accept_action_str(s, actionstr, check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
-                states.append(s)
-                
-                if len(actionstr) == 2:  # 移動なら、行動前の状態の配列を再利用する（NoneはNoneのまま格納）
-                    arrss_for_feature_CNN.append(nodes[-1].arrays_for_feature_CNN)
-                else:
-                    arrss_for_feature_CNN.append(None)
-            node_num += len(states)
+                states = []
+                leaf_movable_arrs = []
+                arrss_for_feature_CNN = []
+                for nodes, actions in zip(nodess, actionss):
+                    leaf_movable_arrs.append(self.calc_leaf_movable_arr(state, actions))
+                    s = state_copy(nodes[-1].s)
+                    #print([self.actionid2str(node.s, action) for node, action in zip(nodes, actions)])
+                    actionstr = actionid2str(s, actions[-1])
+                    accept_action_str(s, actionstr, check_placable=False)  # 合法手チェックしないことで高速化。actionsに非合法手が含まれないことが前提。
+                    states.append(s)
+                    
+                    if len(actionstr) == 2:  # 移動なら、行動前の状態の配列を再利用する（NoneはNoneのまま格納）
+                        arrss_for_feature_CNN.append(nodes[-1].arrays_for_feature_CNN)
+                    else:
+                        arrss_for_feature_CNN.append(None)
+                node_num += len(states)
 
-            p_arr, v_arr = self.pv_array(states, arrss_for_feature_CNN, leaf_movable_arrs)
+                p_arr, v_arr = self.pv_array(states, arrss_for_feature_CNN, leaf_movable_arrs)
 
-            # for nodes2, actions2 in zip(nodess, actionss):
-            #     pass
-            #     print([Glendenning2Official(actionid2str(node.s, action)) for node, action in zip(nodes2, actions2)])
-            # print("")
+                # for nodes2, actions2 in zip(nodess, actionss):
+                #     pass
+                #     print([Glendenning2Official(actionid2str(node.s, action)) for node, action in zip(nodes2, actions2)])
+                # print("")
 
-            # expand
-            for count, s, nodes, actions, arrs_for_feature_CNN in zip(range(len(states)), states, nodess, actionss, arrss_for_feature_CNN):
-                if not s.pseudo_terminate:
-                    # sはtでaを実行したときのstate
-                    t = nodes[-1]
-                    a = actions[-1]
-                    if a in t.children.keys():  # 過去に探索済み
+                # expand
+                for count, s, nodes, actions, arrs_for_feature_CNN in zip(range(len(states)), states, nodess, actionss, arrss_for_feature_CNN):
+                    if not s.pseudo_terminate:
+                        # sはtでaを実行したときのstate
+                        t = nodes[-1]
+                        a = actions[-1]
+                        if a in t.children.keys():  # 過去に探索済み
+                            continue
+
+                        new_tree = Tree(s, None)
+                        state_vec, is_searched = self.get_state_vec_and_is_state_searched(new_tree)
+                        if is_searched:  # 過去に探索していた状態と一致したとき  
+                            t.children[a] = self.state2node_per_turn[s.turn][state_vec]
+                            # t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
+                            # t.children[a].V = np.array(v_arr[count], dtype=np.float32)
+                            if s.turn != t.children[a].s.turn or t.s.turn + 1 != t.children[a].s.turn:
+                                display_cui(t.s)
+                                display_cui(s)
+                                t.children[a].s
+                                assert False, "!" * 100
+
+                        else:  # 初めて探索されたとき
+                            t.children[a] = new_tree
+                            t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
+                            t.children[a].V = np.array(v_arr[count], dtype=np.float32)
+                            self.add_state2node_per_turn_item(s.turn, state_vec, t.children[a])
+                            t.children[a].arrays_for_feature_CNN = arrs_for_feature_CNN
+
+                # backup
+                count = 0
+                for nodes, actions, s in zip(nodess, actionss, states):
+                    for node, action in zip(nodes, actions):
+                        node.tree_c.contents.N_arr[action] += 1
+                        node.tree_c.contents.W_arr[action] += v_arr[count]
+                        self.estimated_V = self.estimated_V * (1 - self.V_ema_w) + v_arr[count] * self.V_ema_w
+                        node.tree_c.contents.Q_arr[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
+                    count += 1
+
+                if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.tree_c.contents.W_arr, root_tree.tree_c.contents.N_arr, root_v):
+                    max_node = SELFPLAY_SEARCHNODES_MAX
+
+                # 勝敗ノード決定
+                for count, s, nodes, actions in zip(range(len(states)), states, nodess, actionss):
+                    # 葉ノードに当たったときのみ変更がありえるので葉ノード以外除外
+                    if not s.pseudo_terminate:
                         continue
 
-                    new_tree = Tree(s, None)
-                    state_vec, is_searched = self.get_state_vec_and_is_state_searched(new_tree)
-                    if is_searched:  # 過去に探索していた状態と一致したとき  
-                        t.children[a] = self.state2node_per_turn[s.turn][state_vec]
-                        # t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
-                        # t.children[a].V = np.array(v_arr[count], dtype=np.float32)
-                        if s.turn != t.children[a].s.turn or t.s.turn + 1 != t.children[a].s.turn:
-                            display_cui(t.s)
-                            display_cui(s)
-                            t.children[a].s
-                            assert False, "!" * 100
+                    # 葉ノード側からたどる
+                    for node, action in zip(nodes[::-1], actions[::-1]):
+                        # 過去の探索で既に勝敗が決まっているときは飛ばす(optimal_actionなどが書き換えられないよう)
+                        if node.result != 0:
+                            continue
 
-                    else:  # 初めて探索されたとき
-                        t.children[a] = new_tree
-                        t.children[a].set_P(np.array(p_arr[count], dtype=np.float32))
-                        t.children[a].V = np.array(v_arr[count], dtype=np.float32)
-                        self.add_state2node_per_turn_item(s.turn, state_vec, t.children[a])
-                        t.children[a].arrays_for_feature_CNN = arrs_for_feature_CNN
+                        is_win_node = (node.s.turn % 2 == 0 and s.pseudo_reward == 1) or (node.s.turn % 2 == 1 and s.pseudo_reward == -1)
+                        win_reward = 1 if node.s.turn % 2 == 0 else -1
+                        lose_reward = -1 if node.s.turn % 2 == 0 else 1
 
-            # backup
-            count = 0
-            for nodes, actions, s in zip(nodess, actionss, states):
-                for node, action in zip(nodes, actions):
-                    node.tree_c.contents.N_arr[action] += 1
-                    node.tree_c.contents.W_arr[action] += v_arr[count]
-                    self.estimated_V = self.estimated_V * (1 - self.V_ema_w) + v_arr[count] * self.V_ema_w
-                    node.tree_c.contents.Q_arr[action] = node.tree_c.contents.W_arr[action] / node.tree_c.contents.N_arr[action]
-                count += 1
+                        if action not in node.children.keys():  # 葉ノードを子に持つ
+                            s_B_dist, s_W_dist = get_player_dist_from_goal(s)
+                            node.dist_diff_arr[action] = max(s_W_dist - s_B_dist + (1 - s.turn % 2), s_B_dist - s_W_dist + s.turn % 2)
+                        elif  node.children[action].result != 0:  # 勝敗が決定した子ノードを持つ
+                            node.dist_diff_arr[action] = int(np.min(node.children[action].dist_diff_arr))
 
-            if node_num >= max_node - self.n_parallel and should_deepsearch(root_tree.tree_c.contents.W_arr, root_tree.tree_c.contents.N_arr, root_v):
-                max_node = SELFPLAY_SEARCHNODES_MAX
-
-            # 勝敗ノード決定
-            for count, s, nodes, actions in zip(range(len(states)), states, nodess, actionss):
-                # 葉ノードに当たったときのみ変更がありえるので葉ノード以外除外
-                if not s.pseudo_terminate:
-                    continue
-
-                # 葉ノード側からたどる
-                for node, action in zip(nodes[::-1], actions[::-1]):
-                    # 過去の探索で既に勝敗が決まっているときは飛ばす(optimal_actionなどが書き換えられないよう)
-                    if node.result != 0:
-                        continue
-
-                    is_win_node = (node.s.turn % 2 == 0 and s.pseudo_reward == 1) or (node.s.turn % 2 == 1 and s.pseudo_reward == -1)
-                    win_reward = 1 if node.s.turn % 2 == 0 else -1
-                    lose_reward = -1 if node.s.turn % 2 == 0 else 1
-
-                    if action not in node.children.keys():  # 葉ノードを子に持つ
-                        s_B_dist, s_W_dist = get_player_dist_from_goal(s)
-                        node.dist_diff_arr[action] = max(s_W_dist - s_B_dist + (1 - s.turn % 2), s_B_dist - s_W_dist + s.turn % 2)
-                    elif  node.children[action].result != 0:  # 勝敗が決定した子ノードを持つ
-                        node.dist_diff_arr[action] = int(np.min(node.children[action].dist_diff_arr))
-
-                    if is_win_node:  # 勝ち側は一つでも勝ちに向かう行動があれば勝ちノード
-                        if action not in node.children.keys() or node.children[action].result == win_reward:
-                            node.result = s.pseudo_reward
-                            node.optimal_action = action
-                            node_illegal = (node.P == 0.)
-                            
-                            if node_illegal[action]:
-                                print("!"*100)
-                                display_cui(state)
-                                display_cui(node.s)
-                                print(node.P)
-                                print(node_illegal)
-                                print(actionid2str(node.s, action))
-                                print(actions)
-                            assert not node_illegal[action], actionid2str(node.s, action)
-                            
-                    else:  # 負け側はすべての行動が相手の勝ちになるときに限り負けノード
-                        if action not in node.children.keys() or node.children[action].result == lose_reward:
-                            node.set_is_lose_child_arr(action, True)
-
-                            if not node.already_certain_path_confirmed: # 壁置きで負けになる場合、一度確定路判定をする。移動の場合も判定するとだいぶ遅くなるので壁おきに制限。
-                                node.already_certain_path_confirmed = True
-                                if is_certain_path_terminate(node.s, (node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
-                                    node.set_is_lose_child_arr_True(np.arange(128))
-                            node_illegal = (node.P == 0.)
-                            if np.all(node_illegal | node.is_lose_child_arr):
+                        if is_win_node:  # 勝ち側は一つでも勝ちに向かう行動があれば勝ちノード
+                            if action not in node.children.keys() or node.children[action].result == win_reward:
                                 node.result = s.pseudo_reward
-                                node.optimal_action = int(np.argmin(node.dist_diff_arr))
-                            else:
-                                break
-                
-            # root_treeの勝敗が決まったら探索を打ち切る
-            if root_tree.result != 0:
-                break
+                                node.optimal_action = action
+                                node_illegal = (node.P == 0.)
+                                
+                                if node_illegal[action]:
+                                    print("!"*100)
+                                    display_cui(state)
+                                    display_cui(node.s)
+                                    print(node.P)
+                                    print(node_illegal)
+                                    print(actionid2str(node.s, action))
+                                    print(actions)
+                                assert not node_illegal[action], actionid2str(node.s, action)
+                                
+                        else:  # 負け側はすべての行動が相手の勝ちになるときに限り負けノード
+                            if action not in node.children.keys() or node.children[action].result == lose_reward:
+                                node.set_is_lose_child_arr(action, True)
 
-        if showNQ:
-            print("p=")
-            display_parameter(np.asarray(root_tree.P * 1000, dtype="int32"))
-            print("N=")
-            display_parameter(np.asarray(root_tree.tree_c.contents.N_arr, dtype="int32"))
-            print("Q=")
-            display_parameter(np.asarray(np.array(root_tree.tree_c.contents.Q_arr) * 1000, dtype="int32"))
-            print("prev v={:.3f}, post v={:.3f}".format(root_v, sum(root_tree.tree_c.contents.W_arr) / sum(root_tree.tree_c.contents.N_arr)))
-            print("root_tree result = {}".format(root_tree.result))
+                                if not node.already_certain_path_confirmed: # 壁置きで負けになる場合、一度確定路判定をする。移動の場合も判定するとだいぶ遅くなるので壁おきに制限。
+                                    node.already_certain_path_confirmed = True
+                                    if is_certain_path_terminate(node.s, (node.s.turn + 1) % 2):  # 負け側ノードが壁置きをしなくても既に相手が確定路により勝ちの場合は、任意の壁置きで負けになることがわかる。
+                                        node.set_is_lose_child_arr_True(np.arange(128))
+                                node_illegal = (node.P == 0.)
+                                if np.all(node_illegal | node.is_lose_child_arr):
+                                    node.result = s.pseudo_reward
+                                    node.optimal_action = int(np.argmin(node.dist_diff_arr))
+                                else:
+                                    break
+                    
+                # root_treeの勝敗が決まったら探索を打ち切る
+                if root_tree.result != 0:
+                    break
+
+            if showNQ:
+                print("p=")
+                display_parameter(np.asarray(root_tree.P * 1000, dtype="int32"))
+                print("N=")
+                display_parameter(np.asarray(root_tree.tree_c.contents.N_arr, dtype="int32"))
+                print("Q=")
+                display_parameter(np.asarray(np.array(root_tree.tree_c.contents.Q_arr) * 1000, dtype="int32"))
+                print("prev v={:.3f}, post v={:.3f}".format(root_v, sum(root_tree.tree_c.contents.W_arr) / sum(root_tree.tree_c.contents.N_arr)))
+                print("root_tree result = {}".format(root_tree.result))
+
+            N_arr = root_tree.tree_c.contents.N_arr
 
         if root_tree.result != 0:  # 勝敗決定の場合
             action = root_tree.optimal_action
@@ -758,12 +765,12 @@ class BasicAI(Agent):
         else:
             x, y = color_p(state, state.turn % 2)
             shortest_move = movable_array_flatten(state, x, y, shortest_only=True)
-            move_N = np.array(root_tree.tree_c.contents.N_arr[128:])
+            move_N = np.array(N_arr[128:])
             move_Q = np.array(root_tree.tree_c.contents.Q_arr[128:])
-            use_shortest = (move_N >= int(sum(root_tree.tree_c.contents.N_arr) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる
+            use_shortest = (move_N >= int(sum(N_arr) * SHORTEST_N_RATIO)) & (move_Q >= SHORTEST_Q)  # 十分探索していて、十分勝ちに近い手なら、できる限り最短路を選ぶことで試合を早く終わらせる
             use_shortest = use_shortest & shortest_move
 
-            N2 = np.array(root_tree.tree_c.contents.N_arr)
+            N2 = np.array(N_arr)
             if np.any(use_shortest):
                 N2[128:] = move_N * use_shortest
 
@@ -823,10 +830,10 @@ class BasicAI(Agent):
                     action_id = dxdy2actionid(move_x, move_y)
                     # print(move_x, move_y, action_id)
 
-                end_mimic = state.turn >= FORCE_MIMIC_TURN and root_tree.tree_c.contents.N_arr[action_id] / sum(root_tree.tree_c.contents.N_arr) <= MIMIC_N_RATIO
+                end_mimic = state.turn >= FORCE_MIMIC_TURN and N_arr[action_id] / sum(N_arr) <= MIMIC_N_RATIO
                 
                 # 合法手でない手を打たないように対策
-                if root_tree.tree_c.contents.N_arr[action_id] == 0:
+                if N_arr[action_id] == 0:
                     end_mimic = True
 
                 if not self.end_mimic and not end_mimic:
@@ -847,9 +854,9 @@ class BasicAI(Agent):
             return action, root_tree
         elif root_tree.result != 0:  # 勝敗決定の場合
             
-            return action, pi, root_v, (sum(root_tree.tree_c.contents.W_arr) + root_v) / (sum(root_tree.tree_c.contents.N_arr) + 1), node_num_expectation
+            return action, pi, root_v, (sum(root_tree.tree_c.contents.W_arr) + root_v) / (sum(N_arr) + 1), node_num_expectation
         else:
-            return action, np.array(root_tree.tree_c.contents.N_arr) / sum(root_tree.tree_c.contents.N_arr), root_v, (sum(root_tree.tree_c.contents.W_arr) + root_v) / (sum(root_tree.tree_c.contents.N_arr) + 1), sum(root_tree.tree_c.contents.N_arr)
+            return action, np.array(N_arr) / sum(N_arr), root_v, (sum(root_tree.tree_c.contents.W_arr) + root_v) / (sum(N_arr) + 1), sum(N_arr)
 
     def get_tree_for_graphviz(self):
         if self.tree_for_visualize is None:
