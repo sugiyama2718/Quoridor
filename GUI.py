@@ -70,6 +70,7 @@ DATA_BASE_DIR = "application_data"
 PARAMETER_PATH = os.path.join(DATA_BASE_DIR, "parameter")
 PLAYER_DATA_DIR = os.path.join(DATA_BASE_DIR, "player_data")
 JOSEKI_PATH = os.path.join(DATA_BASE_DIR, "joseki", "joseki_240310.txt")
+AI_OPENING_TREE_PATH = os.path.join(DATA_BASE_DIR, "ai_opening", "opening_tree.json")
 with open(JOSEKI_PATH, "r") as fin:
     joseki_text = fin.read()
     joseki_list = joseki_text.strip().split("\n")
@@ -464,7 +465,7 @@ class Quoridor(Widget):
                     PARAMETER_PATH, 1, self.search_nodes,
                     self.curiosity, self.level,
                     seed=int(time.time()), p_tau=P_TAU,
-                    post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT
+                    post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT, opening_tree_path=AI_OPENING_TREE_PATH
                 )
                 self.current_agent_settings_p1 = None
                 # モードID, level, curiosity(数値), search_nodes
@@ -474,7 +475,7 @@ class Quoridor(Widget):
                     PARAMETER_PATH, 0, self.search_nodes,
                     self.curiosity, self.level,
                     seed=int(time.time()), p_tau=P_TAU,
-                    post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT
+                    post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT, opening_tree_path=AI_OPENING_TREE_PATH
                 )
                 agent2 = GUIHuman(1)
                 self.current_agent_settings_p1 = (self.mode, self.level, self.curiosity, self.search_nodes)
@@ -485,13 +486,13 @@ class Quoridor(Widget):
                 PARAMETER_PATH, 0,
                 self.search_nodes_1p, self.curiosity_1p, self.level_1p,
                 seed=int(time.time()), p_tau=P_TAU,
-                post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT
+                post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT, opening_tree_path=AI_OPENING_TREE_PATH
             )
             agent2 = prepare_AI(
                 PARAMETER_PATH, 1,
                 self.search_nodes_2p, self.curiosity_2p, self.level_2p,
                 seed=int(time.time()), p_tau=P_TAU,
-                post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT
+                post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT, opening_tree_path=AI_OPENING_TREE_PATH
             )
             self.current_agent_settings_p1 = (self.mode, self.level_1p, self.curiosity_1p, self.search_nodes_1p)
             self.current_agent_settings_p2 = (self.mode, self.level_2p, self.curiosity_2p, self.search_nodes_2p)
@@ -530,13 +531,13 @@ class Quoridor(Widget):
             if self.training_game_num % 2 == 0:
                 self.training_color = 0
                 agent1 = GUIHuman(0)
-                agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
+                agent2 = prepare_AI(PARAMETER_PATH, 1, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT, opening_tree_path=AI_OPENING_TREE_PATH)
                 # AIはp2側
                 self.current_agent_settings_p1 = None
                 self.current_agent_settings_p2 = (self.mode, training_index, 0.32, training_search_nodes)
             else:
                 self.training_color = 1
-                agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT)
+                agent1 = prepare_AI(PARAMETER_PATH, 0, training_search_nodes, 0.32, training_index, seed=int(time.time()), p_tau=P_TAU, post_alpha=POST_ALPHA, post_beta=POST_BETA, C_puct=C_PUCT, opening_tree_path=AI_OPENING_TREE_PATH)
                 agent2 = GUIHuman(1)
                 # AIはp1側
                 self.current_agent_settings_p1 = (self.mode, training_index, 0.32, training_search_nodes)
