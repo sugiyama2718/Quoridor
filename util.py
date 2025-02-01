@@ -341,7 +341,8 @@ def build_graph(node, graph, statevec2node, parent_id=None, edge_label=None):
     # 子ノードに対して再帰的に処理
     for child_key in node.children.keys():
         next_node = move_to_child(node, child_key, statevec2node)
-        build_graph(next_node, graph, statevec2node, node_id, child_key)
+        if next_node is not None:
+            build_graph(next_node, graph, statevec2node, node_id, child_key)
 
 def save_tree_graph(root, statevec2node, path):
     global visited
@@ -610,6 +611,9 @@ def remove_nodes_below_threshold(tree, statevec2node, threshold=1):
             remove_nodes_below_threshold(v, statevec2node, threshold)
 
         child = move_to_child(tree, key, statevec2node)
+        if child is None:
+            continue
+            
         if child.visited_num <= threshold:
             del_list.append(key)
 

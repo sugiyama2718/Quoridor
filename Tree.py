@@ -423,7 +423,11 @@ def move_to_child(node, key, statevec2node):
     if isinstance(node.children[key], OpeningTree):
         node = node.children[key]
     else:
-        node = statevec2node[tuple(node.children[key])]  # node.children[key]がstate_vecになっている
+        state_vec = tuple(node.children[key])
+        if state_vec in statevec2node.keys():
+            node = statevec2node[tuple(node.children[key])]  # node.children[key]がstate_vecになっている
+        else:
+            return None
     return node
 
 
@@ -438,8 +442,8 @@ def load_dict_to_opening_tree(json_dict):
     omit_list = ["fvec", "children", "tree_c"]
     for k, v in json_dict.items():
         if k not in omit_list:
-            if isinstance(v, list):
-                setattr(ret, k, [int(x) for x in v])  # 整数ベクトルに変換して設定
+            if k == "P" or k == "P_without_loss":
+                setattr(ret, k, np.array(v, dtype=np.float32))
             else:
                 setattr(ret, k, v)
 

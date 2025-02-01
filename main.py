@@ -682,10 +682,12 @@ def process_evaluate_data(evaluate_ret, old_AI_id, old_rate, play_num, epoch_now
 
     kifu_tree_p1, statevec2node_p1 = generate_opening_tree([x for i, x in enumerate(kifu) if i % 2 == 0], MAX_DEPTH)
     save_tree_graph(kifu_tree_p1, statevec2node_p1, os.path.join(save_dir, f"p1_{old_AI_id}_sente"))
+    print("game records when p1 is the first player")
     compute_contributions(kifu_tree_p1, statevec2node_p1, len([x for i, x in enumerate(kifu) if i % 2 == 0]), MAX_DEPTH)
 
     kifu_tree_p2, statevec2node_p2 = generate_opening_tree([x for i, x in enumerate(kifu) if i % 2 == 1], MAX_DEPTH)
     save_tree_graph(kifu_tree_p2, statevec2node_p2, os.path.join(save_dir, f"p2_{old_AI_id}_sente"))
+    print("game records when p1 is the second player")
     compute_contributions(kifu_tree_p2, statevec2node_p2, len([x for i, x in enumerate(kifu) if i % 2 == 1]), MAX_DEPTH)
 
     print(f"graph saved at {save_dir}")
@@ -958,9 +960,7 @@ if __name__ == '__main__':
         os.makedirs(dir, exist_ok=True)
 
     np.seterr(divide='raise', invalid='raise')
-    search_nodes = SELFPLAY_SEARCHNODES_MIN
-    if len(sys.argv) >= 3:
-        search_nodes = int(sys.argv[2])
+    search_nodes = args.search_nodes
 
     if sys.argv[1] == "train":
         learn(search_nodes)
@@ -972,9 +972,10 @@ if __name__ == '__main__':
     elif sys.argv[1] == "view":
         epoch = 15000
         #opening_tree_path = os.path.join(AI_JOSEKI_DIR, "250119_independent", "opening_tree.json")
-        opening_tree_path = AI_OPENING_TREE_DEFAULT_PATH
-        AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.25, seed=100, opening_tree_path=opening_tree_path), 
-        CNNAI(1, search_nodes=search_nodes, tau=0.25, seed=100, opening_tree_path=opening_tree_path)]
+        #opening_tree_path = AI_OPENING_TREE_DEFAULT_PATH
+        opening_tree_path = os.path.join(AI_JOSEKI_DIR, "250128_2", "opening_tree.json")
+        AIs = [CNNAI(0, search_nodes=search_nodes, tau=EVALUATION_TAU, seed=100, opening_tree_path=opening_tree_path, p_tau=0.7, post_alpha=2.0, post_beta=5.0), 
+        CNNAI(1, search_nodes=search_nodes, tau=EVALUATION_TAU, seed=100, opening_tree_path=opening_tree_path, p_tau=0.7, post_alpha=2.0, post_beta=5.0)]
         #AIs = [CNNAI(0, search_nodes=search_nodes, tau=0.5, seed=100), CNNAI(1, search_nodes=search_nodes, tau=0.5, seed=100, is_mimic_AI=True)]
         # AIs[0].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
         # AIs[1].load(os.path.join(PARAMETER_DIR, "train_experiment.ckpt"))
@@ -1012,13 +1013,16 @@ if __name__ == '__main__':
             print("============={}==============".format(i))
             normal_play(AIs)
     elif sys.argv[1] == "evaluate":
+        search_nodes_eval = args.search_nodes
         def evaluate_2game_process(seed):
             # 先後で２試合して勝利数を返す
             epoch1 = 15000
             epoch2 = 15000
-            search_nodes_eval = 500
-            opening_tree_path = os.path.join(AI_JOSEKI_DIR, "250119_independent", "opening_tree.json")
+
+            #opening_tree_path = os.path.join(AI_JOSEKI_DIR, "250119_independent", "opening_tree.json")
+            opening_tree_path = os.path.join(AI_JOSEKI_DIR, "250128_2", "opening_tree.json")
             #opening_tree_path = AI_OPENING_TREE_DEFAULT_PATH
+            #opening_tree_path = None  # 定石なし
             AIs = [CNNAI(0, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, p_tau=0.7, post_alpha=2.0, post_beta=5.0), 
             CNNAI(1, search_nodes=search_nodes_eval, tau=EVALUATION_TAU, seed=seed, opening_tree_path=opening_tree_path, p_tau=0.7, post_alpha=2.0, post_beta=5.0)]
             #AIs = [CNNAI(0, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed), CNNAI(1, search_nodes=EVALUATION_SEARCHNODES, tau=EVALUATION_TAU, seed=seed)]
@@ -1029,6 +1033,8 @@ if __name__ == '__main__':
             ret = evaluate(AIs, 2, multiprocess=True, display=False, return_detail=True)
             del AIs
             return ret
+        print("search_nodes =", search_nodes_eval)
+        print("OPENING_TREE_COEF =", OPENING_TREE_COEF)
         play_num = 500
         play_num_half = play_num // 2
         with Pool(processes=4) as p:
