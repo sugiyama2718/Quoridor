@@ -1,6 +1,7 @@
 import copy
-import os
+import os, sys
 import json
+import argparse
 
 # 学習設定 large 学習本番
 POOL_SIZE = 60000  # 学習のときにサンプルする対象となる試合数
@@ -142,7 +143,14 @@ OPENING_TURN = 20  # 何ターンを前半とみなすか
 
 MAX_PAST_GAMES = 20  # 過去の棋譜をいくつ覚えるか
 
-OPENING_TREE_COEF = 2.0  # 定石中の勝利を何回の探索分にするか
+# argparse のパーサーを作成（description は任意）
+parser = argparse.ArgumentParser()
+# 追加の引数を定義
+parser.add_argument('--search_nodes', type=int, default=SELFPLAY_SEARCHNODES_MIN, help='検索ノードの数（整数）')
+parser.add_argument('--OPENING_TREE_COEF', type=float, default=100.0, help='オープニングツリー係数（浮動小数点数）')
+args = parser.parse_args(sys.argv[2:])
+
+OPENING_TREE_COEF = args.OPENING_TREE_COEF  # 定石中の勝利を何回の探索分にするか
 OPENING_P_ALPHA = 2.0
 OPENING_P_BETA = 5.0
 OPENING_P_TAU = 0.48
