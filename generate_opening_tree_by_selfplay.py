@@ -144,11 +144,12 @@ def main():
         'p_tau': 0.7,
         'post_alpha': 2.0,
         'post_beta': 5.0,
-        'use_recent_move_vec': True
+        'use_recent_move_vec': True,
+        'opening_tree_path': None
     }
 
     PROCESS_NUM = 4
-    CYCLE_NUM = 50
+    CYCLE_NUM = 125
     MAX_DEPTH = 200  # AI向け定石なので、必要があればいくらでも深く探索させたい
 
     # --- 初回だけ generate_opening_tree(空リストで良いなら空でOK) ---

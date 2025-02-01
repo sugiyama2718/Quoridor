@@ -135,7 +135,8 @@ def evaluate_2game_process_2id(arg_tuple):
             p_tau=ai_param_i['p_tau'],
             post_alpha=ai_param_i['post_alpha'],
             post_beta=ai_param_i['post_beta'],
-            use_recent_move_vec=ai_param_i['use_recent_move_vec']
+            use_recent_move_vec=ai_param_i['use_recent_move_vec'],
+            opening_tree_path=ai_param_i['opening_tree_path']
         )
     else:
         AI1 = CNNAI(
@@ -147,7 +148,8 @@ def evaluate_2game_process_2id(arg_tuple):
             p_tau=ai_param_i['p_tau'],
             post_alpha=ai_param_i['post_alpha'],
             post_beta=ai_param_i['post_beta'],
-            use_recent_move_vec=ai_param_i['use_recent_move_vec']
+            use_recent_move_vec=ai_param_i['use_recent_move_vec'],
+            opening_tree_path=ai_param_i['opening_tree_path']
         )
         AI1.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(ai_param_i['AI_id']), "epoch{}.ckpt".format(ai_param_i['AI_id'])))
 
@@ -164,7 +166,8 @@ def evaluate_2game_process_2id(arg_tuple):
             p_tau=ai_param_j['p_tau'],
             post_alpha=ai_param_j['post_alpha'],
             post_beta=ai_param_j['post_beta'],
-            use_recent_move_vec=ai_param_j['use_recent_move_vec']
+            use_recent_move_vec=ai_param_j['use_recent_move_vec'],
+            opening_tree_path=ai_param_j['opening_tree_path']
         )
     else:
         AI2 = CNNAI(
@@ -176,7 +179,8 @@ def evaluate_2game_process_2id(arg_tuple):
             p_tau=ai_param_j['p_tau'],
             post_alpha=ai_param_j['post_alpha'],
             post_beta=ai_param_j['post_beta'],
-            use_recent_move_vec=ai_param_j['use_recent_move_vec']
+            use_recent_move_vec=ai_param_j['use_recent_move_vec'],
+            opening_tree_path=ai_param_j['opening_tree_path']
         )
         AI2.load(os.path.join(PARAMETER_DIR, get_epoch_dir_name(ai_param_j['AI_id']), "epoch{}.ckpt".format(ai_param_j['AI_id'])))
 
@@ -279,37 +283,25 @@ if __name__ == "__main__":
             'p_tau': 0.7,
             'post_alpha': 2.0,
             'post_beta': 5.0,
-            'use_recent_move_vec': True
+            'use_recent_move_vec': True,
+            'opening_tree_path': None
         }
         ai_parameters.append(ai_param)
         config_counter += 1
 
     # 実験: 
-    for AI_id in AI_id_list[-8:]:
+    for AI_id in AI_id_list:
         ai_param = {
             'config_id': config_counter,  # 内部識別用ID
             'AI_id': AI_id,
-            'search_nodes': 1000,
+            'search_nodes': SEARCHNODES_FOR_EXTRACT,
             'C_puct': 2.5,
             'tau': default_tau,
             'p_tau': 0.7,
             'post_alpha': 2.0,
             'post_beta': 5.0,
-            'use_recent_move_vec': True
-        }
-        ai_parameters.append(ai_param)
-        config_counter += 1
-    for AI_id in AI_id_list[-8:]:
-        ai_param = {
-            'config_id': config_counter,  # 内部識別用ID
-            'AI_id': AI_id,
-            'search_nodes': 2000,
-            'C_puct': 2.5,
-            'tau': default_tau,
-            'p_tau': 0.7,
-            'post_alpha': 2.0,
-            'post_beta': 5.0,
-            'use_recent_move_vec': True
+            'use_recent_move_vec': True,
+            'opening_tree_path': os.path.join(AI_JOSEKI_DIR, "250128_3", "opening_tree.json")
         }
         ai_parameters.append(ai_param)
         config_counter += 1
@@ -358,7 +350,7 @@ if __name__ == "__main__":
             # ここでai_parameters[i], ai_parameters[j]を渡す
             args.append((i, j, ai_parameters[i], ai_parameters[j], 
             action_lists_sente_dict[i][-MAX_PAST_GAMES:], action_lists_sente_dict[j][-MAX_PAST_GAMES:], action_lists_gote_dict[i][-MAX_PAST_GAMES:], action_lists_gote_dict[j][-MAX_PAST_GAMES:], 
-            (k + total_game_num) * 10000, wait_time_list[k], []))
+            (k + total_game_num) * 10000, wait_time_list[k], None))
 
         with Pool(processes=PROCESS_NUM) as p:
             imap = p.imap(func=evaluate_2game_process_2id, iterable=args)
@@ -453,6 +445,7 @@ if __name__ == "__main__":
             "post_alpha": [param['post_alpha'] for param in survived_ai_params],
             "post_beta": [param['post_beta'] for param in survived_ai_params],
             "use_recent_move_vec": [param['use_recent_move_vec'] for param in survived_ai_params],
+            "opening_tree_path": [str(param['opening_tree_path']) for param in survived_ai_params],
             "rate": estimated_r_arr[survived_list],
             "sente_win_num": sente_win_nums,
             "gote_win_num": gote_win_nums,
