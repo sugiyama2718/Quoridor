@@ -803,6 +803,12 @@ class BasicAI(Agent):
             else:
                 N2 = np.power(np.asarray(N2, dtype="float64"), 1. / tau)
             pi = N2 / np.sum(N2)
+            if showNQ:
+                print("entropy =", -np.sum(pi * np.log(pi + 1e-10)))
+                # CSVファイルに追記する（np.savetxtの場合は、書き込む行は2次元配列にする必要がある）
+                with open('N_arr_evolution.csv', 'a') as f:
+                    # fmt は小数点以下の表示桁数など、必要に応じて調整してください
+                    np.savetxt(f, [N_arr], delimiter=',', fmt='%d')
 
             if recent_move_vec is not None and self.use_recent_move_vec:
                 action = adaptive_next_sample(pi, recent_move_vec, 5.0)

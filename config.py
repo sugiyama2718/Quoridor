@@ -78,6 +78,8 @@ EVAL_DETAIL_DIR = "train_results/eval_detail"
 
 AI_OPENING_TREE_DEFAULT_PATH = os.path.join(AI_JOSEKI_DIR, "opening_tree.json")
 
+EXPERIMENT_RESULTS_DIR = "experiment_results"
+
 EPOCH_DIR_UNIT = 1000  # 何epochごとにディレクトリを作成するか
 SAVE_CYCLE = 5  # 何epochごとに保存するか
 SAVE_FIRST_EPOCH_NUM = 100  # 
@@ -154,6 +156,7 @@ OPENING_TREE_COEF = args.OPENING_TREE_COEF  # 定石中の勝利を何回の探�
 OPENING_P_ALPHA = 2.0
 OPENING_P_BETA = 5.0
 OPENING_P_TAU = 0.48
+OPENING_BIAS_FOR_CALC_Q = 10
 
 V_REGULARIZER = 0.1
 P_REGULARIZER = 0.01
