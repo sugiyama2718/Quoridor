@@ -44,9 +44,9 @@ def get_opening_node_from_state(state, statevec2node):
     return ret
 
 
-def calc_Q(N, W):
-    N_plus = N + 6
-    W_plus = W + 3
+def calc_Q(N, W, estimated_V):
+    N_plus = N + OPENING_BIAS_FOR_CALC_Q
+    W_plus = W + OPENING_BIAS_FOR_CALC_Q * (estimated_V + 1) / 2
     return 2 * (W_plus / N_plus - 0.5)
 
 
@@ -60,7 +60,8 @@ def _build_opening_tree_core(
     max_depth,
     target_epoch=None,
     disable_tqdm=False,
-    pi_lists=None
+    pi_lists=None,
+    estimated_V=0.0
 ):
     """
     OpeningTreeとstatevec2nodeに対し、kifu_list(複数ゲーム)を反映させる。
@@ -225,28 +226,28 @@ def _build_opening_tree_core(
                 if aid != -1:
                     parent_node.tree_c.contents.N_arr[aid] += 1
                     parent_node.tree_c.contents.W_arr[aid] += int(is_sente_win == 1)
-                    parent_node.tree_c.contents.Q_arr[aid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
+                    parent_node.tree_c.contents.Q_arr[aid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid], estimated_V)
                 if maid != -1:
                     parent_node.tree_c.contents.N_arr[maid] += 1
                     parent_node.tree_c.contents.W_arr[maid] += int(is_sente_win == 1)
-                    parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[maid], parent_node.tree_c.contents.W_arr[maid])
+                    parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[maid], parent_node.tree_c.contents.W_arr[maid], estimated_V)
             else:
                 # 非対称
                 if is_normal:
                     if aid != -1:
                         parent_node.tree_c.contents.N_arr[aid] += 2
                         parent_node.tree_c.contents.W_arr[aid] += 2 * int(is_sente_win == 1)
-                        parent_node.tree_c.contents.Q_arr[aid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid])
+                        parent_node.tree_c.contents.Q_arr[aid] = calc_Q(parent_node.tree_c.contents.N_arr[aid], parent_node.tree_c.contents.W_arr[aid], estimated_V)
                 else:
                     if maid != -1:
                         parent_node.tree_c.contents.N_arr[maid] += 2
                         parent_node.tree_c.contents.W_arr[maid] += 2 * int(is_sente_win == 1)
-                        parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[maid], parent_node.tree_c.contents.W_arr[maid])
+                        parent_node.tree_c.contents.Q_arr[maid] = calc_Q(parent_node.tree_c.contents.N_arr[maid], parent_node.tree_c.contents.W_arr[maid], estimated_V)
 
     return opening_tree, statevec2node
 
 
-def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_tqdm=False, pi_lists=None):
+def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_tqdm=False, pi_lists=None, estimated_V=0.0):
     """
     初回など、空のOpeningTreeを作って、all_kifu_listを1からビルドする。
     """
@@ -273,14 +274,15 @@ def generate_opening_tree(all_kifu_list, max_depth, target_epoch=None, disable_t
                              max_depth=max_depth,
                              target_epoch=target_epoch,
                              disable_tqdm=disable_tqdm,
-                             pi_lists=pi_lists)
+                             pi_lists=pi_lists,
+                             estimated_V=estimated_V)
 
     return root_node, statevec2node
 
 
 def update_opening_tree_with_new_kifu(opening_tree, statevec2node,
                                       new_kifu_list, max_depth,
-                                      target_epoch=None, disable_tqdm=False, pi_lists=None):
+                                      target_epoch=None, disable_tqdm=False, pi_lists=None, estimated_V=0.0):
     """
     既存のopening_treeとstatevec2nodeに対して、新しい棋譜(new_kifu_list)だけを処理して差分更新する。
     """
@@ -295,7 +297,8 @@ def update_opening_tree_with_new_kifu(opening_tree, statevec2node,
                              max_depth=max_depth,
                              target_epoch=target_epoch,
                              disable_tqdm=disable_tqdm,
-                             pi_lists=pi_lists)
+                             pi_lists=pi_lists,
+                             estimated_V=estimated_V)
     return opening_tree, statevec2node
 
 
@@ -603,22 +606,38 @@ def traverse_opening_tree_and_print(tree, actions):
 
 
 def remove_nodes_below_threshold(tree, statevec2node, threshold=1):
-    """treeにルートノード、"""
-
-    del_list = []
-    for key, v in tree.children.items():
-        if isinstance(v, OpeningTree):
-            remove_nodes_below_threshold(v, statevec2node, threshold)
-
+    """
+    ツリーの各枝について、子ノードが存在しない（move_to_child() が None を返す）、
+    または子ノードの visited_num が threshold 以下の場合、その枝を削除する。
+    削除対象の子ノードが存在する場合は、対応する statevec2node のエントリも削除する。
+    また、有効な子ノードについては、親の children 辞書に直接ノードの参照（OpeningTree オブジェクト）を設定する。
+    
+    これにより、後続の処理で _build_opening_tree_core() 等から子ノードにアクセスした際、
+    None を返す枝が残らないようにする。
+    
+    Parameters:
+        tree (OpeningTree): 現在のサブツリーのルートノード。
+        statevec2node (dict): ノードの fvec をキーとし、ノードへの参照を保持する辞書。
+        threshold (int): visited_num の閾値。visited_num <= threshold のノードは削除対象となる。
+    """
+    # children 辞書のキーリストのコピーを使って安全に反復処理
+    for key in list(tree.children.keys()):
+        # move_to_child() により実際の子ノードを取得する
         child = move_to_child(tree, key, statevec2node)
-        if child is None:
-            continue
-            
-        if child.visited_num <= threshold:
-            del_list.append(key)
-
-    for key in del_list:
-        del tree.children[key]
+        
+        # 子ノードが存在しない、または visited_num が threshold 以下の場合
+        if child is None or child.visited_num <= threshold:
+            if child is not None and hasattr(child, 'fvec'):
+                if child.fvec in statevec2node:
+                    del statevec2node[child.fvec]
+            # 親ノードの枝から削除
+            del tree.children[key]
+        else:
+            # 有効な子ノードの場合は、親の children 辞書に直接ノード参照を設定する
+            tree.children[key] = child
+            # 子ノードが OpeningTree であれば、再帰的に同じ処理を実施
+            if isinstance(child, OpeningTree):
+                remove_nodes_below_threshold(child, statevec2node, threshold)
 
 
 def MCTS_select(root_tree, C_puct, estimated_V, color):
@@ -740,6 +759,13 @@ def update_array_with_beta(N2, alpha, beta):
     updated_N2 = N2_sum * weighted_by_beta(pi_prev, alpha, beta)
     
     return updated_N2
+
+
+def set_statevec2node(opening_tree, statevec2node):
+    opening_tree.statevec2node = statevec2node
+    for key, node in opening_tree.children.items():
+        if isinstance(node, OpeningTree):
+            set_statevec2node(node, statevec2node)
 
 
 if __name__ == "__main__":
