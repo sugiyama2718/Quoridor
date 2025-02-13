@@ -110,7 +110,7 @@ def actionid2str(state, action_id):
 def actionid2str_statevec(statevec, action_id):
     """
     statevecを受け取るバージョン。
-    statevec は feature_int(state).flatten() して得られる tuple とする。
+    statevec は get_state_vec(state) して得られる tuple とする。
     
     statevec の各要素の意味は以下の通り:
       index 0 : state.Bx

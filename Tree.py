@@ -285,8 +285,8 @@ def get_normalized_state(action_list):
     state = get_state_from_action_list(action_list)
     mirror_state = get_state_from_action_list(mirror_action_list)
 
-    state_vec = tuple(feature_int(state).flatten())
-    mirror_state_vec = tuple(feature_int(mirror_state).flatten())
+    state_vec = get_state_vec(state)
+    mirror_state_vec = get_state_vec(mirror_state)
 
     if state_vec <= mirror_state_vec:
         return state, state_vec, False
@@ -393,8 +393,8 @@ def get_normalized_official_s(actions, nodes):
         is_success = is_success and accept_action_str(s, action_str)
         is_success = is_success and accept_action_str(mirror_s, mirror_action_str)
 
-        state_vec = tuple(feature_int(s).flatten())
-        mirror_state_vec = tuple(feature_int(mirror_s).flatten())
+        state_vec = get_state_vec(s)
+        mirror_state_vec = get_state_vec(mirror_s)
 
         is_mirrored = (state_vec > mirror_state_vec)
         is_mirror_list.append(is_mirrored)
@@ -470,3 +470,8 @@ def load_dict_to_opening_tree(json_dict):
             ret.children[k] = v
 
     return ret
+
+
+def get_state_vec(state):
+    # stateを固定長タプルにしてdictのkeyにするために使う。state.turnを入れているのは、turnの異なる状態を区別して無限ループを避けるため
+    return tuple([state.turn] + list(feature_int(state).flatten()))

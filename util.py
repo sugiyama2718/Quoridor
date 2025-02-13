@@ -1,9 +1,9 @@
 import os
 import graphviz
 import math
-from Tree import OpeningTree, Tree_c, move_to_child, mirror_action, Glendenning2Official, Official2Glendenning, get_normalized_action_list, get_normalized_state, get_state_from_action_list, get_flipped_index, transform_x_to_symmetric
+from Tree import OpeningTree, Tree_c, move_to_child, mirror_action, Glendenning2Official, Official2Glendenning, get_normalized_action_list, get_normalized_state, get_state_from_action_list, get_flipped_index, transform_x_to_symmetric, get_state_vec
 from tqdm import tqdm
-from State import State, State_init, accept_action_str, feature_int
+from State import State, State_init, accept_action_str
 from config import *
 from collections import defaultdict
 import numpy as np
@@ -35,7 +35,7 @@ os.makedirs(RECORDS_PATH, exist_ok=True)
 
 def get_opening_node_from_state(state, statevec2node):
     # 既に登録済みの場合はstate_vecを返す
-    state_vec = tuple(feature_int(state).flatten())  # MCTSのときと違いターン数を区別しない。
+    state_vec = get_state_vec(state)
     if state_vec in statevec2node.keys():
         ret = state_vec
     else:
@@ -133,8 +133,8 @@ def _build_opening_tree_core(
             maid = str2actionid(mirror_state, mirror_action_str)
 
             # 局面比較
-            prev_state_vec = tuple(feature_int(state).flatten())
-            prev_mirror_state_vec = tuple(feature_int(mirror_state).flatten())
+            prev_state_vec = get_state_vec(state)
+            prev_mirror_state_vec = get_state_vec(mirror_state)
 
             # 左右対称判定
             symmetrical = (prev_state_vec == prev_mirror_state_vec)
@@ -144,8 +144,8 @@ def _build_opening_tree_core(
             accept_action_str(mirror_state, mirror_action_str, check_placable=False, calc_placable_array=False, check_movable=False)
 
             # 局面比較
-            state_vec = tuple(feature_int(state).flatten())
-            mirror_state_vec = tuple(feature_int(mirror_state).flatten())
+            state_vec = get_state_vec(state)
+            mirror_state_vec = get_state_vec(mirror_state)
 
             # normalized_state
             if state_vec <= mirror_state_vec:
@@ -452,11 +452,11 @@ def get_recent_move_distribution(past_games, action_list):
     """
     # 現在の局面
     state = get_state_from_action_list(action_list)
-    state_vec = tuple(feature_int(state).flatten())
+    state_vec = get_state_vec(state)
 
     mirror_action_list = list(map(mirror_action, action_list))
     mirror_state = get_state_from_action_list(mirror_action_list)
-    mirror_state_vec = tuple(feature_int(mirror_state).flatten())
+    mirror_state_vec = get_state_vec(mirror_state)
 
     # 対称性判定
     symmetrical = (state_vec == mirror_state_vec)
@@ -607,37 +607,51 @@ def traverse_opening_tree_and_print(tree, actions):
 
 def remove_nodes_below_threshold(tree, statevec2node, threshold=1):
     """
-    ツリーの各枝について、子ノードが存在しない（move_to_child() が None を返す）、
-    または子ノードの visited_num が threshold 以下の場合、その枝を削除する。
-    削除対象の子ノードが存在する場合は、対応する statevec2node のエントリも削除する。
-    また、有効な子ノードについては、親の children 辞書に直接ノードの参照（OpeningTree オブジェクト）を設定する。
+    ツリー内の不要なノードを削除するため、以下の３段階を実施する。
     
-    これにより、後続の処理で _build_opening_tree_core() 等から子ノードにアクセスした際、
-    None を返す枝が残らないようにする。
+    1. opening_tree全体を走査し、削除対象となるノード（visited_num <= threshold）の
+       fvecを収集する。
+    2. 収集した fvec をキーとして、statevec2node から該当ノードのエントリを削除する。
+    3. opening_tree全体を走査し、各ノードの children 辞書について、move_to_child() の結果が
+       None となるキー（＝有効な子ノードにアクセスできない枝）を削除する。また、有効な場合は、
+       直接のノード参照に更新する。
     
     Parameters:
-        tree (OpeningTree): 現在のサブツリーのルートノード。
-        statevec2node (dict): ノードの fvec をキーとし、ノードへの参照を保持する辞書。
-        threshold (int): visited_num の閾値。visited_num <= threshold のノードは削除対象となる。
+        tree (OpeningTree): 走査開始のルートノード。
+        statevec2node (dict): ノードの fvec をキーとして、各 OpeningTree ノードの参照を保持する辞書。
+        threshold (int): visited_num の閾値。visited_num <= threshold のノードを削除対象とする。
     """
-    # children 辞書のキーリストのコピーを使って安全に反復処理
-    for key in list(tree.children.keys()):
-        # move_to_child() により実際の子ノードを取得する
-        child = move_to_child(tree, key, statevec2node)
-        
-        # 子ノードが存在しない、または visited_num が threshold 以下の場合
-        if child is None or child.visited_num <= threshold:
-            if child is not None and hasattr(child, 'fvec'):
-                if child.fvec in statevec2node:
-                    del statevec2node[child.fvec]
-            # 親ノードの枝から削除
-            del tree.children[key]
-        else:
-            # 有効な子ノードの場合は、親の children 辞書に直接ノード参照を設定する
-            tree.children[key] = child
-            # 子ノードが OpeningTree であれば、再帰的に同じ処理を実施
+    # -------------------------
+    # ステップ1: 削除対象の fvec を収集する
+    deletion_targets = set()
+    
+    def collect_deletion_targets(node):
+        if node.visited_num <= threshold:
+            deletion_targets.add(node.fvec)
+        for key, child in node.children.items():
             if isinstance(child, OpeningTree):
-                remove_nodes_below_threshold(child, statevec2node, threshold)
+                collect_deletion_targets(child)
+                
+    collect_deletion_targets(tree)
+    
+    # -------------------------
+    # ステップ2: statevec2node から削除対象のノードを削除する
+    for fvec in deletion_targets:
+        if fvec in statevec2node:
+            del statevec2node[fvec]
+    
+    # -------------------------
+    # ステップ3: opening_tree の各ノードの children を走査し、None となっている枝を削除する
+    def clean_children(node):
+        for key, value in list(node.children.items()):
+            child = move_to_child(node, key, statevec2node)
+            if child is None or child.visited_num <= threshold:
+                del node.children[key]
+            else:
+                if isinstance(value, OpeningTree):
+                    clean_children(child)
+
+    clean_children(tree)
 
 
 def MCTS_select(root_tree, C_puct, estimated_V, color):

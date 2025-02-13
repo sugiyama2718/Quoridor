@@ -3,7 +3,7 @@
 from Agent import Agent, actionid2str, move_id2dxdy, is_jump_move, dxdy2actionid, str2actionid
 from Tree import Tree, Tree_c
 import State
-from State import State, State_init, color_p, movable_array, movable_array_flatten, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_flatten_array, calc_dist_array, display_cui, feature_int, get_arrays_for_feature_CNN
+from State import State, State_init, color_p, movable_array, movable_array_flatten, accept_action_str, BOARD_LEN, get_player_dist_from_goal, is_certain_path_terminate, placable_flatten_array, calc_dist_array, display_cui, get_arrays_for_feature_CNN
 import numpy as np
 import copy
 from graphviz import Digraph
@@ -12,9 +12,8 @@ from itertools import product
 import time
 from pprint import pprint
 import random
-from config import N_PARALLEL, SHORTEST_N_RATIO, SHORTEST_Q
 from config import *
-from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter, get_normalized_state, load_statevec2node, traverse_opening_tree_and_print, transform_x_to_symmetric, select_and_get_nodess_and_actionss, get_normalized_action_list, update_array_with_beta
+from util import Glendenning2Official, Official2Glendenning, adaptive_next_sample, display_parameter, get_normalized_state, load_statevec2node, traverse_opening_tree_and_print, transform_x_to_symmetric, select_and_get_nodess_and_actionss, get_normalized_action_list, update_array_with_beta, get_state_vec
 import ctypes
 from Tree import load_dict_to_opening_tree
 
@@ -44,11 +43,6 @@ mult_int_arr.restype = None
 mult_float_arr = lib.multFloatArr
 mult_float_arr.argtypes = [ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float)]
 mult_float_arr.restype = None
-
-
-def get_state_vec(state):
-    # stateを固定長タプルにしてdictのkeyにするために使う。state.turnを入れているのは、turnの異なる状態を区別して無限ループを避けるため
-    return tuple([state.turn] + list(feature_int(state).flatten()))
 
 
 def get_state_vec_from_tree(tree):

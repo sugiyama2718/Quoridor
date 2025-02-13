@@ -19,13 +19,14 @@ from util import (
     compute_contributions, update_opening_tree_with_new_kifu, MCTS_select,
     remove_nodes_below_threshold, select_and_get_nodess_and_actionss,
     get_normalized_action_list, mirror_action, update_array_with_beta,
-    display_parameter, get_flipped_index, load_statevec2node, set_statevec2node
+    display_parameter, get_flipped_index, load_statevec2node, set_statevec2node, get_state_vec
 )
 tf.get_logger().setLevel(logging.ERROR)
-from State import State, accept_action_str, State_init, feature_int
+from State import State, accept_action_str, State_init
 from Tree import Glendenning2Official, load_dict_to_opening_tree
 from Agent import actionid2str, str2actionid
 from extract_good_AIs import evaluate_2game_process_2id
+import gc
 
 import json  # JSON入出力用
 
@@ -75,8 +76,8 @@ def selfplay_cycle(
             is_success = is_success and accept_action_str(s, action_str)
             is_success = is_success and accept_action_str(mirror_s, mirror_action_str)
 
-            state_vec = tuple(feature_int(s).flatten())
-            mirror_state_vec = tuple(feature_int(mirror_s).flatten())
+            state_vec = get_state_vec(s)
+            mirror_state_vec = get_state_vec(mirror_s)
 
             is_mirrored = (state_vec > mirror_state_vec)
 
@@ -93,9 +94,9 @@ def selfplay_cycle(
                 for node, action in zip(nodes, actions):
                     print("-"*30)
                     print(action)
-                    print(display_parameter(np.array(node.P * 1000, dtype=int)))
-                    print(display_parameter(np.array(node.tree_c.contents.N_arr, dtype=int)))
-                    print(display_parameter(np.array(np.array(node.tree_c.contents.Q_arr) * 1000, dtype=int)))
+                    display_parameter(np.array(node.P * 1000, dtype=int))
+                    display_parameter(np.array(node.tree_c.contents.N_arr, dtype=int))
+                    display_parameter(np.array(np.array(node.tree_c.contents.Q_arr) * 1000, dtype=int))
 
     actionss = new_actionss
 
@@ -155,8 +156,9 @@ def main():
     }
 
     PROCESS_NUM = 4
-    CYCLE_NUM = 250
+    CYCLE_NUM = 1250
     MAX_DEPTH = 200  # AI向け定石なので、必要があればいくらでも深く探索させたい
+    REMOVE_CYCLE_PERIOD = 50  # 何回に一回、探索数の少ないノードを削除するか
 
     # --- 既存のopening_treeがあればjsonから読み込み、なければ初期生成 ---
     if os.path.exists(AI_OPENING_TREE_DEFAULT_PATH):
@@ -203,10 +205,15 @@ def main():
         # 確認用
         print(f"  Cycle {cycle_id+1}: OpeningTree root.visited_num = {opening_tree.visited_num}")
 
-        # 定期的に（例：50サイクルごと）コンパクト化と保存を実施
-        if (cycle_id + 1) % 50 == 0:
+        # 定期的にコンパクト化と保存を実施
+        if (cycle_id + 1) % REMOVE_CYCLE_PERIOD == 0:
             print("  --- 定期コンパクト化および中間保存を実施中 ---")
             remove_nodes_below_threshold(opening_tree, statevec2node)
+            print("remove_nodes_below_threshold done")
+            # statevec2node = load_statevec2node(opening_tree)  # 念の為再度statevec2nodeを作り直し
+            # print("load_statevec2node done")
+            # set_statevec2node(opening_tree, statevec2node)
+            
             # 中間保存ファイル（保存処理に時間がかかるため、頻繁にならないようにremove_nodes_below_thresholdと同期）
             intermediate_path = os.path.join(AI_JOSEKI_DIR, f"opening_tree_cycle_{cycle_id+1}.json")
             with open(intermediate_path, "w") as fout:
@@ -214,13 +221,16 @@ def main():
             # メインの定石木jsonも更新
             with open(AI_OPENING_TREE_DEFAULT_PATH, "w") as fout:
                 json.dump(opening_tree.to_dict(), fout)
+            print("saved opening_tree")
+            
+        gc.collect()  # ガベージコレクションを明示的に実行
 
     print("\nAll cycles finished.")
     print(f"Total kifu count: {len(all_kifu_list_global)}")
 
     # 最終的に一度コンパクト化して保存
     remove_nodes_below_threshold(opening_tree, statevec2node)
-    save_tree_graph(opening_tree, statevec2node, os.path.join(AI_JOSEKI_DIR, "opening_tree_graph"))
+    #save_tree_graph(opening_tree, statevec2node, os.path.join(AI_JOSEKI_DIR, "opening_tree_graph"))
     with open(AI_OPENING_TREE_DEFAULT_PATH, "w") as fout:
         json.dump(opening_tree.to_dict(), fout)
 
