@@ -51,7 +51,7 @@ def selfplay_cycle(
         actionss = [[]] * game_num  # 初期局面の場合のみ、空リストで埋める
         nodess = [None] * game_num
     else:
-        nodess, actionss = select_and_get_nodess_and_actionss(opening_tree, 10.0, estimated_V, 0, game_num, game_num, 1)
+        nodess, actionss = select_and_get_nodess_and_actionss(opening_tree, 10.0, estimated_V, 0, game_num, game_num, 1, adjust_p_tau=True)
 
     new_actionss = []
     for nodes, actions in zip(nodess, actionss):
@@ -144,7 +144,7 @@ def main():
     ai_param = {
         'config_id': 0,
         'AI_id': 15000,
-        'search_nodes': 1000,
+        'search_nodes': 5000,
         'C_puct': 2.5,
         'tau': 0.32,
         #'tau': 0.72,
@@ -156,7 +156,7 @@ def main():
     }
 
     PROCESS_NUM = 4
-    CYCLE_NUM = 1250
+    CYCLE_NUM = 10000
     MAX_DEPTH = 200  # AI向け定石なので、必要があればいくらでも深く探索させたい
     REMOVE_CYCLE_PERIOD = 50  # 何回に一回、探索数の少ないノードを削除するか
 

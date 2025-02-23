@@ -654,7 +654,7 @@ def remove_nodes_below_threshold(tree, statevec2node, threshold=1):
     clean_children(tree)
 
 
-def MCTS_select(root_tree, C_puct, estimated_V, color):
+def MCTS_select(root_tree, C_puct, estimated_V, color, adjust_p_tau=False):
     t = root_tree
     nodes = []
     actions = []
@@ -666,11 +666,20 @@ def MCTS_select(root_tree, C_puct, estimated_V, color):
             print(actions)
             assert False, "t.P is None is not expected"
 
+        if adjust_p_tau:
+            root_V = (np.sum(t.tree_c.contents.W_arr) + 0.5) / (np.sum(t.tree_c.contents.N_arr) + 1)
+            root_V = root_V if root_V > 0 else 0.0  # 勝利側だけtauを調整する
+            p_tau = 1.0 - 0.6 * root_V
+            P = np.power(t.P_without_loss, p_tau)
+            P /= np.sum(P)
+        else:
+            P = t.P_without_loss
+
         # t.get_turn() で手番を取得し、子ノードには t.move_to_child(a) で移動
         a = select_action(
             t.tree_c.contents.Q_arr,
             t.tree_c.contents.N_arr,
-            t.P_without_loss.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+            P.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             C_puct,
             estimated_V,
             color,
@@ -690,12 +699,12 @@ def MCTS_select(root_tree, C_puct, estimated_V, color):
             t = t.move_to_child(a, actions, nodes)
 
 
-def select_and_get_nodess_and_actionss(root_tree, C_puct, estimated_V, color, n_parallel, max_node, virtual_loss_n):
+def select_and_get_nodess_and_actionss(root_tree, C_puct, estimated_V, color, n_parallel, max_node, virtual_loss_n, adjust_p_tau=False):
     nodess = []
     actionss = []
 
     for _ in range(min(n_parallel, max_node)):
-        _, _, nodes, actions, _ = MCTS_select(root_tree, C_puct, estimated_V, color)
+        _, _, nodes, actions, _ = MCTS_select(root_tree, C_puct, estimated_V, color, adjust_p_tau)
         if nodes is None:
             break
         nodess.append(nodes)
